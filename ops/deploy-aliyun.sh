@@ -57,7 +57,7 @@ fi
 EOF
 
 echo "==> [3/6] Uploading release bundle to $SSH_HOST:/srv/drop2empire/releases/$SHORT_SHA..."
-ssh -o ConnectTimeout=10 "$SSH_HOST" "mkdir -p /srv/drop2empire/config /srv/drop2empire/tls /srv/drop2empire/releases/$SHORT_SHA && chmod 700 /srv/drop2empire /srv/drop2empire/config && chmod 755 /srv/drop2empire/tls"
+ssh -o ConnectTimeout=10 "$SSH_HOST" "mkdir -p /srv/drop2empire/config /srv/drop2empire/tls /srv/drop2empire/releases/$SHORT_SHA && chmod 755 /srv/drop2empire /srv/drop2empire/tls && chmod 700 /srv/drop2empire/config"
 scp -q "$STAGE_DIR/release.tar.gz" "$SSH_HOST:/srv/drop2empire/releases/$SHORT_SHA/release.tar.gz"
 
 echo "==> [4/6] Building runtime images & rolling out compose project 'drop2empire' on $SSH_HOST..."
@@ -153,18 +153,22 @@ docker compose -p drop2empire \
 ln -sfn "$RELEASE_DIR" /srv/drop2empire/current
 EOF
 
-echo "==> [5/6] Verifying Drop to Empire HTTPS health & API readiness on https://$SSH_HOST:$PUBLIC_PORT..."
+echo "==> [5/6] Verifying Drop to Empire HTTPS health & API readiness on $SSH_HOST:$PUBLIC_PORT..."
+ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s" -- "$SSH_HOST" "$PUBLIC_PORT" <<'EOF'
+set -euo pipefail
+HOST_IP="$1"
+PORT="$2"
 for i in {1..20}; do
-  if curl -fsS "https://$SSH_HOST:$PUBLIC_PORT/readyz" >/dev/null 2>&1; then
+  if curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/readyz" >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
-
-curl -fsS "https://$SSH_HOST:$PUBLIC_PORT/healthz" >/dev/null
-curl -fsS "https://$SSH_HOST:$PUBLIC_PORT/readyz" >/dev/null
-curl -fsS "https://$SSH_HOST:$PUBLIC_PORT/version.json"
+curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/healthz" >/dev/null
+curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/readyz" >/dev/null
+curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/version.json"
 echo ""
+EOF
 
 echo "==> [6/6] Verifying existing Aliyun services (teamie) are 100% healthy and untouched..."
 curl -fsS "https://$SSH_HOST/" -o /dev/null
