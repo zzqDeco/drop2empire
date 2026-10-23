@@ -40,7 +40,7 @@ cp "$ROOT_DIR/apps/web/nginx.conf" "$STAGE_DIR/bundle/nginx.conf"
 cp "$ROOT_DIR/deploy/compose.production.yaml" "$STAGE_DIR/bundle/deploy/compose.production.yaml"
 cp "$ROOT_DIR/deploy/production.env.example" "$STAGE_DIR/bundle/deploy/production.env.example"
 
-tar -C "$STAGE_DIR/bundle" -czf "$STAGE_DIR/release.tar.gz" .
+COPYFILE_DISABLE=1 tar -C "$STAGE_DIR/bundle" -czf "$STAGE_DIR/release.tar.gz" .
 
 echo "==> [2/6] Pre-flight conflict check on $SSH_HOST..."
 ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s" -- "$PUBLIC_PORT" <<'EOF'
@@ -88,12 +88,16 @@ ENVEOF
 fi
 
 # Resolve cached base layers on host to avoid Mainland China Docker Hub timeouts
-ALPINE_BASE=$(docker inspect teamie-identity-1 --format '{{.Image}}' 2>/dev/null || echo "alpine:3.22")
-NGINX_BASE=$(docker inspect teamie-web-1 --format '{{.Image}}' 2>/dev/null || echo "nginx:1.28-alpine")
-PG_BASE=$(docker inspect teamie-postgres-1 --format '{{.Config.Image}}' 2>/dev/null || echo "postgres:17-alpine")
+ALPINE_ID=$(docker inspect teamie-identity-1 --format '{{.Image}}')
+NGINX_ID=$(docker inspect teamie-web-1 --format '{{.Image}}')
+PG_ID=$(docker inspect teamie-postgres-1 --format '{{.Image}}')
+
+docker tag "$ALPINE_ID" drop2empire-base-alpine:local
+docker tag "$NGINX_ID" drop2empire-base-nginx:local
+docker tag "$PG_ID" drop2empire-postgres:17-alpine
 
 cat > Dockerfile.game.runtime <<DOCKEREOF
-FROM ${ALPINE_BASE}
+FROM drop2empire-base-alpine:local
 USER root
 WORKDIR /app
 COPY service /app/service
@@ -103,7 +107,8 @@ ENTRYPOINT ["/app/service"]
 DOCKEREOF
 
 cat > Dockerfile.web.runtime <<DOCKEREOF
-FROM ${NGINX_BASE}
+FROM drop2empire-base-nginx:local
+USER root
 LABEL org.opencontainers.image.version=${VERSION} org.opencontainers.image.revision=${COMMIT_SHA}
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 RUN rm -rf /usr/share/nginx/html/*
@@ -115,13 +120,13 @@ DOCKEREOF
 GAME_IMG="drop2empire-game:${SHORT_SHA}"
 WEB_IMG="drop2empire-web:${SHORT_SHA}"
 
-docker build -q -t "$GAME_IMG" -f Dockerfile.game.runtime . >/dev/null
-docker build -q -t "$WEB_IMG" -f Dockerfile.web.runtime . >/dev/null
+DOCKER_BUILDKIT=0 docker build -q -t "$GAME_IMG" -f Dockerfile.game.runtime . >/dev/null
+DOCKER_BUILDKIT=0 docker build -q -t "$WEB_IMG" -f Dockerfile.web.runtime . >/dev/null
 
 cat > "$RELEASE_DIR/images.env" <<IMGEOF
 GAME_IMAGE=${GAME_IMG}
 WEB_IMAGE=${WEB_IMG}
-POSTGRES_IMAGE=${PG_BASE}
+POSTGRES_IMAGE=drop2empire-postgres:17-alpine
 IMGEOF
 
 docker compose -p drop2empire \
