@@ -277,6 +277,7 @@ struct PlayerProfileDTO {
   16: required i64 totalManualClicks (api.body="totalManualClicks")
   17: required i64 simulatedElapsedSeconds (api.body="simulatedElapsedSeconds")
   18: required string offlineAwardSummary (api.body="offlineAwardSummary")
+  19: required bool isAdmin (api.body="isAdmin")
 }
 
 struct DashboardStateResp {
@@ -298,9 +299,26 @@ struct DashboardStateResp {
   16: required list<CollectibleItemDTO> collectibles (api.body="collectibles")
   17: required list<SeasonNoticeDTO> seasonNotices (api.body="seasonNotices")
   18: required list<EventLogDTO> eventLogs (api.body="eventLogs")
+  19: optional string sessionToken (api.body="sessionToken")
 }
 
 struct GetDashboardReq {}
+
+struct RegisterAccountReq {
+  1: required string handle (api.body="handle")
+  2: required string password (api.body="password")
+}
+
+struct LoginAccountReq {
+  1: required string handle (api.body="handle")
+  2: required string password (api.body="password")
+}
+
+struct LogoutAccountReq {}
+
+struct LogoutAccountResp {
+  1: required bool ok (api.body="ok")
+}
 
 struct SwitchAccountReq {
   1: required string handle (api.body="handle")
@@ -378,6 +396,7 @@ struct ControlSimulationReq {
   1: required string action (api.body="action")
   2: optional i32 speedMultiplier (api.body="speedMultiplier")
   3: optional i64 advanceSeconds (api.body="advanceSeconds")
+  4: optional string targetHandle (api.body="targetHandle")
 }
 
 struct BenchmarkMilestoneDTO {
@@ -406,6 +425,9 @@ struct Benchmark30mResp {
 
 service EmpireService {
   DashboardStateResp GetDashboard(1: GetDashboardReq req) (api.get="/api/v1/empire/state")
+  DashboardStateResp RegisterAccount(1: RegisterAccountReq req) (api.post="/api/v1/empire/auth/register")
+  DashboardStateResp LoginAccount(1: LoginAccountReq req) (api.post="/api/v1/empire/auth/login")
+  LogoutAccountResp LogoutAccount(1: LogoutAccountReq req) (api.post="/api/v1/empire/auth/logout")
   DashboardStateResp SwitchAccount(1: SwitchAccountReq req) (api.post="/api/v1/empire/account/switch")
   DashboardStateResp GatherWater(1: GatherWaterReq req) (api.post="/api/v1/empire/production/gather-water")
   DashboardStateResp RecruitResident(1: RecruitResidentReq req) (api.post="/api/v1/empire/production/recruit")

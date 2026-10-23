@@ -9,10 +9,13 @@ import {
   type DeployWarTroopsReq,
   type GatherWaterReq,
   type InstallEquipmentReq,
+  type LoginAccountReq,
+  type LogoutAccountResp,
   type OpenSeasonChestReq,
   type PlaceMarketOrderReq,
   type RecruitResidentReq,
   type RedeemSeasonChestReq,
+  type RegisterAccountReq,
   type SaveAllocationPresetReq,
   type SwitchAccountReq,
   type SwitchGuildReq,
@@ -20,6 +23,8 @@ import {
 } from "./generated";
 
 export * from "./generated";
+
+const SESSION_STORAGE_KEY = "d2e-session-token";
 
 export class ApiError extends Error {
   status: number;
@@ -44,8 +49,32 @@ function routePath(
 }
 
 export class EmpireClient {
+  getSessionToken(): string | null {
+    try {
+      return window.localStorage.getItem(SESSION_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  setSessionToken(token: string | null) {
+    try {
+      if (token) {
+        window.localStorage.setItem(SESSION_STORAGE_KEY, token);
+      } else {
+        window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage errors in private mode
+    }
+  }
+
   async #request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers = new Headers(options.headers);
+    const token = this.getSessionToken();
+    if (token) {
+      headers.set("X-Session-Token", token);
+    }
     if (options.body && !(options.body instanceof FormData)) {
       headers.set("Content-Type", "application/json");
     }
@@ -68,6 +97,48 @@ export class EmpireClient {
 
   getDashboard = () =>
     this.#request<DashboardStateResp>(IDL_ROUTES.GetDashboard.clientPath);
+
+  registerAccount = async (req: RegisterAccountReq) => {
+    const resp = await this.#request<DashboardStateResp>(
+      IDL_ROUTES.RegisterAccount.clientPath,
+      {
+        method: IDL_ROUTES.RegisterAccount.method,
+        body: JSON.stringify(req),
+      },
+    );
+    if (resp.sessionToken) {
+      this.setSessionToken(resp.sessionToken);
+    }
+    return resp;
+  };
+
+  loginAccount = async (req: LoginAccountReq) => {
+    const resp = await this.#request<DashboardStateResp>(
+      IDL_ROUTES.LoginAccount.clientPath,
+      {
+        method: IDL_ROUTES.LoginAccount.method,
+        body: JSON.stringify(req),
+      },
+    );
+    if (resp.sessionToken) {
+      this.setSessionToken(resp.sessionToken);
+    }
+    return resp;
+  };
+
+  logoutAccount = async () => {
+    try {
+      return await this.#request<LogoutAccountResp>(
+        IDL_ROUTES.LogoutAccount.clientPath,
+        {
+          method: IDL_ROUTES.LogoutAccount.method,
+          body: JSON.stringify({}),
+        },
+      );
+    } finally {
+      this.setSessionToken(null);
+    }
+  };
 
   switchAccount = (req: SwitchAccountReq) =>
     this.#request<DashboardStateResp>(IDL_ROUTES.SwitchAccount.clientPath, {

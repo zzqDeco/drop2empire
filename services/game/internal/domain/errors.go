@@ -24,3 +24,11 @@ func ErrPrecondition(code, msg string) error {
 func ErrNotFound(msg string) error {
 	return &Error{Status: http.StatusNotFound, Code: "not_found", Message: msg}
 }
+
+func ErrUnauthorized(msg string) error {
+	return &Error{Status: http.StatusUnauthorized, Code: "unauthorized", Message: msg}
+}
+
+func ErrForbidden(msg string) error {
+	return &Error{Status: http.StatusForbidden, Code: "forbidden", Message: msg}
+}

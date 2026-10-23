@@ -1338,6 +1338,7 @@ type PlayerProfileDTO struct {
 	TotalManualClicks          int64  `thrift:"totalManualClicks,16,required" json:"totalManualClicks"`
 	SimulatedElapsedSeconds    int64  `thrift:"simulatedElapsedSeconds,17,required" json:"simulatedElapsedSeconds"`
 	OfflineAwardSummary        string `thrift:"offlineAwardSummary,18,required" json:"offlineAwardSummary"`
+	IsAdmin                    bool   `thrift:"isAdmin,19,required" json:"isAdmin"`
 }
 
 func NewPlayerProfileDTO() *PlayerProfileDTO {
@@ -1419,6 +1420,10 @@ func (p *PlayerProfileDTO) GetOfflineAwardSummary() (v string) {
 	return p.OfflineAwardSummary
 }
 
+func (p *PlayerProfileDTO) GetIsAdmin() (v bool) {
+	return p.IsAdmin
+}
+
 func (p *PlayerProfileDTO) String() string {
 	if p == nil {
 		return "<nil>"
@@ -1445,6 +1450,7 @@ type DashboardStateResp struct {
 	Collectibles        []*CollectibleItemDTO    `thrift:"collectibles,16,required,list<CollectibleItemDTO>" json:"collectibles"`
 	SeasonNotices       []*SeasonNoticeDTO       `thrift:"seasonNotices,17,required,list<SeasonNoticeDTO>" json:"seasonNotices"`
 	EventLogs           []*EventLogDTO           `thrift:"eventLogs,18,required,list<EventLogDTO>" json:"eventLogs"`
+	SessionToken        *string                  `thrift:"sessionToken,19,optional" json:"sessionToken,omitempty"`
 }
 
 func NewDashboardStateResp() *DashboardStateResp {
@@ -1541,6 +1547,15 @@ func (p *DashboardStateResp) GetEventLogs() (v []*EventLogDTO) {
 	return p.EventLogs
 }
 
+var DashboardStateResp_SessionToken_DEFAULT string
+
+func (p *DashboardStateResp) GetSessionToken() (v string) {
+	if !p.IsSetSessionToken() {
+		return DashboardStateResp_SessionToken_DEFAULT
+	}
+	return *p.SessionToken
+}
+
 func (p *DashboardStateResp) IsSetPlayer() bool {
 	return p.Player != nil
 }
@@ -1551,6 +1566,10 @@ func (p *DashboardStateResp) IsSetMacroLedger() bool {
 
 func (p *DashboardStateResp) IsSetWar() bool {
 	return p.War != nil
+}
+
+func (p *DashboardStateResp) IsSetSessionToken() bool {
+	return p.SessionToken != nil
 }
 
 func (p *DashboardStateResp) String() string {
@@ -1575,6 +1594,99 @@ func (p *GetDashboardReq) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("GetDashboardReq(%+v)", *p)
+}
+
+type RegisterAccountReq struct {
+	Handle   string `thrift:"handle,1,required" json:"handle"`
+	Password string `thrift:"password,2,required" json:"password"`
+}
+
+func NewRegisterAccountReq() *RegisterAccountReq {
+	return &RegisterAccountReq{}
+}
+
+func (p *RegisterAccountReq) InitDefault() {
+}
+
+func (p *RegisterAccountReq) GetHandle() (v string) {
+	return p.Handle
+}
+
+func (p *RegisterAccountReq) GetPassword() (v string) {
+	return p.Password
+}
+
+func (p *RegisterAccountReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RegisterAccountReq(%+v)", *p)
+}
+
+type LoginAccountReq struct {
+	Handle   string `thrift:"handle,1,required" json:"handle"`
+	Password string `thrift:"password,2,required" json:"password"`
+}
+
+func NewLoginAccountReq() *LoginAccountReq {
+	return &LoginAccountReq{}
+}
+
+func (p *LoginAccountReq) InitDefault() {
+}
+
+func (p *LoginAccountReq) GetHandle() (v string) {
+	return p.Handle
+}
+
+func (p *LoginAccountReq) GetPassword() (v string) {
+	return p.Password
+}
+
+func (p *LoginAccountReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("LoginAccountReq(%+v)", *p)
+}
+
+type LogoutAccountReq struct {
+}
+
+func NewLogoutAccountReq() *LogoutAccountReq {
+	return &LogoutAccountReq{}
+}
+
+func (p *LogoutAccountReq) InitDefault() {
+}
+
+func (p *LogoutAccountReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("LogoutAccountReq(%+v)", *p)
+}
+
+type LogoutAccountResp struct {
+	Ok bool `thrift:"ok,1,required" json:"ok"`
+}
+
+func NewLogoutAccountResp() *LogoutAccountResp {
+	return &LogoutAccountResp{}
+}
+
+func (p *LogoutAccountResp) InitDefault() {
+}
+
+func (p *LogoutAccountResp) GetOk() (v bool) {
+	return p.Ok
+}
+
+func (p *LogoutAccountResp) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("LogoutAccountResp(%+v)", *p)
 }
 
 type SwitchAccountReq struct {
@@ -2020,9 +2132,10 @@ func (p *OpenSeasonChestReq) String() string {
 }
 
 type ControlSimulationReq struct {
-	Action          string `thrift:"action,1,required" json:"action"`
-	SpeedMultiplier *int32 `thrift:"speedMultiplier,2,optional" json:"speedMultiplier,omitempty"`
-	AdvanceSeconds  *int64 `thrift:"advanceSeconds,3,optional" json:"advanceSeconds,omitempty"`
+	Action          string  `thrift:"action,1,required" json:"action"`
+	SpeedMultiplier *int32  `thrift:"speedMultiplier,2,optional" json:"speedMultiplier,omitempty"`
+	AdvanceSeconds  *int64  `thrift:"advanceSeconds,3,optional" json:"advanceSeconds,omitempty"`
+	TargetHandle    *string `thrift:"targetHandle,4,optional" json:"targetHandle,omitempty"`
 }
 
 func NewControlSimulationReq() *ControlSimulationReq {
@@ -2054,12 +2167,25 @@ func (p *ControlSimulationReq) GetAdvanceSeconds() (v int64) {
 	return *p.AdvanceSeconds
 }
 
+var ControlSimulationReq_TargetHandle_DEFAULT string
+
+func (p *ControlSimulationReq) GetTargetHandle() (v string) {
+	if !p.IsSetTargetHandle() {
+		return ControlSimulationReq_TargetHandle_DEFAULT
+	}
+	return *p.TargetHandle
+}
+
 func (p *ControlSimulationReq) IsSetSpeedMultiplier() bool {
 	return p.SpeedMultiplier != nil
 }
 
 func (p *ControlSimulationReq) IsSetAdvanceSeconds() bool {
 	return p.AdvanceSeconds != nil
+}
+
+func (p *ControlSimulationReq) IsSetTargetHandle() bool {
+	return p.TargetHandle != nil
 }
 
 func (p *ControlSimulationReq) String() string {
@@ -2204,6 +2330,12 @@ func (p *Benchmark30mResp) String() string {
 
 type EmpireService interface {
 	GetDashboard(ctx context.Context, req *GetDashboardReq) (r *DashboardStateResp, err error)
+
+	RegisterAccount(ctx context.Context, req *RegisterAccountReq) (r *DashboardStateResp, err error)
+
+	LoginAccount(ctx context.Context, req *LoginAccountReq) (r *DashboardStateResp, err error)
+
+	LogoutAccount(ctx context.Context, req *LogoutAccountReq) (r *LogoutAccountResp, err error)
 
 	SwitchAccount(ctx context.Context, req *SwitchAccountReq) (r *DashboardStateResp, err error)
 

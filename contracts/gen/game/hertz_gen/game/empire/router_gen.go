@@ -33,6 +33,9 @@ type EmpireServer = EmpireService
 // EmpireService route pattern constants generated from contracts/game/http_empire.thrift.
 const (
 	PatternGetDashboard = "GET /api/v1/empire/state"
+	PatternRegisterAccount = "POST /api/v1/empire/auth/register"
+	PatternLoginAccount = "POST /api/v1/empire/auth/login"
+	PatternLogoutAccount = "POST /api/v1/empire/auth/logout"
 	PatternSwitchAccount = "POST /api/v1/empire/account/switch"
 	PatternGatherWater = "POST /api/v1/empire/production/gather-water"
 	PatternRecruitResident = "POST /api/v1/empire/production/recruit"
@@ -53,9 +56,12 @@ const (
 	PatternRunBenchmark30m = "POST /api/v1/empire/debug/benchmark-30m"
 )
 
-// EmpireServiceRoutes lists all 19 route specifications declared on EmpireService.
+// EmpireServiceRoutes lists all 22 route specifications declared on EmpireService.
 var EmpireServiceRoutes = []RouteSpec{
 	{Name: "GetDashboard", Method: "GET", Path: "/api/v1/empire/state", MuxPattern: PatternGetDashboard, RequestType: "GetDashboardReq", ResponseType: "DashboardStateResp"},
+	{Name: "RegisterAccount", Method: "POST", Path: "/api/v1/empire/auth/register", MuxPattern: PatternRegisterAccount, RequestType: "RegisterAccountReq", ResponseType: "DashboardStateResp"},
+	{Name: "LoginAccount", Method: "POST", Path: "/api/v1/empire/auth/login", MuxPattern: PatternLoginAccount, RequestType: "LoginAccountReq", ResponseType: "DashboardStateResp"},
+	{Name: "LogoutAccount", Method: "POST", Path: "/api/v1/empire/auth/logout", MuxPattern: PatternLogoutAccount, RequestType: "LogoutAccountReq", ResponseType: "LogoutAccountResp"},
 	{Name: "SwitchAccount", Method: "POST", Path: "/api/v1/empire/account/switch", MuxPattern: PatternSwitchAccount, RequestType: "SwitchAccountReq", ResponseType: "DashboardStateResp"},
 	{Name: "GatherWater", Method: "POST", Path: "/api/v1/empire/production/gather-water", MuxPattern: PatternGatherWater, RequestType: "GatherWaterReq", ResponseType: "DashboardStateResp"},
 	{Name: "RecruitResident", Method: "POST", Path: "/api/v1/empire/production/recruit", MuxPattern: PatternRecruitResident, RequestType: "RecruitResidentReq", ResponseType: "DashboardStateResp"},
@@ -79,6 +85,9 @@ var EmpireServiceRoutes = []RouteSpec{
 // EmpireServiceRouteHandlers binds every endpoint in EmpireService to an http.HandlerFunc.
 type EmpireServiceRouteHandlers struct {
 	GetDashboard http.HandlerFunc
+	RegisterAccount http.HandlerFunc
+	LoginAccount http.HandlerFunc
+	LogoutAccount http.HandlerFunc
 	SwitchAccount http.HandlerFunc
 	GatherWater http.HandlerFunc
 	RecruitResident http.HandlerFunc
@@ -105,6 +114,18 @@ func RegisterEmpireServiceRoutes(mux *http.ServeMux, h EmpireServiceRouteHandler
 		panic("EmpireServiceRouteHandlers.GetDashboard (" + PatternGetDashboard + ") is nil")
 	}
 	mux.HandleFunc(PatternGetDashboard, h.GetDashboard)
+	if h.RegisterAccount == nil {
+		panic("EmpireServiceRouteHandlers.RegisterAccount (" + PatternRegisterAccount + ") is nil")
+	}
+	mux.HandleFunc(PatternRegisterAccount, h.RegisterAccount)
+	if h.LoginAccount == nil {
+		panic("EmpireServiceRouteHandlers.LoginAccount (" + PatternLoginAccount + ") is nil")
+	}
+	mux.HandleFunc(PatternLoginAccount, h.LoginAccount)
+	if h.LogoutAccount == nil {
+		panic("EmpireServiceRouteHandlers.LogoutAccount (" + PatternLogoutAccount + ") is nil")
+	}
+	mux.HandleFunc(PatternLogoutAccount, h.LogoutAccount)
 	if h.SwitchAccount == nil {
 		panic("EmpireServiceRouteHandlers.SwitchAccount (" + PatternSwitchAccount + ") is nil")
 	}
@@ -200,6 +221,59 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			fn = mw.WrapRoute(RouteSpec{Name: "GetDashboard", Method: "GET", Path: "/api/v1/empire/state", MuxPattern: PatternGetDashboard, RequestType: "GetDashboardReq", ResponseType: "DashboardStateResp"}, fn)
 		}
 		h.GetDashboard = fn
+	}
+	if h.RegisterAccount == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req RegisterAccountReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.RegisterAccount(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "RegisterAccount", Method: "POST", Path: "/api/v1/empire/auth/register", MuxPattern: PatternRegisterAccount, RequestType: "RegisterAccountReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.RegisterAccount = fn
+	}
+	if h.LoginAccount == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req LoginAccountReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.LoginAccount(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "LoginAccount", Method: "POST", Path: "/api/v1/empire/auth/login", MuxPattern: PatternLoginAccount, RequestType: "LoginAccountReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.LoginAccount = fn
+	}
+	if h.LogoutAccount == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req LogoutAccountReq
+			resp, err := srv.LogoutAccount(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "LogoutAccount", Method: "POST", Path: "/api/v1/empire/auth/logout", MuxPattern: PatternLogoutAccount, RequestType: "LogoutAccountReq", ResponseType: "LogoutAccountResp"}, fn)
+		}
+		h.LogoutAccount = fn
 	}
 	if h.SwitchAccount == nil {
 		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

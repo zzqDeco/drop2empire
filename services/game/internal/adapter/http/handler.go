@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"drop2empire/contracts/gen/game/hertz_gen/game/empire"
@@ -25,7 +26,23 @@ func NewHTTPHandler(svc *app.Service, ready func(context.Context) error) http.Ha
 	httpx.OperationsContext(mux, ready)
 	srv := NewServer(svc)
 	empire.RegisterEmpireServer(mux, srv, httpx.Responder{})
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimSpace(r.Header.Get("X-Session-Token"))
+		if token == "" {
+			if auth := strings.TrimSpace(r.Header.Get("Authorization")); strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+				token = strings.TrimSpace(auth[7:])
+			}
+		}
+		if token == "" {
+			if c, err := r.Cookie("d2e_session"); err == nil {
+				token = strings.TrimSpace(c.Value)
+			}
+		}
+		if token != "" {
+			r = r.WithContext(app.WithSessionToken(r.Context(), token))
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func computeETASeconds(requiredMilli, currentMilli, netRatePerSecMilli int64) int64 {
@@ -50,10 +67,14 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	}
 
 	handles := make([]string, 0, len(w.Players))
-	for h := range w.Players {
-		handles = append(handles, h)
+	if p.IsAdmin {
+		for h := range w.Players {
+			handles = append(handles, h)
+		}
+		sort.Strings(handles)
+	} else {
+		handles = append(handles, p.Handle)
 	}
-	sort.Strings(handles)
 
 	rates := domain.NetResourceRatesPerSecMilli(p)
 	assignedPop := domain.AssignedPopulation(p)
@@ -92,6 +113,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		TotalManualClicks:          p.TotalManualClicks,
 		SimulatedElapsedSeconds:    p.SimulatedElapsedSeconds,
 		OfflineAwardSummary:        p.LastOfflineSummary,
+		IsAdmin:                    p.IsAdmin,
 	}
 
 	resourcesDTO := make([]*empire.ResourceLineDTO, 0, len(domain.ResourceCatalog))
@@ -105,7 +127,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		if meta.Key == domain.ResStone && p.UnlockedBlueprints[domain.BPQuarryTech] {
 			unlocked = true
 		}
-		if (meta.Key == domain.ResIronIngot || meta.Key == domain.ResRation) && p.UnlockedBlueprints[domain.BPBasicWorkshop] {
+		if (meta.Key == domain.ResIronIngot || meta.Key == domain.ResRation) && p.UnlockedBlueprints[domain.BPBasicWorkshop] && p.Profession != domain.ProfNone {
 			unlocked = true
 		}
 		if p.Profession != domain.ProfNone {
@@ -162,7 +184,19 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	for _, bp := range domain.BlueprintCatalog {
 		unlocked := p.UnlockedBlueprints[bp.Code]
 		prereqOK := bp.PrerequisiteCode == "" || p.UnlockedBlueprints[bp.PrerequisiteCode]
-		visible := unlocked || prereqOK || (bp.Code == domain.BPAxeBlueprint && p.PopulationTotal >= 1)
+		visible := false
+		if unlocked {
+			visible = true
+		} else if p.PopulationTotal > 0 {
+			switch bp.Code {
+			case domain.BPFirstResident:
+				visible = true
+			case domain.BPAxeBlueprint:
+				visible = p.UnlockedBlueprints[domain.BPFirstResident] || p.PopulationTotal >= 3
+			default:
+				visible = prereqOK
+			}
+		}
 
 		var maxETA int64
 		allResourcesOK := true
@@ -563,6 +597,33 @@ func (s *Server) GetDashboard(ctx context.Context, _ *empire.GetDashboardReq) (*
 	return mapDashboardResp(w), nil
 }
 
+func (s *Server) RegisterAccount(ctx context.Context, req *empire.RegisterAccountReq) (*empire.DashboardStateResp, error) {
+	w, token, err := s.svc.RegisterAccount(ctx, req.Handle, req.Password)
+	if err != nil {
+		return nil, err
+	}
+	resp := mapDashboardResp(w)
+	resp.SessionToken = &token
+	return resp, nil
+}
+
+func (s *Server) LoginAccount(ctx context.Context, req *empire.LoginAccountReq) (*empire.DashboardStateResp, error) {
+	w, token, err := s.svc.LoginAccount(ctx, req.Handle, req.Password)
+	if err != nil {
+		return nil, err
+	}
+	resp := mapDashboardResp(w)
+	resp.SessionToken = &token
+	return resp, nil
+}
+
+func (s *Server) LogoutAccount(ctx context.Context, _ *empire.LogoutAccountReq) (*empire.LogoutAccountResp, error) {
+	if err := s.svc.LogoutAccount(ctx); err != nil {
+		return nil, err
+	}
+	return &empire.LogoutAccountResp{Ok: true}, nil
+}
+
 func (s *Server) SwitchAccount(ctx context.Context, req *empire.SwitchAccountReq) (*empire.DashboardStateResp, error) {
 	w, err := s.svc.SwitchAccount(ctx, req.Handle)
 	if err != nil {
@@ -722,7 +783,11 @@ func (s *Server) ControlSimulation(ctx context.Context, req *empire.ControlSimul
 	if req.AdvanceSeconds != nil {
 		adv = *req.AdvanceSeconds
 	}
-	w, err := s.svc.ControlSimulation(ctx, req.Action, mult, adv)
+	var targetHandle string
+	if req.TargetHandle != nil {
+		targetHandle = *req.TargetHandle
+	}
+	w, err := s.svc.ControlSimulation(ctx, req.Action, mult, adv, targetHandle)
 	if err != nil {
 		return nil, err
 	}
@@ -730,7 +795,10 @@ func (s *Server) ControlSimulation(ctx context.Context, req *empire.ControlSimul
 }
 
 func (s *Server) RunBenchmark30m(ctx context.Context, _ *empire.RunBenchmark30mReq) (*empire.Benchmark30mResp, error) {
-	runs := s.svc.RunBenchmark30m(ctx)
+	runs, err := s.svc.RunBenchmark30m(ctx)
+	if err != nil {
+		return nil, err
+	}
 	runsDTO := make([]*empire.BenchmarkRunDTO, 0, len(runs))
 	for _, r := range runs {
 		msDTO := make([]*empire.BenchmarkMilestoneDTO, 0, len(r.Milestones))

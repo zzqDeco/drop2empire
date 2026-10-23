@@ -277,6 +277,7 @@ export interface PlayerProfileDTO {
   totalManualClicks: number;
   simulatedElapsedSeconds: number;
   offlineAwardSummary: string;
+  isAdmin: boolean;
 }
 
 export interface DashboardStateResp {
@@ -298,9 +299,26 @@ export interface DashboardStateResp {
   collectibles: CollectibleItemDTO[];
   seasonNotices: SeasonNoticeDTO[];
   eventLogs: EventLogDTO[];
+  sessionToken?: string;
 }
 
 export type GetDashboardReq = Record<string, never>;
+
+export interface RegisterAccountReq {
+  handle: string;
+  password: string;
+}
+
+export interface LoginAccountReq {
+  handle: string;
+  password: string;
+}
+
+export type LogoutAccountReq = Record<string, never>;
+
+export interface LogoutAccountResp {
+  ok: boolean;
+}
 
 export interface SwitchAccountReq {
   handle: string;
@@ -378,6 +396,7 @@ export interface ControlSimulationReq {
   action: string;
   speedMultiplier?: number;
   advanceSeconds?: number;
+  targetHandle?: string;
 }
 
 export interface BenchmarkMilestoneDTO {
@@ -417,6 +436,33 @@ export const IDL_ROUTES = {
     clientPath: "/empire/state",
     requestType: "GetDashboardReq",
     responseType: "DashboardStateResp",
+  },
+  RegisterAccount: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/auth/register",
+    clientPath: "/empire/auth/register",
+    requestType: "RegisterAccountReq",
+    responseType: "DashboardStateResp",
+  },
+  LoginAccount: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/auth/login",
+    clientPath: "/empire/auth/login",
+    requestType: "LoginAccountReq",
+    responseType: "DashboardStateResp",
+  },
+  LogoutAccount: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/auth/logout",
+    clientPath: "/empire/auth/logout",
+    requestType: "LogoutAccountReq",
+    responseType: "LogoutAccountResp",
   },
   SwitchAccount: {
     service: "EmpireService",

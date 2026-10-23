@@ -1,11 +1,62 @@
 package domain
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"sort"
 	"time"
 )
+
+func HashPassword(handle, rawPassword string) string {
+	sum := sha256.Sum256([]byte("d2e::" + handle + "::" + rawPassword))
+	return hex.EncodeToString(sum[:])
+}
+
+func NewSessionToken(handle string, now time.Time) string {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		sum := sha256.Sum256([]byte(fmt.Sprintf("%s-%d", handle, now.UnixNano())))
+		return hex.EncodeToString(sum[:])
+	}
+	return hex.EncodeToString(b)
+}
+
+func EnsureDefaultAccounts(w *WorldState, now time.Time) {
+	if w.Players == nil {
+		w.Players = make(map[string]*PlayerState)
+	}
+	if w.Sessions == nil {
+		w.Sessions = make(map[string]string)
+	}
+	if p, ok := w.Players["pioneer"]; ok {
+		if p.PasswordHash == "" {
+			p.PasswordHash = HashPassword("pioneer", "pioneer123")
+		}
+	} else {
+		pioneer := NewBlankPlayer("pioneer", now)
+		pioneer.PasswordHash = HashPassword("pioneer", "pioneer123")
+		w.Players["pioneer"] = pioneer
+	}
+	if vet, ok := w.Players["archon_demo"]; ok {
+		if vet.PasswordHash == "" {
+			vet.PasswordHash = HashPassword("archon_demo", "demo123456")
+		}
+	}
+	if adm, ok := w.Players["admin"]; ok {
+		adm.IsAdmin = true
+		if adm.PasswordHash == "" {
+			adm.PasswordHash = HashPassword("admin", "admin123456")
+		}
+	} else {
+		adm := NewBlankPlayer("admin", now)
+		adm.IsAdmin = true
+		adm.PasswordHash = HashPassword("admin", "admin123456")
+		w.Players["admin"] = adm
+	}
+}
 
 func NewDefaultWorld(now time.Time) *WorldState {
 	lastPrices := make(map[string]int64, len(ResourceCatalog))
@@ -23,6 +74,7 @@ func NewDefaultWorld(now time.Time) *WorldState {
 	w := &WorldState{
 		ActiveHandle:           "pioneer",
 		Players:                make(map[string]*PlayerState),
+		Sessions:               make(map[string]string),
 		TotalIssuedBasis:       treasuryInit + npcInit,
 		NPCHeldBasis:           npcInit,
 		TreasuryHeldBasis:      treasuryInit,
@@ -47,10 +99,18 @@ func NewDefaultWorld(now time.Time) *WorldState {
 
 	// Primary player starts at 0 water, 0 population (GDD 3.2 & 4.1 authentic start).
 	pioneer := NewBlankPlayer("pioneer", now)
+	pioneer.PasswordHash = HashPassword("pioneer", "pioneer123")
 	w.Players["pioneer"] = pioneer
 
-	// Second pre-seeded veteran account so user can also test multi-account trading immediately if desired.
+	// Dedicated Admin account (strictly separated from normal player accounts).
+	admin := NewBlankPlayer("admin", now)
+	admin.IsAdmin = true
+	admin.PasswordHash = HashPassword("admin", "admin123456")
+	w.Players["admin"] = admin
+
+	// Pre-seeded veteran account so user can also test multi-account trading immediately if desired.
 	veteran := NewBlankPlayer("archon_demo", now)
+	veteran.PasswordHash = HashPassword("archon_demo", "demo123456")
 	veteran.PopulationTotal = 45
 	veteran.Workers[JobWater] = 18
 	veteran.Workers[JobWood] = 12
@@ -104,18 +164,9 @@ func NewBlankPlayer(handle string, now time.Time) *PlayerState {
 		Workers:              map[string]int32{JobWater: 0, JobWood: 0, JobStone: 0, JobSmeltIron: 0, JobPrepRation: 0},
 		ResourcesMilli:       res,
 		FrozenResourcesMilli: frozen,
-		UnlockedBlueprints:   map[string]bool{},
-		InstalledEquipments:  map[string]int32{},
-		Presets: []AllocationPreset{
-			{
-				Name:        "前期7:3打水伐木",
-				Allocations: map[string]int32{JobWater: 7, JobWood: 3},
-			},
-			{
-				Name:        "工坊5:3:2均衡",
-				Allocations: map[string]int32{JobWater: 20, JobWood: 12, JobStone: 8},
-			},
-		},
+		UnlockedBlueprints:      map[string]bool{},
+		InstalledEquipments:     map[string]int32{},
+		Presets:                 []AllocationPreset{},
 		GoldBasis:               0,
 		GoldFrozenBasis:         0,
 		ActivityPoints:          0,
@@ -273,8 +324,8 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 			outRes:    ResIronIngot,
 			baseMilli: 80, // 0.08 iron/s per worker
 			effPct:    ironEff,
-			unlocked:  p.UnlockedBlueprints[BPBasicWorkshop],
-			hint:      "需建成【基础工坊】（40 人口）",
+			unlocked:  p.UnlockedBlueprints[BPBasicWorkshop] && p.Profession != ProfNone,
+			hint:      "需完成职业选择并启动工坊高炉",
 			inputNote: "工坊持续熔炼精炼铁锭",
 		},
 		{
@@ -283,8 +334,8 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 			outRes:    ResRation,
 			baseMilli: 120, // 0.12 ration/s per worker
 			effPct:    rationEff,
-			unlocked:  p.UnlockedBlueprints[BPBasicWorkshop],
-			hint:      "需建成【基础工坊】（40 人口）",
+			unlocked:  p.UnlockedBlueprints[BPBasicWorkshop] && p.Profession != ProfNone,
+			hint:      "需完成职业选择并开启军需产线",
 			inputNote: "工坊持续封装行军口粮",
 		},
 	}
@@ -449,6 +500,74 @@ func AllocateWorkers(p *PlayerState, mode string, entries map[string]int32, pres
 	}
 
 	switch mode {
+	case "delta":
+		for k, delta := range entries {
+			if delta == 0 {
+				continue
+			}
+			if k == JobWood && !p.UnlockedBlueprints[BPAxeBlueprint] {
+				return ErrPrecondition("job_locked", "尚未解锁【斧头蓝图】，无法分配伐木工")
+			}
+			if k == JobStone && !p.UnlockedBlueprints[BPQuarryTech] {
+				return ErrPrecondition("job_locked", "尚未解锁【采石技术】，无法分配采石工")
+			}
+			if (k == JobSmeltIron || k == JobPrepRation) && (!p.UnlockedBlueprints[BPBasicWorkshop] || p.Profession == ProfNone) {
+				return ErrPrecondition("job_locked", "尚未开启工坊高炉/军需产线，无法分配该岗位")
+			}
+			assigned := AssignedPopulation(p)
+			idle := total - assigned
+			if idle < 0 {
+				idle = 0
+			}
+			if delta > 0 {
+				useIdle := delta
+				if useIdle > idle {
+					useIdle = idle
+				}
+				needTransfer := delta - useIdle
+				if needTransfer > 0 {
+					if k != JobWater {
+						if p.Workers[JobWater] < needTransfer {
+							return ErrPrecondition("no_available_workers", "当前无闲置或打水居民可供调配，请先从其他岗位调出居民")
+						}
+						p.Workers[JobWater] -= needTransfer
+					} else {
+						for _, src := range []string{JobPrepRation, JobSmeltIron, JobStone, JobWood} {
+							if needTransfer <= 0 {
+								break
+							}
+							avail := p.Workers[src]
+							if avail <= 0 {
+								continue
+							}
+							take := needTransfer
+							if take > avail {
+								take = avail
+							}
+							p.Workers[src] -= take
+							needTransfer -= take
+						}
+						if needTransfer > 0 {
+							return ErrPrecondition("no_available_workers", "所有居民均已在打水岗位")
+						}
+					}
+				}
+				p.Workers[k] += delta
+			} else {
+				rem := -delta
+				if rem > p.Workers[k] {
+					rem = p.Workers[k]
+				}
+				if rem > 0 {
+					p.Workers[k] -= rem
+					if k != JobWater {
+						p.Workers[JobWater] += rem
+					}
+				}
+			}
+		}
+		return nil
+
 	case "manual":
 		next := map[string]int32{
 			JobWater:      0,
@@ -478,7 +597,13 @@ func AllocateWorkers(p *PlayerState, mode string, entries map[string]int32, pres
 			sum += v
 		}
 		if sum > total {
-			return ErrPrecondition("population_exceeded", fmt.Sprintf("分配总人数 (%d) 超过当前人口上限 (%d)", sum, total))
+			excess := sum - total
+			if next[JobWater] >= excess && next[JobWater] == p.Workers[JobWater] {
+				next[JobWater] -= excess
+				sum -= excess
+			} else {
+				return ErrPrecondition("population_exceeded", fmt.Sprintf("分配总人数 (%d) 超过当前人口上限 (%d)", sum, total))
+			}
 		}
 		p.Workers = next
 		AppendLog(p, now, "PRODUCTION", fmt.Sprintf("已更新劳动力分配：打水 %d / 伐木 %d / 采石 %d / 炼铁 %d / 军粮 %d（闲置 %d）。",

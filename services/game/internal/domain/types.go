@@ -168,6 +168,8 @@ type CollectibleItem struct {
 type PlayerState struct {
 	ID                      string             `json:"id"`
 	Handle                  string             `json:"handle"`
+	PasswordHash            string             `json:"passwordHash"`
+	IsAdmin                 bool               `json:"isAdmin"`
 	Phase                   int32              `json:"phase"`
 	Profession              string             `json:"profession"`
 	ArtifactName            string             `json:"artifactName"`
@@ -280,6 +282,7 @@ type WarDaySettlement struct {
 type WorldState struct {
 	ActiveHandle           string                  `json:"activeHandle"`
 	Players                map[string]*PlayerState `json:"players"`
+	Sessions               map[string]string       `json:"sessions"`
 	TotalIssuedBasis       int64                   `json:"totalIssuedBasis"`
 	NPCHeldBasis           int64                   `json:"npcHeldBasis"`
 	TreasuryHeldBasis      int64                   `json:"treasuryHeldBasis"`
