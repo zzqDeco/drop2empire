@@ -256,6 +256,21 @@ export class EmpireClient {
       method: IDL_ROUTES.RunBenchmark30m.method,
       body: JSON.stringify({}),
     });
+
+  createInvite = () =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.CreateInvite.clientPath, {
+      method: IDL_ROUTES.CreateInvite.method,
+      body: JSON.stringify({}),
+    });
+
+  revokeInvite = (id: string) =>
+    this.#request<DashboardStateResp>(
+      routePath(IDL_ROUTES.RevokeInvite, { id }),
+      {
+        method: IDL_ROUTES.RevokeInvite.method,
+        body: JSON.stringify({}),
+      },
+    );
 }
 
 export const api = new EmpireClient();

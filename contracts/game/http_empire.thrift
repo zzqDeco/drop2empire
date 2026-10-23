@@ -258,6 +258,16 @@ struct EventLogDTO {
   4: required string message (api.body="message")
 }
 
+struct RegistrationInviteDTO {
+  1: required string id (api.body="id")
+  2: required string codePreview (api.body="codePreview")
+  3: required string createdAt (api.body="createdAt")
+  4: required string expiresAt (api.body="expiresAt")
+  5: optional string usedAt (api.body="usedAt")
+  6: optional string usedBy (api.body="usedBy")
+  7: optional string revokedAt (api.body="revokedAt")
+}
+
 struct PlayerProfileDTO {
   1: required string id (api.body="id")
   2: required string handle (api.body="handle")
@@ -300,6 +310,8 @@ struct DashboardStateResp {
   17: required list<SeasonNoticeDTO> seasonNotices (api.body="seasonNotices")
   18: required list<EventLogDTO> eventLogs (api.body="eventLogs")
   19: optional string sessionToken (api.body="sessionToken")
+  20: required list<RegistrationInviteDTO> invites (api.body="invites")
+  21: optional string createdInviteCode (api.body="createdInviteCode")
 }
 
 struct GetDashboardReq {}
@@ -307,6 +319,13 @@ struct GetDashboardReq {}
 struct RegisterAccountReq {
   1: required string handle (api.body="handle")
   2: required string password (api.body="password")
+  3: required string inviteCode (api.body="inviteCode")
+}
+
+struct CreateInviteReq {}
+
+struct RevokeInviteReq {
+  1: required string id (api.path="id")
 }
 
 struct LoginAccountReq {
@@ -446,4 +465,6 @@ service EmpireService {
   DashboardStateResp OpenSeasonChest(1: OpenSeasonChestReq req) (api.post="/api/v1/empire/season/open-chest")
   DashboardStateResp ControlSimulation(1: ControlSimulationReq req) (api.post="/api/v1/empire/debug/sim")
   Benchmark30mResp RunBenchmark30m(1: RunBenchmark30mReq req) (api.post="/api/v1/empire/debug/benchmark-30m")
+  DashboardStateResp CreateInvite(1: CreateInviteReq req) (api.post="/api/v1/empire/admin/invites")
+  DashboardStateResp RevokeInvite(1: RevokeInviteReq req) (api.post="/api/v1/empire/admin/invites/:id/revoke")
 }

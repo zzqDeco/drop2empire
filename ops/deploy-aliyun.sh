@@ -127,7 +127,7 @@ LABEL org.opencontainers.image.version=${VERSION} org.opencontainers.image.revis
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 RUN rm -rf /usr/share/nginx/html/*
 COPY dist/ /usr/share/nginx/html/
-EXPOSE 80 8443
+EXPOSE 80 8443 18480
 HEALTHCHECK --interval=15s --timeout=3s CMD wget -qO- http://127.0.0.1/healthz || exit 1
 DOCKEREOF
 
@@ -168,6 +168,18 @@ curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/h
 curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/readyz" >/dev/null
 curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/version.json"
 echo ""
+# Verify public /admin is blocked (404) while loopback SSH tunnel port 18480 serves /admin (200)
+PUB_ADMIN_STATUS=$(curl -s -o /dev/null -w '%{http_code}' --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/admin")
+if [[ "$PUB_ADMIN_STATUS" != "404" ]]; then
+  echo "ERROR: Expected public /admin to return 404, got ${PUB_ADMIN_STATUS}" >&2
+  exit 1
+fi
+TUNNEL_ADMIN_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:18480/admin")
+if [[ "$TUNNEL_ADMIN_STATUS" != "200" ]]; then
+  echo "ERROR: Expected loopback tunnel 127.0.0.1:18480/admin to return 200, got ${TUNNEL_ADMIN_STATUS}" >&2
+  exit 1
+fi
+echo "Verified: public /admin -> ${PUB_ADMIN_STATUS} (blocked), loopback 127.0.0.1:18480/admin -> ${TUNNEL_ADMIN_STATUS} (tunnel ready)"
 EOF
 curl -fsS "https://$SSH_HOST:$PUBLIC_PORT/readyz" >/dev/null
 

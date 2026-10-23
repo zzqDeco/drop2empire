@@ -142,6 +142,17 @@ type EventEntry struct {
 	Message   string `json:"message"`
 }
 
+type RegistrationInvite struct {
+	ID          string `json:"id"`
+	CodeHash    string `json:"codeHash"`
+	CodePreview string `json:"codePreview"`
+	CreatedAt   string `json:"createdAt"`
+	ExpiresAt   string `json:"expiresAt"`
+	UsedAt      string `json:"usedAt,omitempty"`
+	UsedBy      string `json:"usedBy,omitempty"`
+	RevokedAt   string `json:"revokedAt,omitempty"`
+}
+
 type CollectibleItem struct {
 	ItemID        string `json:"itemId"`
 	SerialNumber  int32  `json:"serialNumber"`
@@ -281,8 +292,11 @@ type WarDaySettlement struct {
 
 type WorldState struct {
 	ActiveHandle           string                  `json:"activeHandle"`
+	AdminMode              bool                    `json:"-"`
 	Players                map[string]*PlayerState `json:"players"`
 	Sessions               map[string]string       `json:"sessions"`
+	Invites                []RegistrationInvite    `json:"invites"`
+	NextInviteSeq          int64                   `json:"nextInviteSeq"`
 	TotalIssuedBasis       int64                   `json:"totalIssuedBasis"`
 	NPCHeldBasis           int64                   `json:"npcHeldBasis"`
 	TreasuryHeldBasis      int64                   `json:"treasuryHeldBasis"`

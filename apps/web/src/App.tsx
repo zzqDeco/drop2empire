@@ -65,9 +65,18 @@ export function App() {
   const [customHandleInput, setCustomHandleInput] = useState("pioneer");
 
   // Authentication form state
-  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const initialInviteCode = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return (
+      new URLSearchParams(window.location.search).get("invite")?.trim() ?? ""
+    );
+  }, []);
+  const [authMode, setAuthMode] = useState<AuthMode>(() =>
+    initialInviteCode ? "register" : "login",
+  );
   const [authHandle, setAuthHandle] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [authInviteCode, setAuthInviteCode] = useState(initialInviteCode);
 
   // Optimistic water clicks for 0ms tactile response
   const [optimisticWaterDeltaMilli, setOptimisticWaterDeltaMilli] = useState(0);
@@ -478,6 +487,115 @@ export function App() {
             </button>
           </section>
 
+          <section className="subpanel" aria-label="邀请码管理">
+            <div className="subpanel-head">
+              <h3>
+                <UserCheck size={ICON.sm} />
+                <span>注册邀请码（一码一用 · 7 天有效）</span>
+              </h3>
+              <button
+                type="button"
+                className="btn-primary btn-sm"
+                disabled={busy}
+                onClick={() =>
+                  void runAction(
+                    () => api.createInvite(),
+                    "已生成新邀请码（仅展示一次，请立即复制）",
+                  )
+                }
+              >
+                <Plus size={ICON.xs} />
+                <span>生成邀请码</span>
+              </button>
+            </div>
+
+            {state.createdInviteCode && (
+              <div className="status-banner status-info">
+                <span>
+                  新生成邀请码：
+                  <strong className="mono-num">
+                    {" "}
+                    {state.createdInviteCode}
+                  </strong>
+                </span>
+              </div>
+            )}
+
+            <div className="table-scroll">
+              <table className="ink-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>掩码</th>
+                    <th>状态</th>
+                    <th>使用者</th>
+                    <th>过期时间</th>
+                    <th className="num-col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(state.invites ?? []).length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="empty-cell">
+                        暂无邀请码，点击右上角生成
+                      </td>
+                    </tr>
+                  ) : (
+                    (state.invites ?? []).map((inv) => {
+                      const isUsed = Boolean(inv.usedAt);
+                      const isRevoked = Boolean(inv.revokedAt);
+                      return (
+                        <tr key={inv.id}>
+                          <td className="mono-num">{inv.id}</td>
+                          <td className="mono-num">{inv.codePreview}</td>
+                          <td>
+                            <span
+                              className={`tag-badge ${
+                                isUsed
+                                  ? "tag-success"
+                                  : isRevoked
+                                    ? "tag-warning"
+                                    : ""
+                              }`}
+                            >
+                              {isUsed
+                                ? "已使用"
+                                : isRevoked
+                                  ? "已吊销"
+                                  : "可使用"}
+                            </span>
+                          </td>
+                          <td className="mono-num">{inv.usedBy ?? "-"}</td>
+                          <td className="mono-num">
+                            {inv.expiresAt.slice(0, 10)}
+                          </td>
+                          <td className="num-col">
+                            {!isUsed && !isRevoked ? (
+                              <button
+                                type="button"
+                                className="btn-outline btn-sm"
+                                disabled={busy}
+                                onClick={() =>
+                                  void runAction(() =>
+                                    api.revokeInvite(inv.id),
+                                  )
+                                }
+                              >
+                                吊销
+                              </button>
+                            ) : (
+                              <span className="mono-num">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
           <div className="split-2col">
             <section className="subpanel" aria-label="货币审计">
               <div className="subpanel-head">
@@ -695,11 +813,13 @@ export function App() {
             onSubmit={(e) => {
               e.preventDefault();
               if (!authHandle.trim() || !authPassword) return;
+              if (authMode === "register" && !authInviteCode.trim()) return;
               void runAction(() =>
                 authMode === "register"
                   ? api.registerAccount({
                       handle: authHandle.trim(),
                       password: authPassword,
+                      inviteCode: authInviteCode.trim(),
                     })
                   : api.loginAccount({
                       handle: authHandle.trim(),
@@ -726,6 +846,19 @@ export function App() {
                 onChange={(e) => setAuthPassword(e.target.value)}
               />
             </label>
+            {authMode === "register" && (
+              <label>
+                <span>邀请码</span>
+                <input
+                  type="text"
+                  required
+                  className="mono-num"
+                  placeholder="d2e-inv-xxxx-xxxx-xxxx"
+                  value={authInviteCode}
+                  onChange={(e) => setAuthInviteCode(e.target.value)}
+                />
+              </label>
+            )}
             <button
               type="submit"
               className="btn-water-strike btn-block"

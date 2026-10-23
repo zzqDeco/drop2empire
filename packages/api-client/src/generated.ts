@@ -258,6 +258,16 @@ export interface EventLogDTO {
   message: string;
 }
 
+export interface RegistrationInviteDTO {
+  id: string;
+  codePreview: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt?: string;
+  usedBy?: string;
+  revokedAt?: string;
+}
+
 export interface PlayerProfileDTO {
   id: string;
   handle: string;
@@ -300,6 +310,8 @@ export interface DashboardStateResp {
   seasonNotices: SeasonNoticeDTO[];
   eventLogs: EventLogDTO[];
   sessionToken?: string;
+  invites: RegistrationInviteDTO[];
+  createdInviteCode?: string;
 }
 
 export type GetDashboardReq = Record<string, never>;
@@ -307,6 +319,13 @@ export type GetDashboardReq = Record<string, never>;
 export interface RegisterAccountReq {
   handle: string;
   password: string;
+  inviteCode: string;
+}
+
+export type CreateInviteReq = Record<string, never>;
+
+export interface RevokeInviteReq {
+  id: string;
 }
 
 export interface LoginAccountReq {
@@ -625,6 +644,24 @@ export const IDL_ROUTES = {
     clientPath: "/empire/debug/benchmark-30m",
     requestType: "RunBenchmark30mReq",
     responseType: "Benchmark30mResp",
+  },
+  CreateInvite: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/admin/invites",
+    clientPath: "/empire/admin/invites",
+    requestType: "CreateInviteReq",
+    responseType: "DashboardStateResp",
+  },
+  RevokeInvite: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/admin/invites/:id/revoke",
+    clientPath: "/empire/admin/invites/:id/revoke",
+    requestType: "RevokeInviteReq",
+    responseType: "DashboardStateResp",
   },
 } as const;
 

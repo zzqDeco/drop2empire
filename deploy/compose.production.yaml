@@ -17,6 +17,7 @@ services:
     cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE]
     ports:
       - "${PUBLIC_HTTPS_PORT:-8443}:8443"
+      - "127.0.0.1:${ADMIN_TUNNEL_PORT:-18480}:18480"
     volumes:
       - ${TLS_CERT_DIR:-/srv/drop2empire/tls}:/etc/nginx/tls:ro
     tmpfs:

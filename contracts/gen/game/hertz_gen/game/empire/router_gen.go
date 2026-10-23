@@ -54,9 +54,11 @@ const (
 	PatternOpenSeasonChest = "POST /api/v1/empire/season/open-chest"
 	PatternControlSimulation = "POST /api/v1/empire/debug/sim"
 	PatternRunBenchmark30m = "POST /api/v1/empire/debug/benchmark-30m"
+	PatternCreateInvite = "POST /api/v1/empire/admin/invites"
+	PatternRevokeInvite = "POST /api/v1/empire/admin/invites/{id}/revoke"
 )
 
-// EmpireServiceRoutes lists all 22 route specifications declared on EmpireService.
+// EmpireServiceRoutes lists all 24 route specifications declared on EmpireService.
 var EmpireServiceRoutes = []RouteSpec{
 	{Name: "GetDashboard", Method: "GET", Path: "/api/v1/empire/state", MuxPattern: PatternGetDashboard, RequestType: "GetDashboardReq", ResponseType: "DashboardStateResp"},
 	{Name: "RegisterAccount", Method: "POST", Path: "/api/v1/empire/auth/register", MuxPattern: PatternRegisterAccount, RequestType: "RegisterAccountReq", ResponseType: "DashboardStateResp"},
@@ -80,6 +82,8 @@ var EmpireServiceRoutes = []RouteSpec{
 	{Name: "OpenSeasonChest", Method: "POST", Path: "/api/v1/empire/season/open-chest", MuxPattern: PatternOpenSeasonChest, RequestType: "OpenSeasonChestReq", ResponseType: "DashboardStateResp"},
 	{Name: "ControlSimulation", Method: "POST", Path: "/api/v1/empire/debug/sim", MuxPattern: PatternControlSimulation, RequestType: "ControlSimulationReq", ResponseType: "DashboardStateResp"},
 	{Name: "RunBenchmark30m", Method: "POST", Path: "/api/v1/empire/debug/benchmark-30m", MuxPattern: PatternRunBenchmark30m, RequestType: "RunBenchmark30mReq", ResponseType: "Benchmark30mResp"},
+	{Name: "CreateInvite", Method: "POST", Path: "/api/v1/empire/admin/invites", MuxPattern: PatternCreateInvite, RequestType: "CreateInviteReq", ResponseType: "DashboardStateResp"},
+	{Name: "RevokeInvite", Method: "POST", Path: "/api/v1/empire/admin/invites/:id/revoke", MuxPattern: PatternRevokeInvite, RequestType: "RevokeInviteReq", ResponseType: "DashboardStateResp"},
 }
 
 // EmpireServiceRouteHandlers binds every endpoint in EmpireService to an http.HandlerFunc.
@@ -106,6 +110,8 @@ type EmpireServiceRouteHandlers struct {
 	OpenSeasonChest http.HandlerFunc
 	ControlSimulation http.HandlerFunc
 	RunBenchmark30m http.HandlerFunc
+	CreateInvite http.HandlerFunc
+	RevokeInvite http.HandlerFunc
 }
 
 // RegisterEmpireServiceRoutes registers all EmpireService endpoints on mux and panics if any IDL endpoint handler is nil.
@@ -198,6 +204,14 @@ func RegisterEmpireServiceRoutes(mux *http.ServeMux, h EmpireServiceRouteHandler
 		panic("EmpireServiceRouteHandlers.RunBenchmark30m (" + PatternRunBenchmark30m + ") is nil")
 	}
 	mux.HandleFunc(PatternRunBenchmark30m, h.RunBenchmark30m)
+	if h.CreateInvite == nil {
+		panic("EmpireServiceRouteHandlers.CreateInvite (" + PatternCreateInvite + ") is nil")
+	}
+	mux.HandleFunc(PatternCreateInvite, h.CreateInvite)
+	if h.RevokeInvite == nil {
+		panic("EmpireServiceRouteHandlers.RevokeInvite (" + PatternRevokeInvite + ") is nil")
+	}
+	mux.HandleFunc(PatternRevokeInvite, h.RevokeInvite)
 }
 
 // RegisterEmpireServer binds EmpireServer methods using HTTPResponder with optional per-route handler overrides.
@@ -605,6 +619,37 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			fn = mw.WrapRoute(RouteSpec{Name: "RunBenchmark30m", Method: "POST", Path: "/api/v1/empire/debug/benchmark-30m", MuxPattern: PatternRunBenchmark30m, RequestType: "RunBenchmark30mReq", ResponseType: "Benchmark30mResp"}, fn)
 		}
 		h.RunBenchmark30m = fn
+	}
+	if h.CreateInvite == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req CreateInviteReq
+			resp, err := srv.CreateInvite(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "CreateInvite", Method: "POST", Path: "/api/v1/empire/admin/invites", MuxPattern: PatternCreateInvite, RequestType: "CreateInviteReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.CreateInvite = fn
+	}
+	if h.RevokeInvite == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req RevokeInviteReq
+			req.ID = r.PathValue("id")
+			resp, err := srv.RevokeInvite(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "RevokeInvite", Method: "POST", Path: "/api/v1/empire/admin/invites/:id/revoke", MuxPattern: PatternRevokeInvite, RequestType: "RevokeInviteReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.RevokeInvite = fn
 	}
 	RegisterEmpireServiceRoutes(mux, h)
 }

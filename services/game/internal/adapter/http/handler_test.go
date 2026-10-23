@@ -47,8 +47,59 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 		t.Fatalf("expected 401 Unauthorized without session token, got %d", unauthRec.Code)
 	}
 
-	// 2. Register a brand-new player account -> starts at 0 water, 0 pop, 0 clicks
-	regReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/auth/register", strings.NewReader(`{"handle":"newbie_lord","password":"password123"}`))
+	// 2. Admin login from public surface (X-Admin-Tunnel: 0) is rejected with 403 Forbidden
+	pubAdminReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/auth/login", strings.NewReader(`{"handle":"admin","password":"admin123456"}`))
+	pubAdminReq.Header.Set("X-Admin-Tunnel", "0")
+	pubAdminRec := httptest.NewRecorder()
+	h.ServeHTTP(pubAdminRec, pubAdminReq)
+	if pubAdminRec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for admin login on public surface, got %d", pubAdminRec.Code)
+	}
+
+	// 3. Login as admin via SSH tunnel -> create a one-time invite code
+	adminLoginReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/auth/login", strings.NewReader(`{"handle":"admin","password":"admin123456"}`))
+	adminLoginReq.Header.Set("X-Admin-Tunnel", "1")
+	adminLoginRec := httptest.NewRecorder()
+	h.ServeHTTP(adminLoginRec, adminLoginReq)
+	if adminLoginRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK on admin login, got %d: %s", adminLoginRec.Code, adminLoginRec.Body.String())
+	}
+	var adminState empire.DashboardStateResp
+	if err := json.Unmarshal(adminLoginRec.Body.Bytes(), &adminState); err != nil {
+		t.Fatal(err)
+	}
+	if !adminState.Player.IsAdmin || adminState.SessionToken == nil {
+		t.Fatalf("expected admin account with sessionToken, got %+v", adminState.Player)
+	}
+	adminToken := *adminState.SessionToken
+
+	invReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/admin/invites", strings.NewReader(`{}`))
+	invReq.Header.Set("X-Session-Token", adminToken)
+	invReq.Header.Set("X-Admin-Tunnel", "1")
+	invRec := httptest.NewRecorder()
+	h.ServeHTTP(invRec, invReq)
+	if invRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK on create invite, got %d: %s", invRec.Code, invRec.Body.String())
+	}
+	var invState empire.DashboardStateResp
+	if err := json.Unmarshal(invRec.Body.Bytes(), &invState); err != nil {
+		t.Fatal(err)
+	}
+	if invState.CreatedInviteCode == nil || *invState.CreatedInviteCode == "" {
+		t.Fatal("expected createdInviteCode in response")
+	}
+	inviteCode := *invState.CreatedInviteCode
+
+	// 4. Register without valid invite code fails
+	badRegReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/auth/register", strings.NewReader(`{"handle":"newbie_lord","password":"password123","inviteCode":"wrong-code"}`))
+	badRegRec := httptest.NewRecorder()
+	h.ServeHTTP(badRegRec, badRegReq)
+	if badRegRec.Code == http.StatusOK {
+		t.Fatal("expected registration with invalid invite code to fail")
+	}
+
+	// 5. Register a brand-new player account with the valid invite code -> starts at 0 water, 0 pop, 0 clicks
+	regReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/auth/register", strings.NewReader(`{"handle":"newbie_lord","password":"password123","inviteCode":"`+inviteCode+`"}`))
 	regRec := httptest.NewRecorder()
 	h.ServeHTTP(regRec, regReq)
 	if regRec.Code != http.StatusOK {
@@ -66,7 +117,15 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 	}
 	playerToken := *regState.SessionToken
 
-	// 3. POST /api/v1/empire/production/gather-water (10 clicks)
+	// 6. Reusing the same invite code fails (one-time use)
+	reuseReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/auth/register", strings.NewReader(`{"handle":"second_lord","password":"password123","inviteCode":"`+inviteCode+`"}`))
+	reuseRec := httptest.NewRecorder()
+	h.ServeHTTP(reuseRec, reuseReq)
+	if reuseRec.Code == http.StatusOK {
+		t.Fatal("expected reused invite code to be rejected")
+	}
+
+	// 7. POST /api/v1/empire/production/gather-water (10 clicks)
 	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/empire/production/gather-water", strings.NewReader(`{"clicks":10}`))
 	req2.Header.Set("X-Session-Token", playerToken)
 	rec2 := httptest.NewRecorder()
@@ -75,7 +134,7 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 		t.Fatalf("expected 200 OK, got %d", rec2.Code)
 	}
 
-	// 4. POST /api/v1/empire/production/recruit
+	// 8. POST /api/v1/empire/production/recruit
 	req3 := httptest.NewRequest(http.MethodPost, "/api/v1/empire/production/recruit", strings.NewReader(`{"count":1}`))
 	req3.Header.Set("X-Session-Token", playerToken)
 	rec3 := httptest.NewRecorder()
@@ -84,7 +143,7 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 		t.Fatalf("expected 200 OK, got %d: %s", rec3.Code, rec3.Body.String())
 	}
 
-	// 5. Normal player cannot call admin-only benchmark-30m (403 Forbidden)
+	// 9. Normal player cannot call admin-only benchmark-30m (403 Forbidden)
 	req4 := httptest.NewRequest(http.MethodPost, "/api/v1/empire/debug/benchmark-30m", strings.NewReader(`{}`))
 	req4.Header.Set("X-Session-Token", playerToken)
 	rec4 := httptest.NewRecorder()
@@ -93,24 +152,26 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 		t.Fatalf("expected 403 Forbidden for normal player calling benchmark, got %d", rec4.Code)
 	}
 
-	// 6. Login as admin -> can call benchmark-30m and simulation controls
-	adminLoginReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/auth/login", strings.NewReader(`{"handle":"admin","password":"admin123456"}`))
-	adminLoginRec := httptest.NewRecorder()
-	h.ServeHTTP(adminLoginRec, adminLoginReq)
-	if adminLoginRec.Code != http.StatusOK {
-		t.Fatalf("expected 200 OK on admin login, got %d: %s", adminLoginRec.Code, adminLoginRec.Body.String())
+	// 10. Admin can switch account to inspect newbie_lord while retaining admin privileges
+	swReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/account/switch", strings.NewReader(`{"handle":"newbie_lord"}`))
+	swReq.Header.Set("X-Session-Token", adminToken)
+	swReq.Header.Set("X-Admin-Tunnel", "1")
+	swRec := httptest.NewRecorder()
+	h.ServeHTTP(swRec, swReq)
+	if swRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for admin switch account, got %d: %s", swRec.Code, swRec.Body.String())
 	}
-	var adminState empire.DashboardStateResp
-	if err := json.Unmarshal(adminLoginRec.Body.Bytes(), &adminState); err != nil {
+	var swState empire.DashboardStateResp
+	if err := json.Unmarshal(swRec.Body.Bytes(), &swState); err != nil {
 		t.Fatal(err)
 	}
-	if !adminState.Player.IsAdmin || adminState.SessionToken == nil {
-		t.Fatalf("expected admin account with sessionToken, got %+v", adminState.Player)
+	if swState.Player.Handle != "newbie_lord" || !swState.Player.IsAdmin {
+		t.Fatalf("expected admin inspecting newbie_lord with isAdmin=true, got %+v", swState.Player)
 	}
-	adminToken := *adminState.SessionToken
 
 	req5 := httptest.NewRequest(http.MethodPost, "/api/v1/empire/debug/benchmark-30m", strings.NewReader(`{}`))
 	req5.Header.Set("X-Session-Token", adminToken)
+	req5.Header.Set("X-Admin-Tunnel", "1")
 	rec5 := httptest.NewRecorder()
 	h.ServeHTTP(rec5, req5)
 	if rec5.Code != http.StatusOK {

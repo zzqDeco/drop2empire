@@ -1319,6 +1319,85 @@ func (p *EventLogDTO) String() string {
 	return fmt.Sprintf("EventLogDTO(%+v)", *p)
 }
 
+type RegistrationInviteDTO struct {
+	ID          string  `thrift:"id,1,required" json:"id"`
+	CodePreview string  `thrift:"codePreview,2,required" json:"codePreview"`
+	CreatedAt   string  `thrift:"createdAt,3,required" json:"createdAt"`
+	ExpiresAt   string  `thrift:"expiresAt,4,required" json:"expiresAt"`
+	UsedAt      *string `thrift:"usedAt,5,optional" json:"usedAt,omitempty"`
+	UsedBy      *string `thrift:"usedBy,6,optional" json:"usedBy,omitempty"`
+	RevokedAt   *string `thrift:"revokedAt,7,optional" json:"revokedAt,omitempty"`
+}
+
+func NewRegistrationInviteDTO() *RegistrationInviteDTO {
+	return &RegistrationInviteDTO{}
+}
+
+func (p *RegistrationInviteDTO) InitDefault() {
+}
+
+func (p *RegistrationInviteDTO) GetID() (v string) {
+	return p.ID
+}
+
+func (p *RegistrationInviteDTO) GetCodePreview() (v string) {
+	return p.CodePreview
+}
+
+func (p *RegistrationInviteDTO) GetCreatedAt() (v string) {
+	return p.CreatedAt
+}
+
+func (p *RegistrationInviteDTO) GetExpiresAt() (v string) {
+	return p.ExpiresAt
+}
+
+var RegistrationInviteDTO_UsedAt_DEFAULT string
+
+func (p *RegistrationInviteDTO) GetUsedAt() (v string) {
+	if !p.IsSetUsedAt() {
+		return RegistrationInviteDTO_UsedAt_DEFAULT
+	}
+	return *p.UsedAt
+}
+
+var RegistrationInviteDTO_UsedBy_DEFAULT string
+
+func (p *RegistrationInviteDTO) GetUsedBy() (v string) {
+	if !p.IsSetUsedBy() {
+		return RegistrationInviteDTO_UsedBy_DEFAULT
+	}
+	return *p.UsedBy
+}
+
+var RegistrationInviteDTO_RevokedAt_DEFAULT string
+
+func (p *RegistrationInviteDTO) GetRevokedAt() (v string) {
+	if !p.IsSetRevokedAt() {
+		return RegistrationInviteDTO_RevokedAt_DEFAULT
+	}
+	return *p.RevokedAt
+}
+
+func (p *RegistrationInviteDTO) IsSetUsedAt() bool {
+	return p.UsedAt != nil
+}
+
+func (p *RegistrationInviteDTO) IsSetUsedBy() bool {
+	return p.UsedBy != nil
+}
+
+func (p *RegistrationInviteDTO) IsSetRevokedAt() bool {
+	return p.RevokedAt != nil
+}
+
+func (p *RegistrationInviteDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RegistrationInviteDTO(%+v)", *p)
+}
+
 type PlayerProfileDTO struct {
 	ID                         string `thrift:"id,1,required" json:"id"`
 	Handle                     string `thrift:"handle,2,required" json:"handle"`
@@ -1451,6 +1530,8 @@ type DashboardStateResp struct {
 	SeasonNotices       []*SeasonNoticeDTO       `thrift:"seasonNotices,17,required,list<SeasonNoticeDTO>" json:"seasonNotices"`
 	EventLogs           []*EventLogDTO           `thrift:"eventLogs,18,required,list<EventLogDTO>" json:"eventLogs"`
 	SessionToken        *string                  `thrift:"sessionToken,19,optional" json:"sessionToken,omitempty"`
+	Invites             []*RegistrationInviteDTO `thrift:"invites,20,required,list<RegistrationInviteDTO>" json:"invites"`
+	CreatedInviteCode   *string                  `thrift:"createdInviteCode,21,optional" json:"createdInviteCode,omitempty"`
 }
 
 func NewDashboardStateResp() *DashboardStateResp {
@@ -1556,6 +1637,19 @@ func (p *DashboardStateResp) GetSessionToken() (v string) {
 	return *p.SessionToken
 }
 
+func (p *DashboardStateResp) GetInvites() (v []*RegistrationInviteDTO) {
+	return p.Invites
+}
+
+var DashboardStateResp_CreatedInviteCode_DEFAULT string
+
+func (p *DashboardStateResp) GetCreatedInviteCode() (v string) {
+	if !p.IsSetCreatedInviteCode() {
+		return DashboardStateResp_CreatedInviteCode_DEFAULT
+	}
+	return *p.CreatedInviteCode
+}
+
 func (p *DashboardStateResp) IsSetPlayer() bool {
 	return p.Player != nil
 }
@@ -1570,6 +1664,10 @@ func (p *DashboardStateResp) IsSetWar() bool {
 
 func (p *DashboardStateResp) IsSetSessionToken() bool {
 	return p.SessionToken != nil
+}
+
+func (p *DashboardStateResp) IsSetCreatedInviteCode() bool {
+	return p.CreatedInviteCode != nil
 }
 
 func (p *DashboardStateResp) String() string {
@@ -1597,8 +1695,9 @@ func (p *GetDashboardReq) String() string {
 }
 
 type RegisterAccountReq struct {
-	Handle   string `thrift:"handle,1,required" json:"handle"`
-	Password string `thrift:"password,2,required" json:"password"`
+	Handle     string `thrift:"handle,1,required" json:"handle"`
+	Password   string `thrift:"password,2,required" json:"password"`
+	InviteCode string `thrift:"inviteCode,3,required" json:"inviteCode"`
 }
 
 func NewRegisterAccountReq() *RegisterAccountReq {
@@ -1616,11 +1715,54 @@ func (p *RegisterAccountReq) GetPassword() (v string) {
 	return p.Password
 }
 
+func (p *RegisterAccountReq) GetInviteCode() (v string) {
+	return p.InviteCode
+}
+
 func (p *RegisterAccountReq) String() string {
 	if p == nil {
 		return "<nil>"
 	}
 	return fmt.Sprintf("RegisterAccountReq(%+v)", *p)
+}
+
+type CreateInviteReq struct {
+}
+
+func NewCreateInviteReq() *CreateInviteReq {
+	return &CreateInviteReq{}
+}
+
+func (p *CreateInviteReq) InitDefault() {
+}
+
+func (p *CreateInviteReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CreateInviteReq(%+v)", *p)
+}
+
+type RevokeInviteReq struct {
+	ID string `thrift:"id,1,required" json:"id"`
+}
+
+func NewRevokeInviteReq() *RevokeInviteReq {
+	return &RevokeInviteReq{}
+}
+
+func (p *RevokeInviteReq) InitDefault() {
+}
+
+func (p *RevokeInviteReq) GetID() (v string) {
+	return p.ID
+}
+
+func (p *RevokeInviteReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RevokeInviteReq(%+v)", *p)
 }
 
 type LoginAccountReq struct {
@@ -2372,4 +2514,8 @@ type EmpireService interface {
 	ControlSimulation(ctx context.Context, req *ControlSimulationReq) (r *DashboardStateResp, err error)
 
 	RunBenchmark30m(ctx context.Context, req *RunBenchmark30mReq) (r *Benchmark30mResp, err error)
+
+	CreateInvite(ctx context.Context, req *CreateInviteReq) (r *DashboardStateResp, err error)
+
+	RevokeInvite(ctx context.Context, req *RevokeInviteReq) (r *DashboardStateResp, err error)
 }

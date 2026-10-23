@@ -41,6 +41,9 @@ func NewHTTPHandler(svc *app.Service, ready func(context.Context) error) http.Ha
 		if token != "" {
 			r = r.WithContext(app.WithSessionToken(r.Context(), token))
 		}
+		if tunnel := strings.TrimSpace(r.Header.Get("X-Admin-Tunnel")); tunnel != "" {
+			r = r.WithContext(app.WithAdminTunnel(r.Context(), tunnel))
+		}
 		mux.ServeHTTP(w, r)
 	})
 }
@@ -65,9 +68,10 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	if p == nil {
 		p = domain.NewBlankPlayer("pioneer", time.Now().UTC())
 	}
+	isAdmin := p.IsAdmin || w.AdminMode
 
 	handles := make([]string, 0, len(w.Players))
-	if p.IsAdmin {
+	if isAdmin {
 		for h := range w.Players {
 			handles = append(handles, h)
 		}
@@ -113,7 +117,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		TotalManualClicks:          p.TotalManualClicks,
 		SimulatedElapsedSeconds:    p.SimulatedElapsedSeconds,
 		OfflineAwardSummary:        p.LastOfflineSummary,
-		IsAdmin:                    p.IsAdmin,
+		IsAdmin:                    isAdmin,
 	}
 
 	resourcesDTO := make([]*empire.ResourceLineDTO, 0, len(domain.ResourceCatalog))
@@ -565,6 +569,31 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		})
 	}
 
+	invitesDTO := make([]*empire.RegistrationInviteDTO, 0)
+	if isAdmin {
+		for _, inv := range w.Invites {
+			dto := &empire.RegistrationInviteDTO{
+				ID:          inv.ID,
+				CodePreview: inv.CodePreview,
+				CreatedAt:   inv.CreatedAt,
+				ExpiresAt:   inv.ExpiresAt,
+			}
+			if inv.UsedAt != "" {
+				v := inv.UsedAt
+				dto.UsedAt = &v
+			}
+			if inv.UsedBy != "" {
+				v := inv.UsedBy
+				dto.UsedBy = &v
+			}
+			if inv.RevokedAt != "" {
+				v := inv.RevokedAt
+				dto.RevokedAt = &v
+			}
+			invitesDTO = append(invitesDTO, dto)
+		}
+	}
+
 	return &empire.DashboardStateResp{
 		ServerTime:          time.Now().UTC().Format(time.RFC3339),
 		Player:              playerDTO,
@@ -584,6 +613,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		Collectibles:        collectiblesDTO,
 		SeasonNotices:       noticesDTO,
 		EventLogs:           logsDTO,
+		Invites:             invitesDTO,
 	}
 }
 
@@ -596,13 +626,31 @@ func (s *Server) GetDashboard(ctx context.Context, _ *empire.GetDashboardReq) (*
 }
 
 func (s *Server) RegisterAccount(ctx context.Context, req *empire.RegisterAccountReq) (*empire.DashboardStateResp, error) {
-	w, token, err := s.svc.RegisterAccount(ctx, req.Handle, req.Password)
+	w, token, err := s.svc.RegisterAccount(ctx, req.Handle, req.Password, req.InviteCode)
 	if err != nil {
 		return nil, err
 	}
 	resp := mapDashboardResp(w)
 	resp.SessionToken = &token
 	return resp, nil
+}
+
+func (s *Server) CreateInvite(ctx context.Context, _ *empire.CreateInviteReq) (*empire.DashboardStateResp, error) {
+	w, code, err := s.svc.CreateInvite(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resp := mapDashboardResp(w)
+	resp.CreatedInviteCode = &code
+	return resp, nil
+}
+
+func (s *Server) RevokeInvite(ctx context.Context, req *empire.RevokeInviteReq) (*empire.DashboardStateResp, error) {
+	w, err := s.svc.RevokeInvite(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
 }
 
 func (s *Server) LoginAccount(ctx context.Context, req *empire.LoginAccountReq) (*empire.DashboardStateResp, error) {

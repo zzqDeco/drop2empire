@@ -7,12 +7,85 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
 )
 
 func HashPassword(handle, rawPassword string) string {
 	sum := sha256.Sum256([]byte("d2e::" + handle + "::" + rawPassword))
 	return hex.EncodeToString(sum[:])
+}
+
+func HashInviteCode(rawCode string) string {
+	norm := strings.ToLower(strings.TrimSpace(rawCode))
+	sum := sha256.Sum256([]byte("d2e-invite::" + norm))
+	return hex.EncodeToString(sum[:])
+}
+
+func CreateInvite(w *WorldState, now time.Time) (RegistrationInvite, string) {
+	w.NextInviteSeq++
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		sum := sha256.Sum256([]byte(fmt.Sprintf("inv-%d-%d", w.NextInviteSeq, now.UnixNano())))
+		copy(b, sum[:6])
+	}
+	hx := hex.EncodeToString(b) // 12 hex chars
+	plain := fmt.Sprintf("d2e-inv-%s-%s-%s", hx[0:4], hx[4:8], hx[8:12])
+	preview := fmt.Sprintf("d2e-inv-%s-****-%s", hx[0:4], hx[8:12])
+	inv := RegistrationInvite{
+		ID:          fmt.Sprintf("inv_%d", w.NextInviteSeq),
+		CodeHash:    HashInviteCode(plain),
+		CodePreview: preview,
+		CreatedAt:   now.UTC().Format(time.RFC3339),
+		ExpiresAt:   now.UTC().Add(7 * 24 * time.Hour).Format(time.RFC3339),
+	}
+	w.Invites = append([]RegistrationInvite{inv}, w.Invites...)
+	return inv, plain
+}
+
+func ConsumeInvite(w *WorldState, rawCode, usedByHandle string, now time.Time) error {
+	cleanCode := strings.TrimSpace(rawCode)
+	if cleanCode == "" {
+		return ErrInvalidInput("注册需提供管理员发放的邀请码")
+	}
+	targetHash := HashInviteCode(cleanCode)
+	for i := range w.Invites {
+		inv := &w.Invites[i]
+		if inv.CodeHash != targetHash {
+			continue
+		}
+		if inv.RevokedAt != "" {
+			return ErrPrecondition("invite_revoked", "该邀请码已被管理员吊销")
+		}
+		if inv.UsedAt != "" {
+			return ErrPrecondition("invite_used", "该邀请码已被使用（一码一用）")
+		}
+		if exp, err := time.Parse(time.RFC3339, inv.ExpiresAt); err == nil && now.UTC().After(exp) {
+			return ErrPrecondition("invite_expired", "该邀请码已过期")
+		}
+		inv.UsedAt = now.UTC().Format(time.RFC3339)
+		inv.UsedBy = usedByHandle
+		return nil
+	}
+	return ErrPrecondition("invalid_invite_code", "邀请码无效，请联系管理员获取有效邀请码")
+}
+
+func RevokeInvite(w *WorldState, inviteID string, now time.Time) error {
+	targetID := strings.TrimSpace(inviteID)
+	for i := range w.Invites {
+		inv := &w.Invites[i]
+		if inv.ID != targetID {
+			continue
+		}
+		if inv.UsedAt != "" {
+			return ErrPrecondition("invite_already_used", "该邀请码已被使用，无法吊销")
+		}
+		if inv.RevokedAt == "" {
+			inv.RevokedAt = now.UTC().Format(time.RFC3339)
+		}
+		return nil
+	}
+	return ErrNotFound("未找到指定的邀请码")
 }
 
 func NewSessionToken(handle string, now time.Time) string {
@@ -30,6 +103,9 @@ func EnsureDefaultAccounts(w *WorldState, now time.Time) {
 	}
 	if w.Sessions == nil {
 		w.Sessions = make(map[string]string)
+	}
+	if w.Invites == nil {
+		w.Invites = []RegistrationInvite{}
 	}
 	if p, ok := w.Players["pioneer"]; ok {
 		if p.PasswordHash == "" {
@@ -75,6 +151,8 @@ func NewDefaultWorld(now time.Time) *WorldState {
 		ActiveHandle:           "pioneer",
 		Players:                make(map[string]*PlayerState),
 		Sessions:               make(map[string]string),
+		Invites:                []RegistrationInvite{},
+		NextInviteSeq:          100,
 		TotalIssuedBasis:       treasuryInit + npcInit,
 		NPCHeldBasis:           npcInit,
 		TreasuryHeldBasis:      treasuryInit,

@@ -10,6 +10,7 @@ import (
 )
 
 type sessionTokenKey struct{}
+type adminTunnelKey struct{}
 
 func WithSessionToken(ctx context.Context, token string) context.Context {
 	return context.WithValue(ctx, sessionTokenKey{}, strings.TrimSpace(token))
@@ -18,6 +19,15 @@ func WithSessionToken(ctx context.Context, token string) context.Context {
 func SessionTokenFromContext(ctx context.Context) string {
 	v, _ := ctx.Value(sessionTokenKey{}).(string)
 	return v
+}
+
+func WithAdminTunnel(ctx context.Context, flag string) context.Context {
+	return context.WithValue(ctx, adminTunnelKey{}, strings.TrimSpace(flag))
+}
+
+func IsPublicSurface(ctx context.Context) bool {
+	v, _ := ctx.Value(adminTunnelKey{}).(string)
+	return v == "0"
 }
 
 type Service struct {
@@ -34,6 +44,33 @@ func NewService(tx domain.TxManager, repo domain.WorldRepository) *Service {
 	}
 }
 
+func resolveSession(w *domain.WorldState, token string) (target *domain.PlayerState, isAdmin bool, ok bool) {
+	raw, exists := w.Sessions[token]
+	if !exists || raw == "" {
+		return nil, false, false
+	}
+	if raw == "admin" || strings.HasPrefix(raw, "admin::") {
+		adm := w.Players["admin"]
+		if adm == nil || !adm.IsAdmin {
+			return nil, false, false
+		}
+		targetHandle := "admin"
+		if strings.HasPrefix(raw, "admin::") {
+			targetHandle = strings.TrimPrefix(raw, "admin::")
+		}
+		tp, tExists := w.Players[targetHandle]
+		if !tExists || tp == nil {
+			tp = adm
+		}
+		return tp, true, true
+	}
+	p, pExists := w.Players[raw]
+	if !pExists || p == nil {
+		return nil, false, false
+	}
+	return p, p.IsAdmin, true
+}
+
 func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *domain.PlayerState, now time.Time) error) (*domain.WorldState, error) {
 	now := s.now()
 	token := SessionTokenFromContext(ctx)
@@ -47,15 +84,15 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 			return err
 		}
 		domain.EnsureDefaultAccounts(w, now)
-		handle, ok := w.Sessions[token]
-		if !ok || handle == "" {
+		p, isAdmin, ok := resolveSession(w, token)
+		if !ok || p == nil {
 			return domain.ErrUnauthorized("登录会话已过期，请重新登录")
 		}
-		p, exists := w.Players[handle]
-		if !exists || p == nil {
-			return domain.ErrUnauthorized("当前账号不存在，请重新登录")
+		if isAdmin && IsPublicSurface(ctx) {
+			return domain.ErrForbidden("管理后台未在公网开放，请通过 SSH 本地隧道访问")
 		}
-		w.ActiveHandle = handle
+		w.ActiveHandle = p.Handle
+		w.AdminMode = isAdmin
 		for _, pl := range w.Players {
 			domain.SettleProduction(pl, now)
 		}
@@ -67,19 +104,23 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 		if err := s.repo.SaveWorld(txCtx, w); err != nil {
 			return err
 		}
+		w.AdminMode = isAdmin
 		out = w
 		return nil
 	})
 	return out, err
 }
 
-func (s *Service) RegisterAccount(ctx context.Context, handle, password string) (*domain.WorldState, string, error) {
+func (s *Service) RegisterAccount(ctx context.Context, handle, password, inviteCode string) (*domain.WorldState, string, error) {
 	clean := strings.TrimSpace(handle)
 	if len(clean) < 2 || len(clean) > 24 || strings.ContainsAny(clean, " \t\r\n") {
 		return nil, "", domain.ErrInvalidInput("账号名称长度需在 2–24 个字符之间且不含空格")
 	}
 	if len(password) < 6 || len(password) > 64 {
 		return nil, "", domain.ErrInvalidInput("登录密码长度需在 6–64 个字符之间")
+	}
+	if strings.TrimSpace(inviteCode) == "" {
+		return nil, "", domain.ErrInvalidInput("请输入管理员发放的邀请码")
 	}
 	now := s.now()
 	var out *domain.WorldState
@@ -93,6 +134,9 @@ func (s *Service) RegisterAccount(ctx context.Context, handle, password string) 
 		if _, exists := w.Players[clean]; exists {
 			return domain.ErrPrecondition("handle_taken", "该领主名号已被注册，请直接登录或更换名称")
 		}
+		if err := domain.ConsumeInvite(w, inviteCode, clean, now); err != nil {
+			return err
+		}
 		p := domain.NewBlankPlayer(clean, now)
 		p.PasswordHash = domain.HashPassword(clean, password)
 		p.IsAdmin = false
@@ -101,6 +145,7 @@ func (s *Service) RegisterAccount(ctx context.Context, handle, password string) 
 		token = domain.NewSessionToken(clean, now)
 		w.Sessions[token] = clean
 		w.ActiveHandle = clean
+		w.AdminMode = false
 
 		for _, pl := range w.Players {
 			domain.SettleProduction(pl, now)
@@ -108,6 +153,7 @@ func (s *Service) RegisterAccount(ctx context.Context, handle, password string) 
 		if err := s.repo.SaveWorld(txCtx, w); err != nil {
 			return err
 		}
+		w.AdminMode = false
 		out = w
 		return nil
 	})
@@ -136,10 +182,14 @@ func (s *Service) LoginAccount(ctx context.Context, handle, password string) (*d
 		if p.PasswordHash != expected {
 			return domain.ErrUnauthorized("账号不存在或密码错误")
 		}
+		if p.IsAdmin && IsPublicSurface(ctx) {
+			return domain.ErrForbidden("管理后台未在公网开放，请通过 SSH 本地隧道访问")
+		}
 
 		token = domain.NewSessionToken(clean, now)
 		w.Sessions[token] = clean
 		w.ActiveHandle = clean
+		w.AdminMode = p.IsAdmin
 
 		for _, pl := range w.Players {
 			domain.SettleProduction(pl, now)
@@ -147,10 +197,38 @@ func (s *Service) LoginAccount(ctx context.Context, handle, password string) (*d
 		if err := s.repo.SaveWorld(txCtx, w); err != nil {
 			return err
 		}
+		w.AdminMode = p.IsAdmin
 		out = w
 		return nil
 	})
 	return out, token, err
+}
+
+func (s *Service) CreateInvite(ctx context.Context) (*domain.WorldState, string, error) {
+	if IsPublicSurface(ctx) {
+		return nil, "", domain.ErrForbidden("管理后台未在公网开放，请通过 SSH 本地隧道访问")
+	}
+	var plainCode string
+	w, err := s.mutate(ctx, func(w *domain.WorldState, _ *domain.PlayerState, now time.Time) error {
+		if !w.AdminMode {
+			return domain.ErrForbidden("仅平台管理员可生成注册邀请码")
+		}
+		_, plainCode = domain.CreateInvite(w, now)
+		return nil
+	})
+	return w, plainCode, err
+}
+
+func (s *Service) RevokeInvite(ctx context.Context, inviteID string) (*domain.WorldState, error) {
+	if IsPublicSurface(ctx) {
+		return nil, domain.ErrForbidden("管理后台未在公网开放，请通过 SSH 本地隧道访问")
+	}
+	return s.mutate(ctx, func(w *domain.WorldState, _ *domain.PlayerState, now time.Time) error {
+		if !w.AdminMode {
+			return domain.ErrForbidden("仅平台管理员可吊销注册邀请码")
+		}
+		return domain.RevokeInvite(w, inviteID, now)
+	})
 }
 
 func (s *Service) LogoutAccount(ctx context.Context) error {
@@ -179,8 +257,8 @@ func (s *Service) SwitchAccount(ctx context.Context, handle string) (*domain.Wor
 	if len(clean) < 2 || len(clean) > 24 {
 		return nil, domain.ErrInvalidInput("账号标识长度需在 2–24 个字符之间")
 	}
-	return s.mutate(ctx, func(w *domain.WorldState, p *domain.PlayerState, now time.Time) error {
-		if !p.IsAdmin {
+	return s.mutate(ctx, func(w *domain.WorldState, _ *domain.PlayerState, now time.Time) error {
+		if !w.AdminMode {
 			return domain.ErrForbidden("仅平台管理员可切换检视其他领主账号")
 		}
 		if _, exists := w.Players[clean]; !exists {
@@ -190,7 +268,11 @@ func (s *Service) SwitchAccount(ctx context.Context, handle string) (*domain.Wor
 		}
 		token := SessionTokenFromContext(ctx)
 		if token != "" {
-			w.Sessions[token] = clean
+			if clean == "admin" {
+				w.Sessions[token] = "admin"
+			} else {
+				w.Sessions[token] = "admin::" + clean
+			}
 		}
 		w.ActiveHandle = clean
 		domain.SettleProduction(w.Players[clean], now)
@@ -281,7 +363,7 @@ func (s *Service) DeployWarTroops(ctx context.Context, nodeID string, infDelta, 
 
 func (s *Service) TriggerWarSettlement(ctx context.Context) (*domain.WorldState, error) {
 	return s.mutate(ctx, func(w *domain.WorldState, p *domain.PlayerState, now time.Time) error {
-		if !p.IsAdmin {
+		if !w.AdminMode {
 			return domain.ErrForbidden("仅平台管理员可手动强制执行 20:00 战争结算")
 		}
 		domain.SettleWarDay(w, p, now)
@@ -303,7 +385,7 @@ func (s *Service) OpenSeasonChest(ctx context.Context, clientSeedHint int64) (*d
 
 func (s *Service) ControlSimulation(ctx context.Context, action string, speedMultiplier int32, advanceSeconds int64, targetHandle string) (*domain.WorldState, error) {
 	return s.mutate(ctx, func(w *domain.WorldState, p *domain.PlayerState, now time.Time) error {
-		if !p.IsAdmin {
+		if !w.AdminMode {
 			return domain.ErrForbidden("仅平台管理员可执行数值模拟与调速指令")
 		}
 		target := p
@@ -387,8 +469,8 @@ func (s *Service) ControlSimulation(ctx context.Context, action string, speedMul
 }
 
 func (s *Service) RunBenchmark30m(ctx context.Context) ([]domain.BenchmarkRun, error) {
-	if _, err := s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, _ time.Time) error {
-		if !p.IsAdmin {
+	if _, err := s.mutate(ctx, func(w *domain.WorldState, _ *domain.PlayerState, _ time.Time) error {
+		if !w.AdminMode {
 			return domain.ErrForbidden("仅平台管理员可运行 30 分钟全阶段数值基准模拟器")
 		}
 		return nil
