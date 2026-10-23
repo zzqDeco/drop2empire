@@ -27,6 +27,7 @@ import {
   type ManageRaidGearReq,
   type DraftRaidBuffReq,
   type FinishRaidReq,
+  type RolloverSeasonReq,
   type UnlockBlueprintReq,
 } from "./generated";
 
@@ -345,6 +346,12 @@ export class EmpireClient {
         body: JSON.stringify({}),
       },
     );
+
+  rolloverSeason = (req: RolloverSeasonReq = {}) =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.RolloverSeason.clientPath, {
+      method: IDL_ROUTES.RolloverSeason.method,
+      body: JSON.stringify(req),
+    });
 }
 
 export const api = new EmpireClient();

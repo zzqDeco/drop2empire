@@ -23,6 +23,18 @@ cmd/main.go ──► adapter/http ──► app ──► domain ◄── infr
 - `services/game/internal/arch_test.go` parses the Go AST of every package under `internal/` and fails `go test` if any layer imports a forbidden dependency or if flat `.go` files are added directly under `internal/`.
 - `make check-arch` (`./ops/check-architecture.sh`) additionally verifies that `./ops/codegen.sh` produces zero uncommitted diff in `contracts/gen/game` and `packages/api-client/src/generated.ts`.
 
+### 4D Modular Code Partitioning (`Overall / Macro / Micro / Season`)
+Both the Go backend and React frontend mirror the 4D game design taxonomy (`docs/design/{01-overall,02-macro,03-micro,04-seasons}`):
+- **Domain (`services/game/internal/domain/`)**:
+  - `overall_types.go`, `overall_lifecycle.go` (Core aggregates, fixed-point scales, auth/invites, resource catalog, world bootstrap)
+  - `macro_professions.go`, `macro_market.go`, `macro_war.go` (4 professions, workshop recipes, CLOB matching & tax burn, Chamber War graph & combat formula)
+  - `micro_settlement.go`, `micro_raid.go`, `micro_simulator.go` (Settlement blueprints/edicts/caravan, 2D multi-zone extraction roguelite & 54 buff cards, 30m deterministic simulator)
+  - `season_framework.go`, `season_s1.go` (Cross-season reset vs. permanent retention engine `RolloverSeason`, S1 animated cosmetics & out-of-raid gear catalog, procedural relic minting)
+- **Application (`services/game/internal/app/`)**:
+  - `overall_app.go`, `macro_app.go`, `micro_settlement_app.go`, `micro_raid_app.go`, `season_app.go`
+- **Frontend (`apps/web/src/`)**:
+  - `App.tsx` (Overall lifecycle & Micro settlement dashboard), `WastelandRaidPanel.tsx` & `LordAvatarSVG.tsx` (Micro 2D extraction roguelite & animated Lord avatar), `MacroEmpireWorkspace.tsx` & `WarGraphMapSVG.tsx` & `ProceduralRelicSVG.tsx` (Macro Workshop/CLOB Market/Chamber War & Season Collectibles), `AdminConsoleView.tsx` (Loopback operator console & season rollover).
+
 ---
 
 ## 2. Contract-First Thrift IDL Pipeline

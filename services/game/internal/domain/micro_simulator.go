@@ -38,12 +38,12 @@ func FormatDurationMMSS(sec float64) string {
 // through all Phase 1 milestones including the 3 Treasure Parts (GDD 4.4 & 21.1).
 func RunPhase1Benchmarks() []BenchmarkRun {
 	strategies := []struct {
-		code       string
-		name       string
-		desc       string
-		waterShare [4]float64 // [before_axe, axe_to_quarry, quarry_to_workshop, workshop_to_treasure]
-		woodShare  [4]float64
-		stoneShare [4]float64
+		code        string
+		name        string
+		desc        string
+		waterShare  [4]float64 // [before_axe, axe_to_quarry, quarry_to_workshop, workshop_to_treasure]
+		woodShare   [4]float64
+		stoneShare  [4]float64
 		useUpgrades bool
 	}{
 		{
@@ -87,7 +87,6 @@ func simulateSingleRun(
 	waterShare, woodShare, stoneShare [4]float64,
 	useUpgrades bool,
 ) BenchmarkRun {
-	// Start after 10 manual clicks (10s elapsed at 1 click/sec = 10,000 milli water)
 	simSec := 10.0
 	water := int64(10) * ResourceScale
 	wood := int64(0)
@@ -107,9 +106,7 @@ func simulateSingleRun(
 		})
 	}
 
-	// Step 0.5s ticks up to 60 minutes max
 	for step := 0; step < 7200; step++ {
-		// Determine current target population cap
 		targetPop := int32(10)
 		if unlocked[BPAxeBlueprint] {
 			targetPop = 25
@@ -118,7 +115,6 @@ func simulateSingleRun(
 			targetPop = 40
 		}
 
-		// Recruit residents if below targetPop
 		for pop < targetPop {
 			cost := NextResidentCostMilli(pop)
 			if water >= cost {
@@ -132,7 +128,6 @@ func simulateSingleRun(
 			}
 		}
 
-		// Check blueprint unlocks
 		if !unlocked[BPAxeBlueprint] && pop >= 10 && water >= 200*ResourceScale {
 			water -= 200 * ResourceScale
 			unlocked[BPAxeBlueprint] = true
@@ -204,7 +199,6 @@ func simulateSingleRun(
 				break
 			}
 		} else {
-			// Original GDD 4.4 lump-sum treasure cost: 18,000 water + 7,000 wood + 2,200 stone
 			if unlocked[BPBasicWorkshop] && !unlocked[BPMysteryTreasure] &&
 				water >= 18000*ResourceScale && wood >= 7000*ResourceScale && stone >= 2200*ResourceScale {
 				water -= 18000 * ResourceScale
@@ -216,7 +210,6 @@ func simulateSingleRun(
 			}
 		}
 
-		// Allocate integer workers for this 0.5s tick
 		stageIdx := 0
 		if unlocked[BPBasicWorkshop] {
 			stageIdx = 3
@@ -252,7 +245,6 @@ func simulateSingleRun(
 			}
 		}
 
-		// 0.5s tick output: (workers * baseRateMilliPerSec * mult / 100) / 2
 		water += (int64(wWater) * 2000 * waterMult) / 200
 		wood += (int64(wWood) * 450 * woodMult) / 200
 		stone += (int64(wStone) * 220 * stoneMult) / 200

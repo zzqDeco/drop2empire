@@ -1835,6 +1835,58 @@ func (p *SeasonNoticeDTO) String() string {
 	return fmt.Sprintf("SeasonNoticeDTO(%+v)", *p)
 }
 
+type SeasonStateDTO struct {
+	SeasonId       string   `thrift:"seasonId,1,required" json:"seasonId"`
+	SeasonNumber   int32    `thrift:"seasonNumber,2,required" json:"seasonNumber"`
+	Title          string   `thrift:"title,3,required" json:"title"`
+	Subtitle       string   `thrift:"subtitle,4,required" json:"subtitle"`
+	StartedAt      string   `thrift:"startedAt,5,required" json:"startedAt"`
+	ResetRules     []string `thrift:"resetRules,6,required,list<string>" json:"resetRules"`
+	RetentionRules []string `thrift:"retentionRules,7,required,list<string>" json:"retentionRules"`
+}
+
+func NewSeasonStateDTO() *SeasonStateDTO {
+	return &SeasonStateDTO{}
+}
+
+func (p *SeasonStateDTO) InitDefault() {
+}
+
+func (p *SeasonStateDTO) GetSeasonId() (v string) {
+	return p.SeasonId
+}
+
+func (p *SeasonStateDTO) GetSeasonNumber() (v int32) {
+	return p.SeasonNumber
+}
+
+func (p *SeasonStateDTO) GetTitle() (v string) {
+	return p.Title
+}
+
+func (p *SeasonStateDTO) GetSubtitle() (v string) {
+	return p.Subtitle
+}
+
+func (p *SeasonStateDTO) GetStartedAt() (v string) {
+	return p.StartedAt
+}
+
+func (p *SeasonStateDTO) GetResetRules() (v []string) {
+	return p.ResetRules
+}
+
+func (p *SeasonStateDTO) GetRetentionRules() (v []string) {
+	return p.RetentionRules
+}
+
+func (p *SeasonStateDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("SeasonStateDTO(%+v)", *p)
+}
+
 type EventLogDTO struct {
 	ID        string `thrift:"id,1,required" json:"id"`
 	Timestamp string `thrift:"timestamp,2,required" json:"timestamp"`
@@ -2094,6 +2146,7 @@ type DashboardStateResp struct {
 	Cosmetics           []*CosmeticSpecDTO       `thrift:"cosmetics,28,required,list<CosmeticSpecDTO>" json:"cosmetics"`
 	RaidGears           []*RaidGearSpecDTO       `thrift:"raidGears,29,required,list<RaidGearSpecDTO>" json:"raidGears"`
 	RaidLoadout         *RaidLoadoutStateDTO     `thrift:"raidLoadout,30,required" json:"raidLoadout"`
+	CurrentSeason       *SeasonStateDTO          `thrift:"currentSeason,31,required" json:"currentSeason"`
 }
 
 func NewDashboardStateResp() *DashboardStateResp {
@@ -2263,6 +2316,15 @@ func (p *DashboardStateResp) GetRaidLoadout() (v *RaidLoadoutStateDTO) {
 	return p.RaidLoadout
 }
 
+var DashboardStateResp_CurrentSeason_DEFAULT *SeasonStateDTO
+
+func (p *DashboardStateResp) GetCurrentSeason() (v *SeasonStateDTO) {
+	if !p.IsSetCurrentSeason() {
+		return DashboardStateResp_CurrentSeason_DEFAULT
+	}
+	return p.CurrentSeason
+}
+
 func (p *DashboardStateResp) IsSetPlayer() bool {
 	return p.Player != nil
 }
@@ -2293,6 +2355,10 @@ func (p *DashboardStateResp) IsSetEquippedCosmetics() bool {
 
 func (p *DashboardStateResp) IsSetRaidLoadout() bool {
 	return p.RaidLoadout != nil
+}
+
+func (p *DashboardStateResp) IsSetCurrentSeason() bool {
+	return p.CurrentSeason != nil
 }
 
 func (p *DashboardStateResp) String() string {
@@ -2858,6 +2924,37 @@ func (p *StartRaidReq) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("StartRaidReq(%+v)", *p)
+}
+
+type RolloverSeasonReq struct {
+	NextTitle *string `thrift:"nextTitle,1,optional" json:"nextTitle,omitempty"`
+}
+
+func NewRolloverSeasonReq() *RolloverSeasonReq {
+	return &RolloverSeasonReq{}
+}
+
+func (p *RolloverSeasonReq) InitDefault() {
+}
+
+var RolloverSeasonReq_NextTitle_DEFAULT string
+
+func (p *RolloverSeasonReq) GetNextTitle() (v string) {
+	if !p.IsSetNextTitle() {
+		return RolloverSeasonReq_NextTitle_DEFAULT
+	}
+	return *p.NextTitle
+}
+
+func (p *RolloverSeasonReq) IsSetNextTitle() bool {
+	return p.NextTitle != nil
+}
+
+func (p *RolloverSeasonReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RolloverSeasonReq(%+v)", *p)
 }
 
 type FinishRaidReq struct {
@@ -3495,4 +3592,6 @@ type EmpireService interface {
 	StartRaid(ctx context.Context, req *StartRaidReq) (r *DashboardStateResp, err error)
 
 	FinishRaid(ctx context.Context, req *FinishRaidReq) (r *DashboardStateResp, err error)
+
+	RolloverSeason(ctx context.Context, req *RolloverSeasonReq) (r *DashboardStateResp, err error)
 }

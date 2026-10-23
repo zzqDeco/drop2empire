@@ -10,15 +10,15 @@ const (
 	ResourceScale int64 = 1000
 	// GoldScale represents 1.0000 Gold unit = 10,000 basis-units.
 	GoldScale int64 = 10000
-	// OfflineCapSeconds caps a single offline production catch-up at 8 hours (GDD 6.4).
+	// OfflineCapSeconds caps a single offline production catch-up at 8 hours.
 	OfflineCapSeconds int64 = 8 * 3600
-	// DailyWarBudgetCap is the per-member daily armament deployment cap (GDD 10.5).
+	// DailyWarBudgetCap is the per-member daily armament deployment cap.
 	DailyWarBudgetCap int32 = 100
-	// MarketTaxBps is 1.00% (100 bps) on spot trades: 0.50% burned, 0.50% to public treasury (GDD 7.4).
+	// MarketTaxBps is 1.00% (100 bps) on spot trades: 0.50% burned, 0.50% to public treasury.
 	MarketTaxBps int64 = 100
 	// MarketBurnShareBps is 50 bps (half of the 100 bps tax).
 	MarketBurnShareBps int64 = 50
-	// ChestRedeemCostPoints is the Activity Points required to redeem 1 Season Chest (GDD 11.1).
+	// ChestRedeemCostPoints is the Activity Points required to redeem 1 Season Chest.
 	ChestRedeemCostPoints int32 = 100
 )
 
@@ -115,7 +115,7 @@ const (
 	ExpRouteSanctum = "exp_sanctum"
 )
 
-// Profession codes (GDD 5.2).
+// Profession codes.
 const (
 	ProfNone      = "none"
 	ProfScientist = "scientist"
@@ -124,7 +124,7 @@ const (
 	ProfArtisan   = "artisan"
 )
 
-// Guild codes (GDD 9 & 10).
+// Guild codes.
 const (
 	GuildObsidian = "OBSIDIAN"
 	GuildArgent   = "ARGENT"
@@ -312,17 +312,17 @@ type CollectibleItem struct {
 }
 
 type PlayerState struct {
-	ID                      string             `json:"id"`
-	Handle                  string             `json:"handle"`
-	PasswordHash            string             `json:"passwordHash"`
-	IsAdmin                 bool               `json:"isAdmin"`
-	Phase                   int32              `json:"phase"`
-	Profession              string             `json:"profession"`
-	ArtifactName            string             `json:"artifactName"`
-	PopulationTotal         int32              `json:"populationTotal"`
-	Workers                 map[string]int32   `json:"workers"`
-	ResourcesMilli          map[string]int64   `json:"resourcesMilli"`
-	FrozenResourcesMilli    map[string]int64   `json:"frozenResourcesMilli"`
+	ID                      string                 `json:"id"`
+	Handle                  string                 `json:"handle"`
+	PasswordHash            string                 `json:"passwordHash"`
+	IsAdmin                 bool                   `json:"isAdmin"`
+	Phase                   int32                  `json:"phase"`
+	Profession              string                 `json:"profession"`
+	ArtifactName            string                 `json:"artifactName"`
+	PopulationTotal         int32                  `json:"populationTotal"`
+	Workers                 map[string]int32       `json:"workers"`
+	ResourcesMilli          map[string]int64       `json:"resourcesMilli"`
+	FrozenResourcesMilli    map[string]int64       `json:"frozenResourcesMilli"`
 	UnlockedBlueprints      map[string]bool        `json:"unlockedBlueprints"`
 	ActiveEdicts            map[string]bool        `json:"activeEdicts"`
 	ActiveExpedition        *ActiveExpeditionState `json:"activeExpedition,omitempty"`
@@ -332,18 +332,18 @@ type PlayerState struct {
 	RaidGearInventory       map[string]int32       `json:"raidGearInventory"`
 	RaidLoadout             RaidLoadoutState       `json:"raidLoadout"`
 	InstalledEquipments     map[string]int32       `json:"installedEquipments"`
-	Presets                 []AllocationPreset `json:"presets"`
-	GoldBasis               int64              `json:"goldBasis"`
-	GoldFrozenBasis         int64              `json:"goldFrozenBasis"`
-	ActivityPoints          int32              `json:"activityPoints"`
-	GuildCode               string             `json:"guildCode"`
-	DailyWarBudgetUsed      int32              `json:"dailyWarBudgetUsed"`
-	SpeedMultiplier         int32              `json:"speedMultiplier"`
-	TotalManualClicks       int64              `json:"totalManualClicks"`
-	SimulatedElapsedSeconds int64              `json:"simulatedElapsedSeconds"`
-	LastSettledAt           time.Time          `json:"lastSettledAt"`
-	LastOfflineSummary      string             `json:"lastOfflineSummary"`
-	EventLogs               []EventEntry       `json:"eventLogs"`
+	Presets                 []AllocationPreset     `json:"presets"`
+	GoldBasis               int64                  `json:"goldBasis"`
+	GoldFrozenBasis         int64                  `json:"goldFrozenBasis"`
+	ActivityPoints          int32                  `json:"activityPoints"`
+	GuildCode               string                 `json:"guildCode"`
+	DailyWarBudgetUsed      int32                  `json:"dailyWarBudgetUsed"`
+	SpeedMultiplier         int32                  `json:"speedMultiplier"`
+	TotalManualClicks       int64                  `json:"totalManualClicks"`
+	SimulatedElapsedSeconds int64                  `json:"simulatedElapsedSeconds"`
+	LastSettledAt           time.Time              `json:"lastSettledAt"`
+	LastOfflineSummary      string                 `json:"lastOfflineSummary"`
+	EventLogs               []EventEntry           `json:"eventLogs"`
 }
 
 type MarketOrder struct {
@@ -447,8 +447,11 @@ type WorldState struct {
 	OpenPriceBasis         map[string]int64        `json:"openPriceBasis"`
 	Orders                 []MarketOrder           `json:"orders"`
 	Trades                 []MarketTrade           `json:"trades"`
+	SeasonNumber           int32                   `json:"seasonNumber"`
 	SeasonCode             string                  `json:"seasonCode"`
 	SeasonName             string                  `json:"seasonName"`
+	SeasonSubtitle         string                  `json:"seasonSubtitle"`
+	SeasonStartedAt        string                  `json:"seasonStartedAt"`
 	WarDay                 int32                   `json:"warDay"`
 	ObsidianScore          int32                   `json:"obsidianScore"`
 	ArgentScore            int32                   `json:"argentScore"`

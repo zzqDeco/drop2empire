@@ -66,9 +66,10 @@ const (
 	PatternDraftRaidBuff = "POST /api/v1/empire/colony/raid/buff"
 	PatternStartRaid = "POST /api/v1/empire/colony/raid/start"
 	PatternFinishRaid = "POST /api/v1/empire/colony/raid/finish"
+	PatternRolloverSeason = "POST /api/v1/empire/admin/season/rollover"
 )
 
-// EmpireServiceRoutes lists all 34 route specifications declared on EmpireService.
+// EmpireServiceRoutes lists all 35 route specifications declared on EmpireService.
 var EmpireServiceRoutes = []RouteSpec{
 	{Name: "GetDashboard", Method: "GET", Path: "/api/v1/empire/state", MuxPattern: PatternGetDashboard, RequestType: "GetDashboardReq", ResponseType: "DashboardStateResp"},
 	{Name: "RegisterAccount", Method: "POST", Path: "/api/v1/empire/auth/register", MuxPattern: PatternRegisterAccount, RequestType: "RegisterAccountReq", ResponseType: "DashboardStateResp"},
@@ -104,6 +105,7 @@ var EmpireServiceRoutes = []RouteSpec{
 	{Name: "DraftRaidBuff", Method: "POST", Path: "/api/v1/empire/colony/raid/buff", MuxPattern: PatternDraftRaidBuff, RequestType: "DraftRaidBuffReq", ResponseType: "DashboardStateResp"},
 	{Name: "StartRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/start", MuxPattern: PatternStartRaid, RequestType: "StartRaidReq", ResponseType: "DashboardStateResp"},
 	{Name: "FinishRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/finish", MuxPattern: PatternFinishRaid, RequestType: "FinishRaidReq", ResponseType: "DashboardStateResp"},
+	{Name: "RolloverSeason", Method: "POST", Path: "/api/v1/empire/admin/season/rollover", MuxPattern: PatternRolloverSeason, RequestType: "RolloverSeasonReq", ResponseType: "DashboardStateResp"},
 }
 
 // EmpireServiceRouteHandlers binds every endpoint in EmpireService to an http.HandlerFunc.
@@ -142,6 +144,7 @@ type EmpireServiceRouteHandlers struct {
 	DraftRaidBuff http.HandlerFunc
 	StartRaid http.HandlerFunc
 	FinishRaid http.HandlerFunc
+	RolloverSeason http.HandlerFunc
 }
 
 // RegisterEmpireServiceRoutes registers all EmpireService endpoints on mux and panics if any IDL endpoint handler is nil.
@@ -282,6 +285,10 @@ func RegisterEmpireServiceRoutes(mux *http.ServeMux, h EmpireServiceRouteHandler
 		panic("EmpireServiceRouteHandlers.FinishRaid (" + PatternFinishRaid + ") is nil")
 	}
 	mux.HandleFunc(PatternFinishRaid, h.FinishRaid)
+	if h.RolloverSeason == nil {
+		panic("EmpireServiceRouteHandlers.RolloverSeason (" + PatternRolloverSeason + ") is nil")
+	}
+	mux.HandleFunc(PatternRolloverSeason, h.RolloverSeason)
 }
 
 // RegisterEmpireServer binds EmpireServer methods using HTTPResponder with optional per-route handler overrides.
@@ -902,6 +909,25 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			fn = mw.WrapRoute(RouteSpec{Name: "FinishRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/finish", MuxPattern: PatternFinishRaid, RequestType: "FinishRaidReq", ResponseType: "DashboardStateResp"}, fn)
 		}
 		h.FinishRaid = fn
+	}
+	if h.RolloverSeason == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req RolloverSeasonReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.RolloverSeason(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "RolloverSeason", Method: "POST", Path: "/api/v1/empire/admin/season/rollover", MuxPattern: PatternRolloverSeason, RequestType: "RolloverSeasonReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.RolloverSeason = fn
 	}
 	RegisterEmpireServiceRoutes(mux, h)
 }

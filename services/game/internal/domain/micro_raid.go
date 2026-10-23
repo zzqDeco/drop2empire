@@ -1,336 +1,9 @@
 package domain
 
-var CosmeticCatalog = []CosmeticSpec{
-	// Headgear (头饰)
-	{
-		ItemKey:      ResCosGoggles,
-		Name:         "荒原防风护目镜",
-		Slot:         "headgear",
-		Rarity:       "RARE",
-		SeasonTag:    "S1 · 荒原勘探",
-		VisualEffect: "额前佩戴黄铜铆钉防沙风镜",
-	},
-	{
-		ItemKey:      ResCosSteamCrown,
-		Name:         "墨械蒸汽齿轮冠",
-		Slot:         "headgear",
-		Rarity:       "EPIC",
-		SeasonTag:    "S1 · 墨械纪元",
-		VisualEffect: "头顶双层精密齿轮持续啮合旋转",
-	},
-	{
-		ItemKey:      ResCosObsidianCrown,
-		Name:         "★S1·曜石星辉王冠",
-		Slot:         "headgear",
-		Rarity:       "LEGENDARY",
-		SeasonTag:    "S1 · 赛季典藏限定",
-		VisualEffect: "悬浮黑曜棱晶王冠 + 金色星芒粒子光环",
-	},
-
-	// Mantle (背饰)
-	{
-		ItemKey:      ResCosSandCloak,
-		Name:         "沙行旅人斗篷",
-		Slot:         "mantle",
-		Rarity:       "RARE",
-		SeasonTag:    "S1 · 荒原勘探",
-		VisualEffect: "随步伐微摆的防沙斗篷",
-	},
-	{
-		ItemKey:      ResCosHydroWings,
-		Name:         "阿基米德水翼背甲",
-		Slot:         "mantle",
-		Rarity:       "EPIC",
-		SeasonTag:    "S1 · 墨械纪元",
-		VisualEffect: "背部高压水翼脉冲喷射蔚蓝水雾",
-	},
-	{
-		ItemKey:      ResCosAstralWings,
-		Name:         "★S1·星界流光羽翼",
-		Slot:         "mantle",
-		Rarity:       "LEGENDARY",
-		SeasonTag:    "S1 · 赛季典藏限定",
-		VisualEffect: "以太双翼动态呼吸扇动 + 星轨拖尾",
-	},
-
-	// HeldRelic (手持圣物)
-	{
-		ItemKey:      ResCosCompass,
-		Name:         "寻脉青铜罗盘",
-		Slot:         "held_relic",
-		Rarity:       "RARE",
-		SeasonTag:    "S1 · 荒原勘探",
-		VisualEffect: "掌心托举指针微颤的古铜罗盘",
-	},
-	{
-		ItemKey:      ResCosAlchLantern,
-		Name:         "赫尔墨斯荧光提灯",
-		Slot:         "held_relic",
-		Rarity:       "EPIC",
-		SeasonTag:    "S1 · 墨械纪元",
-		VisualEffect: "琉璃提灯内翠绿炼金火苗持续跃动",
-	},
-	{
-		ItemKey:      ResCosThunderStaff,
-		Name:         "★S1·泰坦雷鸣权杖",
-		Slot:         "held_relic",
-		Rarity:       "LEGENDARY",
-		SeasonTag:    "S1 · 赛季典藏限定",
-		VisualEffect: "权杖顶端悬浮雷核 + 环绕跳跃电弧",
-	},
-
-	// Companion (随从萌宠)
-	{
-		ItemKey:      ResCosWoodFrog,
-		Name:         "汲水发条木蛙",
-		Slot:         "companion",
-		Rarity:       "RARE",
-		SeasonTag:    "S1 · 荒原勘探",
-		VisualEffect: "脚边跟随上下蹦跳的发条木偶蛙",
-	},
-	{
-		ItemKey:      ResCosMechOwl,
-		Name:         "炼金机械猫头鹰",
-		Slot:         "companion",
-		Rarity:       "EPIC",
-		SeasonTag:    "S1 · 墨械纪元",
-		VisualEffect: "肩侧盘旋振翅并定时眨眼的黄铜夜枭",
-	},
-	{
-		ItemKey:      ResCosAetherDrake,
-		Name:         "★S1·星界以太幼龙",
-		Slot:         "companion",
-		Rarity:       "LEGENDARY",
-		SeasonTag:    "S1 · 赛季典藏限定",
-		VisualEffect: "环绕领主悬浮飞行并吐出星芒水泡的以太幼龙",
-	},
-}
-
-// RaidGearCatalog defines out-of-raid weapons, armors, boots, seasonal safe containers, and potions.
-// Tier 1 items can be crafted directly with settlement resources; Tier 2 & 3 require consuming a single-use Raid Blueprint first!
-var RaidGearCatalog = []RaidGearSpec{
-	// Weapons (武器)
-	{
-		ItemKey:       "gear_wood_spear",
-		Name:          "削尖硬木矛",
-		Category:      "weapon",
-		Tier:          1,
-		BlueprintKey:  "",
-		BlueprintName: "基础免图纸",
-		StatSummary:   "攻击 +6 · 局内阵亡会损毁掉落",
-		AtkBonus:      6,
-		CostsMilli:    map[string]int64{ResWood: 35 * ResourceScale, ResWater: 20 * ResourceScale},
-	},
-	{
-		ItemKey:       "gear_flint_bow",
-		Name:          "燧石短猎弓",
-		Category:      "weapon",
-		Tier:          1,
-		BlueprintKey:  "",
-		BlueprintName: "基础免图纸",
-		StatSummary:   "攻击 +11 · 远距离先手 · 阵亡掉落",
-		AtkBonus:      11,
-		CostsMilli:    map[string]int64{ResWood: 55 * ResourceScale, ResStone: 25 * ResourceScale, ResFlint: 1 * ResourceScale},
-	},
-	{
-		ItemKey:       "gear_repeat_crossbow",
-		Name:          "墨械连发手弩",
-		Category:      "weapon",
-		Tier:          2,
-		BlueprintKey:  ResBPCrossbow,
-		BlueprintName: "★图纸：墨械连发手弩",
-		StatSummary:   "攻击 +20 · 暴击率 +15% · 阵亡掉落",
-		AtkBonus:      20,
-		CostsMilli:    map[string]int64{ResWood: 90 * ResourceScale, ResCharcoal: 20 * ResourceScale, ResFlint: 2 * ResourceScale},
-	},
-	{
-		ItemKey:       "gear_titan_hammer",
-		Name:          "泰坦裂地重锤",
-		Category:      "weapon",
-		Tier:          3,
-		BlueprintKey:  ResBPTitanHammer,
-		BlueprintName: "★★图纸：泰坦裂地重锤",
-		StatSummary:   "攻击 +36 · 破甲重击首领 · 阵亡掉落",
-		AtkBonus:      36,
-		CostsMilli:    map[string]int64{ResStone: 140 * ResourceScale, ResCharcoal: 35 * ResourceScale, ResFlint: 4 * ResourceScale, ResMeteorOre: 1 * ResourceScale},
-	},
-
-	// Armors (护甲)
-	{
-		ItemKey:       "gear_linen_vest",
-		Name:          "粗麻防沙衣",
-		Category:      "armor",
-		Tier:          1,
-		BlueprintKey:  "",
-		BlueprintName: "基础免图纸",
-		StatSummary:   "生命 +30 · 护甲 +3 · 阵亡掉落",
-		HpBonus:       30,
-		DefBonus:      3,
-		CostsMilli:    map[string]int64{ResWater: 40 * ResourceScale, ResWood: 30 * ResourceScale},
-	},
-	{
-		ItemKey:       "gear_splint_mail",
-		Name:          "硬化木片甲",
-		Category:      "armor",
-		Tier:          1,
-		BlueprintKey:  "",
-		BlueprintName: "基础免图纸",
-		StatSummary:   "生命 +55 · 护甲 +6 · 阵亡掉落",
-		HpBonus:       55,
-		DefBonus:      6,
-		CostsMilli:    map[string]int64{ResWood: 70 * ResourceScale, ResStone: 35 * ResourceScale},
-	},
-	{
-		ItemKey:       "gear_carapace_armor",
-		Name:          "岩甲沙虫壳胸甲",
-		Category:      "armor",
-		Tier:          2,
-		BlueprintKey:  ResBPCarapaceArmor,
-		BlueprintName: "★图纸：沙虫壳胸甲",
-		StatSummary:   "生命 +100 · 护甲 +13 · 阵亡掉落",
-		HpBonus:       100,
-		DefBonus:      13,
-		CostsMilli:    map[string]int64{ResStone: 95 * ResourceScale, ResCharcoal: 20 * ResourceScale, ResFlint: 2 * ResourceScale},
-	},
-	{
-		ItemKey:       "gear_hydro_armor",
-		Name:          "阿基米德水压动力甲",
-		Category:      "armor",
-		Tier:          3,
-		BlueprintKey:  ResBPHydroArmor,
-		BlueprintName: "★★图纸：水压动力重甲",
-		StatSummary:   "生命 +180 · 护甲 +24 · 背囊 +3格 · 阵亡掉落",
-		HpBonus:       180,
-		DefBonus:      24,
-		CostsMilli:    map[string]int64{ResWater: 260 * ResourceScale, ResStone: 150 * ResourceScale, ResCharcoal: 40 * ResourceScale, ResMeteorOre: 1 * ResourceScale},
-	},
-
-	// Boots (战靴 — 控制 2D 地图移动冷却间隔)
-	{
-		ItemKey:        "gear_straw_sandals",
-		Name:           "草编轻便履",
-		Category:       "boots",
-		Tier:           1,
-		BlueprintKey:   "",
-		BlueprintName:  "基础免图纸",
-		StatSummary:    "移速间隔缩短至 310ms/格 · 阵亡掉落",
-		MoveCooldownMs: 310,
-		CostsMilli:     map[string]int64{ResWater: 30 * ResourceScale, ResWood: 25 * ResourceScale},
-	},
-	{
-		ItemKey:        "gear_hide_boots",
-		Name:           "厚底鹿皮行军靴",
-		Category:       "boots",
-		Tier:           1,
-		BlueprintKey:   "",
-		BlueprintName:  "基础免图纸",
-		StatSummary:    "移速间隔缩短至 265ms/格 · 护甲 +2 · 阵亡掉落",
-		DefBonus:       2,
-		MoveCooldownMs: 265,
-		CostsMilli:     map[string]int64{ResWood: 50 * ResourceScale, ResStone: 25 * ResourceScale, ResFlint: 1 * ResourceScale},
-	},
-	{
-		ItemKey:        "gear_spring_boots",
-		Name:           "墨械弹簧战靴",
-		Category:       "boots",
-		Tier:           2,
-		BlueprintKey:   ResBPSpringBoots,
-		BlueprintName:  "★图纸：墨械弹簧战靴",
-		StatSummary:    "移速间隔缩短至 210ms/格 · 护甲 +4 · 阵亡掉落",
-		DefBonus:       4,
-		MoveCooldownMs: 210,
-		CostsMilli:     map[string]int64{ResWood: 80 * ResourceScale, ResCharcoal: 22 * ResourceScale, ResFlint: 2 * ResourceScale},
-	},
-	{
-		ItemKey:        "gear_hermes_boots",
-		Name:           "赫尔墨斯风行羽靴",
-		Category:       "boots",
-		Tier:           3,
-		BlueprintKey:   ResBPHermesBoots,
-		BlueprintName:  "★★图纸：赫尔墨斯风行靴",
-		StatSummary:    "极速移动 155ms/格 · 闪避 +20% · 阵亡掉落",
-		DefBonus:       7,
-		MoveCooldownMs: 155,
-		CostsMilli:     map[string]int64{ResWater: 220 * ResourceScale, ResCharcoal: 35 * ResourceScale, ResAncientShard: 1 * ResourceScale, ResMeteorOre: 1 * ResourceScale},
-	},
-
-	// Safe Containers (本赛季安全保险箱 — 阵亡绝不掉落，本赛季永久生效)
-	{
-		ItemKey:       "safe_copper_2",
-		Name:          "加固铜扣保险箱 (2格)",
-		Category:      "safe_box",
-		Tier:          1,
-		BlueprintKey:  "",
-		BlueprintName: "基础免图纸",
-		StatSummary:   "本赛季安全保险箱扩至 2 格（阵亡绝不遗失）",
-		SafeSlots:     2,
-		CostsMilli:    map[string]int64{ResWater: 180 * ResourceScale, ResWood: 110 * ResourceScale, ResStone: 50 * ResourceScale},
-	},
-	{
-		ItemKey:       "safe_cipher_3",
-		Name:          "墨械密码保险箱 (3格)",
-		Category:      "safe_box",
-		Tier:          2,
-		BlueprintKey:  ResBPCipherSafe,
-		BlueprintName: "★图纸：墨械密码保险箱",
-		StatSummary:   "本赛季安全保险箱扩至 3 格（阵亡绝不遗失）",
-		SafeSlots:     3,
-		CostsMilli:    map[string]int64{ResStone: 140 * ResourceScale, ResCharcoal: 30 * ResourceScale, ResFlint: 4 * ResourceScale},
-	},
-	{
-		ItemKey:       "safe_aether_5",
-		Name:          "泰坦次元保险箱 (5格)",
-		Category:      "safe_box",
-		Tier:          3,
-		BlueprintKey:  ResBPAetherSafe,
-		BlueprintName: "★★图纸：泰坦次元保险箱",
-		StatSummary:   "本赛季终极安全保险箱扩至 5 格（阵亡绝不遗失）",
-		SafeSlots:     5,
-		CostsMilli:    map[string]int64{ResStone: 260 * ResourceScale, ResCharcoal: 60 * ResourceScale, ResAncientShard: 2 * ResourceScale, ResMeteorOre: 2 * ResourceScale},
-	},
-
-	// Tactical Potions (战术药水 — 局内随时饮用生效)
-	{
-		ItemKey:       "pot_heal_spring",
-		Name:          "清泉止血露",
-		Category:      "potion",
-		Tier:          1,
-		BlueprintKey:  "",
-		BlueprintName: "基础免图纸",
-		StatSummary:   "局内饮用：瞬间恢复 +55 生命值与 +15秒 探索时间",
-		CostsMilli:    map[string]int64{ResWater: 45 * ResourceScale, ResWood: 15 * ResourceScale},
-	},
-	{
-		ItemKey:       "pot_gale_stride",
-		Name:          "轻身疾行散",
-		Category:      "potion",
-		Tier:          1,
-		BlueprintKey:  "",
-		BlueprintName: "基础免图纸",
-		StatSummary:   "局内饮用：25秒内移动冷却缩短 35%（风驰电掣）",
-		CostsMilli:    map[string]int64{ResWater: 50 * ResourceScale, ResCharcoal: 8 * ResourceScale},
-	},
-	{
-		ItemKey:       "pot_scavenge_elixir",
-		Name:          "巧手速搜合剂",
-		Category:      "potion",
-		Tier:          2,
-		BlueprintKey:  ResBPScavengeElixir,
-		BlueprintName: "★图纸：速搜合剂配方",
-		StatSummary:   "局内饮用：35秒内搜索所有宝箱读条时间缩短 50%",
-		CostsMilli:    map[string]int64{ResWater: 75 * ResourceScale, ResCharcoal: 14 * ResourceScale, ResFlint: 1 * ResourceScale},
-	},
-	{
-		ItemKey:       "pot_berserk_elixir",
-		Name:          "泰坦狂暴免死圣水",
-		Category:      "potion",
-		Tier:          3,
-		BlueprintKey:  ResBPBerserkElixir,
-		BlueprintName: "★★图纸：狂暴圣水配方",
-		StatSummary:   "局内饮用：攻击 +25、护甲 +12，并获得 1 次致命免死护盾",
-		CostsMilli:    map[string]int64{ResWater: 120 * ResourceScale, ResCharcoal: 25 * ResourceScale, ResFlint: 2 * ResourceScale, ResAncientShard: 1 * ResourceScale},
-	},
-}
+import (
+	"fmt"
+	"time"
+)
 
 // RaidBuffCardCatalog defines 54 distinct Pre-Departure Roguelite Buff Cards across 6 tactical categories.
 // Players roll 3 random cards at a time, spend varied settlement resources to buy or reroll, and can equip up to 4 slots per raid.
@@ -400,4 +73,512 @@ var RaidBuffCardCatalog = []RaidBuffCardSpec{
 	{CardCode: "buff_tac_07", Name: "墨械喷气推进包", Category: "tactical", Rarity: "EPIC", EffectSummary: "本局移动冷却缩短 24%，倒计时 +25 秒", CostsMilli: map[string]int64{ResCharcoal: 30 * ResourceScale, ResStone: 40 * ResourceScale, ResFlint: 2 * ResourceScale}, MoveSpeedPct: 24, DurationBonus: 25},
 	{CardCode: "buff_tac_08", Name: "全能执政官行囊", Category: "tactical", Rarity: "EPIC", EffectSummary: "全属性强化：生命 +45、攻 +10、甲 +6、背囊 +2格", CostsMilli: map[string]int64{ResWater: 60 * ResourceScale, ResWood: 50 * ResourceScale, ResStone: 40 * ResourceScale, ResFlint: 2 * ResourceScale}, HpBonus: 45, AtkBonus: 10, DefBonus: 6, BagBonus: 2},
 	{CardCode: "buff_tac_09", Name: "星界裂隙折跃仪", Category: "tactical", Rarity: "EPIC", EffectSummary: "移动冷却缩短 20%，倒计时 +40 秒，背囊 +3 格", CostsMilli: map[string]int64{ResWater: 65 * ResourceScale, ResCharcoal: 25 * ResourceScale, ResFlint: 3 * ResourceScale}, MoveSpeedPct: 20, DurationBonus: 40, BagBonus: 3},
+}
+
+var RaidRerollCostsMilli = map[string]int64{
+	ResWater: 25 * ResourceScale,
+	ResWood:  15 * ResourceScale,
+}
+
+func FindCosmeticSpec(itemKey string) (CosmeticSpec, bool) {
+	for _, c := range CosmeticCatalog {
+		if c.ItemKey == itemKey {
+			return c, true
+		}
+	}
+	return CosmeticSpec{}, false
+}
+
+func FindRaidGearSpec(itemKey string) (RaidGearSpec, bool) {
+	for _, g := range RaidGearCatalog {
+		if g.ItemKey == itemKey {
+			return g, true
+		}
+	}
+	return RaidGearSpec{}, false
+}
+
+func FindRaidBuffCardSpec(code string) (RaidBuffCardSpec, bool) {
+	for _, b := range RaidBuffCardCatalog {
+		if b.CardCode == code {
+			return b, true
+		}
+	}
+	return RaidBuffCardSpec{}, false
+}
+
+func rollThreeBuffCards(seed uint64) []string {
+	n := uint64(len(RaidBuffCardCatalog))
+	if n < 3 {
+		return nil
+	}
+	picked := make([]string, 0, 3)
+	used := make(map[int]bool, 3)
+	s := seed
+	if s == 0 {
+		s = 0x9e3779b97f4a7c15
+	}
+	for len(picked) < 3 {
+		s = s*6364136223846793005 + 1442695040888963407
+		idx := int((s >> 16) % n)
+		if !used[idx] {
+			used[idx] = true
+			picked = append(picked, RaidBuffCardCatalog[idx].CardCode)
+		}
+	}
+	return picked
+}
+
+func EnsureRaidState(p *PlayerState) {
+	if p.EquippedCosmetics == nil {
+		p.EquippedCosmetics = map[string]string{}
+	}
+	if p.LearnedRaidBlueprints == nil {
+		p.LearnedRaidBlueprints = map[string]bool{}
+	}
+	if p.RaidGearInventory == nil {
+		p.RaidGearInventory = map[string]int32{}
+	}
+	if len(p.RaidLoadout.DraftPoolCards) != 3 {
+		seed := uint64(p.SimulatedElapsedSeconds*131 + p.TotalManualClicks*17 + int64(len(p.Handle))*97 + 101)
+		p.RaidLoadout.DraftPoolCards = rollThreeBuffCards(seed)
+	}
+	for slot, key := range p.EquippedCosmetics {
+		if key != "" && p.ResourcesMilli[key] < ResourceScale {
+			delete(p.EquippedCosmetics, slot)
+		}
+	}
+}
+
+func ComputeRaidLoadoutStats(p *PlayerState) (maxHP, atk, def, moveCooldownMs, durationSec, bagCap, safeSlots int32) {
+	EnsureRaidState(p)
+	maxHP = 100
+	atk = 12
+	def = 2
+	moveCooldownMs = 360
+	durationSec = 180
+	bagCap = 6
+	safeSlots = 1
+
+	if wSpec, ok := FindRaidGearSpec(p.RaidLoadout.WeaponKey); ok && p.RaidGearInventory[wSpec.ItemKey] > 0 {
+		atk += wSpec.AtkBonus
+	}
+	if aSpec, ok := FindRaidGearSpec(p.RaidLoadout.ArmorKey); ok && p.RaidGearInventory[aSpec.ItemKey] > 0 {
+		maxHP += aSpec.HpBonus
+		def += aSpec.DefBonus
+		if aSpec.ItemKey == "gear_hydro_armor" {
+			bagCap += 3
+		}
+	}
+	if bSpec, ok := FindRaidGearSpec(p.RaidLoadout.BootsKey); ok && p.RaidGearInventory[bSpec.ItemKey] > 0 {
+		def += bSpec.DefBonus
+		if bSpec.MoveCooldownMs > 0 {
+			moveCooldownMs = bSpec.MoveCooldownMs
+		}
+	}
+	if sSpec, ok := FindRaidGearSpec(p.RaidLoadout.SafeBoxKey); ok && p.RaidGearInventory[sSpec.ItemKey] > 0 {
+		if sSpec.SafeSlots > safeSlots {
+			safeSlots = sSpec.SafeSlots
+		}
+	}
+
+	var totalSpeedPct int32
+	for _, code := range p.RaidLoadout.EquippedBuffCards {
+		if cSpec, ok := FindRaidBuffCardSpec(code); ok {
+			maxHP += cSpec.HpBonus
+			atk += cSpec.AtkBonus
+			def += cSpec.DefBonus
+			durationSec += cSpec.DurationBonus
+			bagCap += cSpec.BagBonus
+			totalSpeedPct += cSpec.MoveSpeedPct
+		}
+	}
+	if totalSpeedPct > 45 {
+		totalSpeedPct = 45
+	}
+	if totalSpeedPct > 0 {
+		moveCooldownMs = (moveCooldownMs * (100 - totalSpeedPct)) / 100
+	}
+	if moveCooldownMs < 110 {
+		moveCooldownMs = 110
+	}
+	return maxHP, atk, def, moveCooldownMs, durationSec, bagCap, safeSlots
+}
+
+func EquipCosmetic(p *PlayerState, slot, itemKey string, now time.Time) error {
+	EnsureRaidState(p)
+	if slot != "headgear" && slot != "mantle" && slot != "held_relic" && slot != "companion" {
+		return ErrInvalidInput("未知的外观穿戴部位")
+	}
+	if itemKey == "" {
+		delete(p.EquippedCosmetics, slot)
+		AppendLog(p, now, "RAID", "已卸下领主外观部件。")
+		return nil
+	}
+	spec, ok := FindCosmeticSpec(itemKey)
+	if !ok || spec.Slot != slot {
+		return ErrInvalidInput("外观部件与穿戴部位不匹配")
+	}
+	if p.ResourcesMilli[itemKey] < ResourceScale {
+		return ErrPrecondition("cosmetic_not_owned", "尚未拥有该赛季外观（或已挂单冻结）")
+	}
+	p.EquippedCosmetics[slot] = itemKey
+	AppendLog(p, now, "RAID", fmt.Sprintf("领主形象已穿戴【%s】！主界面与荒原地图实时生效。", spec.Name))
+	return nil
+}
+
+func LearnRaidBlueprint(p *PlayerState, blueprintKey string, now time.Time) error {
+	EnsureRaidState(p)
+	var targetGear RaidGearSpec
+	found := false
+	for _, g := range RaidGearCatalog {
+		if g.BlueprintKey == blueprintKey && blueprintKey != "" {
+			targetGear = g
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ErrInvalidInput("未知的荒原一次性蓝图")
+	}
+	if p.LearnedRaidBlueprints[blueprintKey] {
+		return ErrPrecondition("already_learned", "本赛季已研读解锁该蓝图配方，可将多余蓝图挂到交易所出售给其他玩家")
+	}
+	if p.ResourcesMilli[blueprintKey] < ResourceScale {
+		return ErrPrecondition("blueprint_missing", fmt.Sprintf("背包中缺少【%s】，请在荒原搜打撤中摸金获取或从市场购买", targetGear.BlueprintName))
+	}
+	p.ResourcesMilli[blueprintKey] -= ResourceScale
+	p.LearnedRaidBlueprints[blueprintKey] = true
+	AppendLog(p, now, "BLUEPRINT", fmt.Sprintf("已研读并销毁一次性蓝图【%s】！本赛季永久解锁【%s】局外打造。", targetGear.BlueprintName, targetGear.Name))
+	return nil
+}
+
+func ManageRaidGear(p *PlayerState, action, itemKey string, now time.Time) error {
+	EnsureRaidState(p)
+	spec, ok := FindRaidGearSpec(itemKey)
+	if !ok {
+		return ErrInvalidInput("未知的斥候整备装备或药水")
+	}
+
+	switch action {
+	case "craft":
+		if spec.BlueprintKey != "" && !p.LearnedRaidBlueprints[spec.BlueprintKey] {
+			return ErrPrecondition("recipe_locked", fmt.Sprintf("尚未研读一次性蓝图【%s】，无法打造该高阶整备", spec.BlueprintName))
+		}
+		if spec.Category == "safe_box" && p.RaidGearInventory[itemKey] > 0 {
+			return ErrPrecondition("already_owned", "该赛季安全保险箱已打造并永久生效")
+		}
+		for rKey, reqMilli := range spec.CostsMilli {
+			if p.ResourcesMilli[rKey] < reqMilli {
+				return ErrPrecondition("insufficient_resource", fmt.Sprintf("%s不足：需要 %.0f", ResourceName(rKey), float64(reqMilli)/1000.0))
+			}
+		}
+		for rKey, reqMilli := range spec.CostsMilli {
+			p.ResourcesMilli[rKey] -= reqMilli
+		}
+		p.RaidGearInventory[itemKey]++
+
+		switch spec.Category {
+		case "weapon":
+			p.RaidLoadout.WeaponKey = itemKey
+		case "armor":
+			p.RaidLoadout.ArmorKey = itemKey
+		case "boots":
+			p.RaidLoadout.BootsKey = itemKey
+		case "safe_box":
+			curSlots := int32(1)
+			if curSpec, exists := FindRaidGearSpec(p.RaidLoadout.SafeBoxKey); exists {
+				curSlots = curSpec.SafeSlots
+			}
+			if spec.SafeSlots >= curSlots {
+				p.RaidLoadout.SafeBoxKey = itemKey
+			}
+		case "potion":
+			if len(p.RaidLoadout.EquippedPotions) < 3 {
+				already := false
+				for _, pk := range p.RaidLoadout.EquippedPotions {
+					if pk == itemKey {
+						already = true
+						break
+					}
+				}
+				if !already {
+					p.RaidLoadout.EquippedPotions = append(p.RaidLoadout.EquippedPotions, itemKey)
+				}
+			}
+		}
+		AppendLog(p, now, "RAID", fmt.Sprintf("成功打造斥候整备【%s】（库存 %d）。", spec.Name, p.RaidGearInventory[itemKey]))
+		return nil
+
+	case "equip":
+		if p.RaidGearInventory[itemKey] <= 0 {
+			return ErrPrecondition("not_owned", "尚未打造该整备物品")
+		}
+		switch spec.Category {
+		case "weapon":
+			p.RaidLoadout.WeaponKey = itemKey
+		case "armor":
+			p.RaidLoadout.ArmorKey = itemKey
+		case "boots":
+			p.RaidLoadout.BootsKey = itemKey
+		case "safe_box":
+			p.RaidLoadout.SafeBoxKey = itemKey
+		case "potion":
+			for _, pk := range p.RaidLoadout.EquippedPotions {
+				if pk == itemKey {
+					return nil
+				}
+			}
+			if len(p.RaidLoadout.EquippedPotions) >= 3 {
+				p.RaidLoadout.EquippedPotions = append(p.RaidLoadout.EquippedPotions[1:], itemKey)
+			} else {
+				p.RaidLoadout.EquippedPotions = append(p.RaidLoadout.EquippedPotions, itemKey)
+			}
+		}
+		return nil
+
+	case "unequip":
+		switch spec.Category {
+		case "weapon":
+			if p.RaidLoadout.WeaponKey == itemKey {
+				p.RaidLoadout.WeaponKey = ""
+			}
+		case "armor":
+			if p.RaidLoadout.ArmorKey == itemKey {
+				p.RaidLoadout.ArmorKey = ""
+			}
+		case "boots":
+			if p.RaidLoadout.BootsKey == itemKey {
+				p.RaidLoadout.BootsKey = ""
+			}
+		case "potion":
+			filtered := make([]string, 0, len(p.RaidLoadout.EquippedPotions))
+			for _, pk := range p.RaidLoadout.EquippedPotions {
+				if pk != itemKey {
+					filtered = append(filtered, pk)
+				}
+			}
+			p.RaidLoadout.EquippedPotions = filtered
+		}
+		return nil
+
+	default:
+		return ErrInvalidInput("未知的整备操作")
+	}
+}
+
+func DraftRaidBuff(p *PlayerState, action, cardCode string, replaceSlot int32, now time.Time) error {
+	EnsureRaidState(p)
+	switch action {
+	case "reroll":
+		for rKey, reqMilli := range RaidRerollCostsMilli {
+			if p.ResourcesMilli[rKey] < reqMilli {
+				return ErrPrecondition("insufficient_resource", fmt.Sprintf("%s不足：刷新卡池需要 %.0f %s", ResourceName(rKey), float64(reqMilli)/1000.0, ResourceName(rKey)))
+			}
+		}
+		for rKey, reqMilli := range RaidRerollCostsMilli {
+			p.ResourcesMilli[rKey] -= reqMilli
+		}
+		seed := uint64(now.UnixNano()) ^ uint64(p.SimulatedElapsedSeconds*31+p.TotalManualClicks)
+		p.RaidLoadout.DraftPoolCards = rollThreeBuffCards(seed)
+		return nil
+
+	case "buy":
+		inPool := false
+		for _, c := range p.RaidLoadout.DraftPoolCards {
+			if c == cardCode {
+				inPool = true
+				break
+			}
+		}
+		if !inPool {
+			return ErrPrecondition("card_not_in_pool", "该增益卡不在当前候选池中")
+		}
+		spec, ok := FindRaidBuffCardSpec(cardCode)
+		if !ok {
+			return ErrInvalidInput("未知的增益卡")
+		}
+		for rKey, reqMilli := range spec.CostsMilli {
+			if p.ResourcesMilli[rKey] < reqMilli {
+				return ErrPrecondition("insufficient_resource", fmt.Sprintf("%s不足：购买【%s】需要 %.0f", ResourceName(rKey), spec.Name, float64(reqMilli)/1000.0))
+			}
+		}
+		for rKey, reqMilli := range spec.CostsMilli {
+			p.ResourcesMilli[rKey] -= reqMilli
+		}
+		if len(p.RaidLoadout.EquippedBuffCards) < 4 {
+			p.RaidLoadout.EquippedBuffCards = append(p.RaidLoadout.EquippedBuffCards, cardCode)
+		} else {
+			idx := int(replaceSlot)
+			if idx < 0 || idx >= 4 {
+				idx = 3
+			}
+			p.RaidLoadout.EquippedBuffCards[idx] = cardCode
+		}
+		seed := uint64(now.UnixNano()) ^ uint64(len(p.RaidLoadout.EquippedBuffCards)*997+int(p.PopulationTotal))
+		p.RaidLoadout.DraftPoolCards = rollThreeBuffCards(seed)
+		AppendLog(p, now, "RAID", fmt.Sprintf("已购入远征增益卡【%s】（%s）并装入战术槽位，候选池已刷新。", spec.Name, spec.EffectSummary))
+		return nil
+
+	case "remove":
+		idx := int(replaceSlot)
+		if idx >= 0 && idx < len(p.RaidLoadout.EquippedBuffCards) {
+			p.RaidLoadout.EquippedBuffCards = append(p.RaidLoadout.EquippedBuffCards[:idx], p.RaidLoadout.EquippedBuffCards[idx+1:]...)
+		}
+		return nil
+
+	default:
+		return ErrInvalidInput("未知的增益卡操作")
+	}
+}
+
+func StartRaid(p *PlayerState, now time.Time) error {
+	EnsureRaidState(p)
+	if !p.UnlockedBlueprints[BPScoutCamp] {
+		return ErrPrecondition("scout_camp_locked", "尚未解锁【荒原斥候营】")
+	}
+	seed := now.UnixNano() ^ (p.SimulatedElapsedSeconds*2654435761 + int64(p.PopulationTotal)*97)
+	if seed <= 0 {
+		seed = -seed + 1001
+	}
+	p.RaidLoadout.ActiveRaidSeed = seed
+	AppendLog(p, now, "RAID", "【荒原搜打撤】斥候小队已进入多区块迷雾裂隙！请在沙暴降临前搜索宝箱、通过传送门探索深渊，并抵达撤离信标。")
+	return nil
+}
+
+var allowedRaidLootKeys = map[string]bool{
+	ResFlint:            true,
+	ResAncientShard:     true,
+	ResMeteorOre:        true,
+	ResBPCrossbow:       true,
+	ResBPTitanHammer:    true,
+	ResBPCarapaceArmor:  true,
+	ResBPHydroArmor:     true,
+	ResBPSpringBoots:    true,
+	ResBPHermesBoots:    true,
+	ResBPCipherSafe:     true,
+	ResBPAetherSafe:     true,
+	ResBPScavengeElixir: true,
+	ResBPBerserkElixir:  true,
+	ResCosGoggles:       true,
+	ResCosSteamCrown:    true,
+	ResCosObsidianCrown: true,
+	ResCosSandCloak:     true,
+	ResCosHydroWings:    true,
+	ResCosAstralWings:   true,
+	ResCosCompass:       true,
+	ResCosAlchLantern:   true,
+	ResCosThunderStaff:  true,
+	ResCosWoodFrog:      true,
+	ResCosMechOwl:       true,
+	ResCosAetherDrake:   true,
+}
+
+func FinishRaid(p *PlayerState, status string, backpackLootKeys, safeBoxLootKeys, usedPotionKeys []string, zonesVisited, chestsOpened, bossesKilled int32, now time.Time) error {
+	EnsureRaidState(p)
+	if p.RaidLoadout.ActiveRaidSeed == 0 {
+		return ErrPrecondition("no_active_raid", "当前没有正在进行的荒原搜打撤远征")
+	}
+	_, _, _, _, _, bagCap, safeSlots := ComputeRaidLoadoutStats(p)
+
+	// Consume used potions
+	for _, pk := range usedPotionKeys {
+		if p.RaidGearInventory[pk] > 0 {
+			p.RaidGearInventory[pk]--
+		}
+		if p.RaidGearInventory[pk] <= 0 {
+			filtered := make([]string, 0, len(p.RaidLoadout.EquippedPotions))
+			for _, eq := range p.RaidLoadout.EquippedPotions {
+				if eq != pk {
+					filtered = append(filtered, eq)
+				}
+			}
+			p.RaidLoadout.EquippedPotions = filtered
+		}
+	}
+
+	// Single-run buff cards are consumed at the end of the raid
+	p.RaidLoadout.EquippedBuffCards = nil
+	p.RaidLoadout.ActiveRaidSeed = 0
+
+	// Always award validated Safe Container items (up to safeSlots)
+	awardedCounts := make(map[string]int32)
+	safeCount := int32(0)
+	for _, k := range safeBoxLootKeys {
+		if safeCount >= safeSlots {
+			break
+		}
+		if allowedRaidLootKeys[k] {
+			addResourceWithCap(p, k, ResourceScale)
+			awardedCounts[k]++
+			safeCount++
+		}
+	}
+
+	if status == "EXTRACTED" {
+		bagCount := int32(0)
+		for _, k := range backpackLootKeys {
+			if bagCount >= bagCap {
+				break
+			}
+			if allowedRaidLootKeys[k] {
+				addResourceWithCap(p, k, ResourceScale)
+				awardedCounts[k]++
+				bagCount++
+			}
+		}
+		summaryParts := make([]string, 0, len(awardedCounts))
+		for k, cnt := range awardedCounts {
+			summaryParts = append(summaryParts, fmt.Sprintf("%s×%d", ResourceName(k), cnt))
+		}
+		lootText := "未携带战利品"
+		if len(summaryParts) > 0 {
+			lootText = fmt.Sprintf("成功带出：%v", summaryParts)
+		}
+		AppendLog(p, now, "RAID", fmt.Sprintf("【成功撤离】穿越 %d 个区块、开启 %d 处宝箱、击败 %d 名守卫！%s。", zonesVisited, chestsOpened, bossesKilled, lootText))
+		return nil
+	}
+
+	// Hardcore MIA Penalty: equipped Weapon, Armor, and Boots are destroyed!
+	lostGear := make([]string, 0, 3)
+	if wk := p.RaidLoadout.WeaponKey; wk != "" {
+		if spec, ok := FindRaidGearSpec(wk); ok {
+			lostGear = append(lostGear, spec.Name)
+		}
+		if p.RaidGearInventory[wk] > 0 {
+			p.RaidGearInventory[wk]--
+		}
+		if p.RaidGearInventory[wk] <= 0 {
+			p.RaidLoadout.WeaponKey = ""
+		}
+	}
+	if ak := p.RaidLoadout.ArmorKey; ak != "" {
+		if spec, ok := FindRaidGearSpec(ak); ok {
+			lostGear = append(lostGear, spec.Name)
+		}
+		if p.RaidGearInventory[ak] > 0 {
+			p.RaidGearInventory[ak]--
+		}
+		if p.RaidGearInventory[ak] <= 0 {
+			p.RaidLoadout.ArmorKey = ""
+		}
+	}
+	if bk := p.RaidLoadout.BootsKey; bk != "" {
+		if spec, ok := FindRaidGearSpec(bk); ok {
+			lostGear = append(lostGear, spec.Name)
+		}
+		if p.RaidGearInventory[bk] > 0 {
+			p.RaidGearInventory[bk]--
+		}
+		if p.RaidGearInventory[bk] <= 0 {
+			p.RaidLoadout.BootsKey = ""
+		}
+	}
+
+	safeSummary := make([]string, 0, len(awardedCounts))
+	for k, cnt := range awardedCounts {
+		safeSummary = append(safeSummary, fmt.Sprintf("%s×%d", ResourceName(k), cnt))
+	}
+	AppendLog(p, now, "RAID", fmt.Sprintf("【荒原迷失 MIA】未能及时撤离！背囊物资与穿戴装备（%v）全部损毁遗失，仅安全保险箱保住：%v。", lostGear, safeSummary))
+	return nil
 }

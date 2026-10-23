@@ -358,6 +358,16 @@ export interface SeasonNoticeDTO {
   demandShifts: string[];
 }
 
+export interface SeasonStateDTO {
+  seasonId: string;
+  seasonNumber: number;
+  title: string;
+  subtitle: string;
+  startedAt: string;
+  resetRules: string[];
+  retentionRules: string[];
+}
+
 export interface EventLogDTO {
   id: string;
   timestamp: string;
@@ -428,6 +438,7 @@ export interface DashboardStateResp {
   cosmetics: CosmeticSpecDTO[];
   raidGears: RaidGearSpecDTO[];
   raidLoadout: RaidLoadoutStateDTO;
+  currentSeason: SeasonStateDTO;
 }
 
 export type GetDashboardReq = Record<string, never>;
@@ -516,6 +527,10 @@ export interface DraftRaidBuffReq {
 }
 
 export type StartRaidReq = Record<string, never>;
+
+export interface RolloverSeasonReq {
+  nextTitle?: string;
+}
 
 export interface FinishRaidReq {
   status: string;
@@ -913,6 +928,15 @@ export const IDL_ROUTES = {
     path: "/api/v1/empire/colony/raid/finish",
     clientPath: "/empire/colony/raid/finish",
     requestType: "FinishRaidReq",
+    responseType: "DashboardStateResp",
+  },
+  RolloverSeason: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/admin/season/rollover",
+    clientPath: "/empire/admin/season/rollover",
+    requestType: "RolloverSeasonReq",
     responseType: "DashboardStateResp",
   },
 } as const;

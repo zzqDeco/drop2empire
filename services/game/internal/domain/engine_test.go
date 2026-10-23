@@ -262,3 +262,51 @@ func TestColonyDepthSystemsConversionEdictsExpeditionsAndCaravan(t *testing.T) {
 		t.Fatalf("expected equipped weapon to be destroyed on MIA, got %s", p.RaidLoadout.WeaponKey)
 	}
 }
+
+func TestSeasonRolloverResetAndPermanentRetention(t *testing.T) {
+	now := time.Date(2026, 10, 24, 2, 0, 0, 0, time.UTC)
+	w := NewDefaultWorld(now)
+	vet := w.Players["archon_demo"]
+
+	// Mint a collectible in S1 and learn a raid blueprint + craft 3-slot safebox
+	vet.ActivityPoints = 500
+	if err := RedeemSeasonChest(vet, 1, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := OpenSeasonChest(w, vet, 777, now); err != nil {
+		t.Fatal(err)
+	}
+	if len(w.Collectibles) != 1 {
+		t.Fatalf("expected 1 collectible minted in S1, got %d", len(w.Collectibles))
+	}
+	vet.ResourcesMilli[ResBPCipherSafe] = 1 * ResourceScale
+	if err := LearnRaidBlueprint(vet, ResBPCipherSafe, now); err != nil {
+		t.Fatal(err)
+	}
+
+	// Execute Cross-Season Rollover -> S2
+	RolloverSeason(w, "S2 · 星陨深渊与以太觉醒", now.Add(24*time.Hour))
+	assertMacroLedgerIdentity(t, w)
+
+	if w.SeasonNumber != 2 || w.SeasonName != "S2 · 星陨深渊与以太觉醒" {
+		t.Fatalf("unexpected season metadata after rollover: num=%d name=%s", w.SeasonNumber, w.SeasonName)
+	}
+	// Reset checks
+	if vet.PopulationTotal != 0 || vet.Profession != ProfNone || vet.GoldBasis != 0 {
+		t.Fatalf("expected settlement pop, profession, and gold to reset on rollover: pop=%d prof=%s gold=%d",
+			vet.PopulationTotal, vet.Profession, vet.GoldBasis)
+	}
+	if vet.LearnedRaidBlueprints[ResBPCipherSafe] {
+		t.Fatal("expected learned seasonal raid blueprints to reset on rollover")
+	}
+	if vet.ResourcesMilli[ResWater] != 0 || vet.ResourcesMilli[ResIronIngot] != 0 {
+		t.Fatal("expected physical settlement resources to reset on rollover")
+	}
+	// Permanent retention checks
+	if vet.ResourcesMilli[ResCosSteamCrown] < ResourceScale || vet.EquippedCosmetics["headgear"] != ResCosSteamCrown {
+		t.Fatalf("expected S1 animated cosmetics and equipped wardrobe to be permanently retained across seasons")
+	}
+	if len(w.Collectibles) != 1 || w.Collectibles[0].OwnerHandle != "archon_demo" {
+		t.Fatalf("expected minted procedural collectibles to be permanently retained across seasons")
+	}
+}

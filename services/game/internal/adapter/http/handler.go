@@ -932,7 +932,28 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		Cosmetics:           cosmeticsDTO,
 		RaidGears:           raidGearsDTO,
 		RaidLoadout:         raidLoadoutDTO,
+		CurrentSeason: &empire.SeasonStateDTO{
+			SeasonId:       w.SeasonCode,
+			SeasonNumber:   w.SeasonNumber,
+			Title:          w.SeasonName,
+			Subtitle:       "跨赛季重置聚落与宏观经济 · 永久保留赛季限定动态外观与唯一纹理藏品",
+			StartedAt:      w.SeasonStartedAt,
+			ResetRules:     append([]string{}, domain.SeasonResetRules...),
+			RetentionRules: append([]string{}, domain.SeasonRetentionRules...),
+		},
 	}
+}
+
+func (s *Server) RolloverSeason(ctx context.Context, req *empire.RolloverSeasonReq) (*empire.DashboardStateResp, error) {
+	var nextTitle string
+	if req.NextTitle != nil {
+		nextTitle = *req.NextTitle
+	}
+	w, err := s.svc.RolloverSeason(ctx, nextTitle)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
 }
 
 func (s *Server) GetDashboard(ctx context.Context, _ *empire.GetDashboardReq) (*empire.DashboardStateResp, error) {

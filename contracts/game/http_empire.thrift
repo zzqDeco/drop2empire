@@ -358,6 +358,16 @@ struct SeasonNoticeDTO {
   5: required list<string> demandShifts (api.body="demandShifts")
 }
 
+struct SeasonStateDTO {
+  1: required string seasonId (api.body="seasonId")
+  2: required i32 seasonNumber (api.body="seasonNumber")
+  3: required string title (api.body="title")
+  4: required string subtitle (api.body="subtitle")
+  5: required string startedAt (api.body="startedAt")
+  6: required list<string> resetRules (api.body="resetRules")
+  7: required list<string> retentionRules (api.body="retentionRules")
+}
+
 struct EventLogDTO {
   1: required string id (api.body="id")
   2: required string timestamp (api.body="timestamp")
@@ -428,6 +438,7 @@ struct DashboardStateResp {
   28: required list<CosmeticSpecDTO> cosmetics (api.body="cosmetics")
   29: required list<RaidGearSpecDTO> raidGears (api.body="raidGears")
   30: required RaidLoadoutStateDTO raidLoadout (api.body="raidLoadout")
+  31: required SeasonStateDTO currentSeason (api.body="currentSeason")
 }
 
 struct GetDashboardReq {}
@@ -516,6 +527,10 @@ struct DraftRaidBuffReq {
 }
 
 struct StartRaidReq {}
+
+struct RolloverSeasonReq {
+  1: optional string nextTitle (api.body="nextTitle")
+}
 
 struct FinishRaidReq {
   1: required string status (api.body="status")
@@ -639,4 +654,5 @@ service EmpireService {
   DashboardStateResp DraftRaidBuff(1: DraftRaidBuffReq req) (api.post="/api/v1/empire/colony/raid/buff")
   DashboardStateResp StartRaid(1: StartRaidReq req) (api.post="/api/v1/empire/colony/raid/start")
   DashboardStateResp FinishRaid(1: FinishRaidReq req) (api.post="/api/v1/empire/colony/raid/finish")
+  DashboardStateResp RolloverSeason(1: RolloverSeasonReq req) (api.post="/api/v1/empire/admin/season/rollover")
 }
