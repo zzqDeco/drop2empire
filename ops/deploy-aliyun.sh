@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Deploy Drop to Empire (D2E) to Aliyun ECS in an isolated stack (/srv/drop2empire, project=drop2empire, port=8080)
+# Deploy Drop to Empire (D2E) to Aliyun ECS in an isolated stack (/srv/drop2empire, project=drop2empire, port=8443 HTTPS)
 # Strictly preserves existing deployments (e.g. teamie on :80/:443 and /srv/teamie).
 set -euo pipefail
 
 ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 SSH_HOST=${1:-${DEPLOY_SSH_HOST:-120.25.210.202}}
-PUBLIC_PORT=${PUBLIC_HTTP_PORT:-8080}
+PUBLIC_PORT=${PUBLIC_HTTPS_PORT:-8443}
 VERSION=${VERSION:-v1.0.0}
 COMMIT_SHA=$(git -C "$ROOT_DIR" rev-parse HEAD)
 SHORT_SHA=$(git -C "$ROOT_DIR" rev-parse --short=12 HEAD)
@@ -57,34 +57,48 @@ fi
 EOF
 
 echo "==> [3/6] Uploading release bundle to $SSH_HOST:/srv/drop2empire/releases/$SHORT_SHA..."
-ssh -o ConnectTimeout=10 "$SSH_HOST" "mkdir -p /srv/drop2empire/config /srv/drop2empire/releases/$SHORT_SHA && chmod 700 /srv/drop2empire /srv/drop2empire/config"
+ssh -o ConnectTimeout=10 "$SSH_HOST" "mkdir -p /srv/drop2empire/config /srv/drop2empire/tls /srv/drop2empire/releases/$SHORT_SHA && chmod 700 /srv/drop2empire /srv/drop2empire/config && chmod 755 /srv/drop2empire/tls"
 scp -q "$STAGE_DIR/release.tar.gz" "$SSH_HOST:/srv/drop2empire/releases/$SHORT_SHA/release.tar.gz"
 
 echo "==> [4/6] Building runtime images & rolling out compose project 'drop2empire' on $SSH_HOST..."
-ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s" -- "$VERSION" "$COMMIT_SHA" "$SHORT_SHA" "$PUBLIC_PORT" <<'EOF'
+ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s" -- "$VERSION" "$COMMIT_SHA" "$SHORT_SHA" "$PUBLIC_PORT" "$SSH_HOST" <<'EOF'
 set -euo pipefail
 VERSION="$1"
 COMMIT_SHA="$2"
 SHORT_SHA="$3"
 PUBLIC_PORT="$4"
+HOST_IP="$5"
 RELEASE_DIR="/srv/drop2empire/releases/$SHORT_SHA"
 ENV_FILE="/srv/drop2empire/config/production.env"
+TLS_DIR="/srv/drop2empire/tls"
 
 cd "$RELEASE_DIR"
-tar -xzf release.tar.gz
+tar -xzf release.tar.gz 2>/dev/null
 rm -f release.tar.gz
+
+# Sync current public IP certificate from Caddy ACME store into isolated /srv/drop2empire/tls
+if docker ps --format '{{.Names}}' | grep -qx 'teamie-caddy-1'; then
+  ACME_PATH="/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${HOST_IP}"
+  docker exec teamie-caddy-1 cat "${ACME_PATH}/${HOST_IP}.crt" > "${TLS_DIR}/fullchain.pem"
+  docker exec teamie-caddy-1 cat "${ACME_PATH}/${HOST_IP}.key" > "${TLS_DIR}/privkey.pem"
+  chmod 0644 "${TLS_DIR}/fullchain.pem"
+  chmod 0600 "${TLS_DIR}/privkey.pem"
+fi
 
 # Initialize production.env once if not present; never overwrite existing DB password
 if [[ ! -f "$ENV_FILE" ]]; then
   RAND_PASS=$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 28)
   umask 077
   cat > "$ENV_FILE" <<ENVEOF
-PUBLIC_HTTP_PORT=${PUBLIC_PORT}
+PUBLIC_HTTPS_PORT=${PUBLIC_PORT}
+TLS_CERT_DIR=${TLS_DIR}
 LOG_LEVEL=info
 POSTGRES_USER=drop2empire
 POSTGRES_DB=drop2empire
 POSTGRES_PASSWORD=${RAND_PASS}
 ENVEOF
+elif ! grep -q "^PUBLIC_HTTPS_PORT=" "$ENV_FILE"; then
+  printf '\nPUBLIC_HTTPS_PORT=%s\nTLS_CERT_DIR=%s\n' "$PUBLIC_PORT" "$TLS_DIR" >> "$ENV_FILE"
 fi
 
 # Resolve cached base layers on host to avoid Mainland China Docker Hub timeouts
@@ -113,15 +127,15 @@ LABEL org.opencontainers.image.version=${VERSION} org.opencontainers.image.revis
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 RUN rm -rf /usr/share/nginx/html/*
 COPY dist/ /usr/share/nginx/html/
-EXPOSE 80
+EXPOSE 80 8443
 HEALTHCHECK --interval=15s --timeout=3s CMD wget -qO- http://127.0.0.1/healthz || exit 1
 DOCKEREOF
 
 GAME_IMG="drop2empire-game:${SHORT_SHA}"
 WEB_IMG="drop2empire-web:${SHORT_SHA}"
 
-DOCKER_BUILDKIT=0 docker build -q -t "$GAME_IMG" -f Dockerfile.game.runtime . >/dev/null
-DOCKER_BUILDKIT=0 docker build -q -t "$WEB_IMG" -f Dockerfile.web.runtime . >/dev/null
+DOCKER_BUILDKIT=0 docker build -q -t "$GAME_IMG" -f Dockerfile.game.runtime . >/dev/null 2>&1
+DOCKER_BUILDKIT=0 docker build -q -t "$WEB_IMG" -f Dockerfile.web.runtime . >/dev/null 2>&1
 
 cat > "$RELEASE_DIR/images.env" <<IMGEOF
 GAME_IMAGE=${GAME_IMG}
@@ -139,19 +153,20 @@ docker compose -p drop2empire \
 ln -sfn "$RELEASE_DIR" /srv/drop2empire/current
 EOF
 
-echo "==> [5/6] Verifying Drop to Empire health & API readiness on http://$SSH_HOST:$PUBLIC_PORT..."
+echo "==> [5/6] Verifying Drop to Empire HTTPS health & API readiness on https://$SSH_HOST:$PUBLIC_PORT..."
 for i in {1..20}; do
-  if curl -fsS "http://$SSH_HOST:$PUBLIC_PORT/readyz" >/dev/null 2>&1; then
+  if curl -fsS "https://$SSH_HOST:$PUBLIC_PORT/readyz" >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-curl -fsS "http://$SSH_HOST:$PUBLIC_PORT/healthz" >/dev/null
-curl -fsS "http://$SSH_HOST:$PUBLIC_PORT/readyz" >/dev/null
-curl -fsS "http://$SSH_HOST:$PUBLIC_PORT/version.json"
+curl -fsS "https://$SSH_HOST:$PUBLIC_PORT/healthz" >/dev/null
+curl -fsS "https://$SSH_HOST:$PUBLIC_PORT/readyz" >/dev/null
+curl -fsS "https://$SSH_HOST:$PUBLIC_PORT/version.json"
 echo ""
 
 echo "==> [6/6] Verifying existing Aliyun services (teamie) are 100% healthy and untouched..."
+curl -fsS "https://$SSH_HOST/" -o /dev/null
 ssh -o ConnectTimeout=10 "$SSH_HOST" 'docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
-echo "==> Deployment complete! Access Drop to Empire at: http://$SSH_HOST:$PUBLIC_PORT"
+echo "==> Deployment complete! Access Drop to Empire at: https://$SSH_HOST:$PUBLIC_PORT"
