@@ -2,7 +2,7 @@
 
 > **从手动打出第一滴水，到管理人口与生产、选择专属职业、参与全球玩家现货市场，最终投入每晚 20:00 结算的商会城池战争，争夺唯一序列号与随机 UV 采样的程序化赛季藏品。**
 
-本项目为《滴水成城》（[`docs/gdd-v1.md`](docs/gdd-v1.md)）V1.0 全栈 Web 实现，采用与 `teamie` 一致的契约先行（Thrift IDL 代码生成）、Go Hertz + PostgreSQL 4 层六边形 Clean DDD 架构，以及 **Blueprint & Ink（纸墨工程制图风 + 严格等宽数字 + Token 自动化门禁）** 前端体系。
+本项目为《滴水成城》（[`docs/gdd-v1.md`](docs/gdd-v1.md) & [`docs/gdd-v2-economy-and-systems.md`](docs/gdd-v2-economy-and-systems.md)）全栈 Web 实现，采用与 `teamie` 一致的契约先行（Thrift IDL 代码生成）、Go Hertz + PostgreSQL 4 层六边形 Clean DDD 架构，以及 **Blueprint & Ink（纸墨工程制图风 + 严格等宽数字 + Token 自动化门禁）** 前端体系。
 
 ---
 

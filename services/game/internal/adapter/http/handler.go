@@ -80,7 +80,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		handles = append(handles, p.Handle)
 	}
 
-	rates := domain.NetResourceRatesPerSecMilli(p)
+	grossRates, drainRates, rates := domain.ComputeResourceFlows(p)
 	assignedPop := domain.AssignedPopulation(p)
 	idlePop := p.PopulationTotal - assignedPop
 	if idlePop < 0 {
@@ -128,7 +128,16 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		if meta.Key == domain.ResWood && p.UnlockedBlueprints[domain.BPAxeBlueprint] {
 			unlocked = true
 		}
+		if meta.Key == domain.ResCharcoal && p.UnlockedBlueprints[domain.BPCharcoalKiln] {
+			unlocked = true
+		}
 		if meta.Key == domain.ResStone && p.UnlockedBlueprints[domain.BPQuarryTech] {
+			unlocked = true
+		}
+		if meta.Key == domain.ResFlint && (p.UnlockedBlueprints[domain.BPWaterCistern] || p.UnlockedBlueprints[domain.BPScoutCamp]) {
+			unlocked = true
+		}
+		if meta.Key == domain.ResAncientShard && p.UnlockedBlueprints[domain.BPScoutCamp] {
 			unlocked = true
 		}
 		if (meta.Key == domain.ResIronIngot || meta.Key == domain.ResRation) && p.UnlockedBlueprints[domain.BPBasicWorkshop] && p.Profession != domain.ProfNone {
@@ -137,15 +146,21 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		if p.Profession != domain.ProfNone {
 			unlocked = true
 		}
+		capMilli := domain.ResourceCapacityMilli(p, meta.Key)
+		grossVal := grossRates[meta.Key]
+		drainVal := drainRates[meta.Key]
 		resourcesDTO = append(resourcesDTO, &empire.ResourceLineDTO{
-			Key:                meta.Key,
-			Name:               meta.Name,
-			Tier:               meta.Tier,
-			AmountMilli:        amt,
-			FrozenMilli:        frz,
-			NetRatePerSecMilli: rates[meta.Key],
-			Unlocked:           unlocked,
-			Description:        meta.Description,
+			Key:                  meta.Key,
+			Name:                 meta.Name,
+			Tier:                 meta.Tier,
+			AmountMilli:          amt,
+			FrozenMilli:          frz,
+			NetRatePerSecMilli:   rates[meta.Key],
+			Unlocked:             unlocked,
+			Description:          meta.Description,
+			CapacityMilli:        capMilli,
+			GrossRatePerSecMilli: grossVal,
+			DrainRatePerSecMilli: drainVal,
 		})
 	}
 
@@ -169,7 +184,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	presetsDTO := make([]*empire.AllocationPresetDTO, 0, len(p.Presets))
 	for _, pr := range p.Presets {
 		entries := make([]*empire.AllocationEntryDTO, 0, len(pr.Allocations))
-		for _, k := range []string{domain.JobWater, domain.JobWood, domain.JobStone, domain.JobSmeltIron, domain.JobPrepRation} {
+		for _, k := range []string{domain.JobWater, domain.JobWood, domain.JobCharcoal, domain.JobStone, domain.JobSmeltIron, domain.JobPrepRation} {
 			if c, ok := pr.Allocations[k]; ok && c > 0 {
 				entries = append(entries, &empire.AllocationEntryDTO{
 					JobKey: k,
@@ -204,7 +219,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 
 		var maxETA int64
 		allResourcesOK := true
-		costOrder := []string{domain.ResWater, domain.ResWood, domain.ResStone}
+		costOrder := []string{domain.ResWater, domain.ResWood, domain.ResCharcoal, domain.ResStone, domain.ResFlint, domain.ResAncientShard}
 		costsDTO := make([]*empire.CostItemDTO, 0, len(bp.CostsMilli))
 		for _, rKey := range costOrder {
 			reqMilli, exists := bp.CostsMilli[rKey]
@@ -594,6 +609,110 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		}
 	}
 
+	costOrderAll := []string{domain.ResWater, domain.ResWood, domain.ResCharcoal, domain.ResStone, domain.ResFlint, domain.ResAncientShard, domain.ResIronIngot, domain.ResRation}
+
+	edictsDTO := make([]*empire.ColonyEdictDTO, 0, len(domain.EdictCatalog))
+	for _, ed := range domain.EdictCatalog {
+		unlocked := p.UnlockedBlueprints[ed.PrerequisiteCode]
+		active := unlocked && p.ActiveEdicts != nil && p.ActiveEdicts[ed.Code]
+		edictsDTO = append(edictsDTO, &empire.ColonyEdictDTO{
+			Code:            ed.Code,
+			Name:            ed.Name,
+			Category:        ed.Category,
+			EffectSummary:   ed.EffectSummary,
+			DrawbackSummary: ed.DrawbackSummary,
+			Unlocked:        unlocked,
+			Active:          active,
+		})
+	}
+
+	expeditionRoutesDTO := make([]*empire.ExpeditionRouteDTO, 0, len(domain.ExpeditionCatalog))
+	if p.UnlockedBlueprints[domain.BPScoutCamp] {
+		for _, rt := range domain.ExpeditionCatalog {
+			costsDTO := make([]*empire.CostItemDTO, 0, len(rt.CostsMilli))
+			allOK := p.ActiveExpedition == nil
+			for _, rKey := range costOrderAll {
+				reqMilli, exists := rt.CostsMilli[rKey]
+				if !exists {
+					continue
+				}
+				curMilli := p.ResourcesMilli[rKey]
+				if curMilli < reqMilli {
+					allOK = false
+				}
+				costsDTO = append(costsDTO, &empire.CostItemDTO{
+					ResourceKey:   rKey,
+					ResourceName:  domain.ResourceName(rKey),
+					RequiredMilli: reqMilli,
+					CurrentMilli:  curMilli,
+					EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
+				})
+			}
+			expeditionRoutesDTO = append(expeditionRoutesDTO, &empire.ExpeditionRouteDTO{
+				RouteCode:       rt.RouteCode,
+				Name:            rt.Name,
+				DurationSeconds: rt.DurationSeconds,
+				Costs:           costsDTO,
+				RewardSummary:   rt.RewardSummary,
+				CanDispatch:     allOK,
+			})
+		}
+	}
+
+	var activeExpeditionDTO *empire.ActiveExpeditionDTO
+	if p.ActiveExpedition != nil {
+		ae := p.ActiveExpedition
+		elapsed := p.SimulatedElapsedSeconds - ae.StartedAtSimSec
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		rem := ae.DurationSeconds - elapsed
+		if rem < 0 {
+			rem = 0
+		}
+		activeExpeditionDTO = &empire.ActiveExpeditionDTO{
+			RouteCode:        ae.RouteCode,
+			RouteName:        ae.RouteName,
+			RemainingSeconds: rem,
+			TotalSeconds:     ae.DurationSeconds,
+			Completed:        rem == 0,
+		}
+	}
+
+	caravanOffersDTO := make([]*empire.CaravanOfferDTO, 0, len(domain.CaravanOfferCatalog))
+	if p.UnlockedBlueprints[domain.BPScoutCamp] {
+		for _, cf := range domain.CaravanOfferCatalog {
+			costsDTO := make([]*empire.CostItemDTO, 0, len(cf.CostsMilli))
+			canTrade := true
+			for _, rKey := range costOrderAll {
+				reqMilli, exists := cf.CostsMilli[rKey]
+				if !exists {
+					continue
+				}
+				curMilli := p.ResourcesMilli[rKey]
+				if curMilli < reqMilli {
+					canTrade = false
+				}
+				costsDTO = append(costsDTO, &empire.CostItemDTO{
+					ResourceKey:   rKey,
+					ResourceName:  domain.ResourceName(rKey),
+					RequiredMilli: reqMilli,
+					CurrentMilli:  curMilli,
+					EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
+				})
+			}
+			caravanOffersDTO = append(caravanOffersDTO, &empire.CaravanOfferDTO{
+				OfferCode:     cf.OfferCode,
+				Title:         cf.Title,
+				Costs:         costsDTO,
+				RewardSummary: cf.RewardSummary,
+				CanTrade:      canTrade,
+			})
+		}
+	}
+
+	hydrationWarn := p.HydrationWarning
+
 	return &empire.DashboardStateResp{
 		ServerTime:          time.Now().UTC().Format(time.RFC3339),
 		Player:              playerDTO,
@@ -614,6 +733,11 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		SeasonNotices:       noticesDTO,
 		EventLogs:           logsDTO,
 		Invites:             invitesDTO,
+		Edicts:              edictsDTO,
+		ExpeditionRoutes:    expeditionRoutesDTO,
+		ActiveExpedition:    activeExpeditionDTO,
+		CaravanOffers:       caravanOffersDTO,
+		HydrationWarning:    hydrationWarn,
 	}
 }
 
@@ -730,6 +854,38 @@ func (s *Server) SaveAllocationPreset(ctx context.Context, req *empire.SaveAlloc
 
 func (s *Server) UnlockBlueprint(ctx context.Context, req *empire.UnlockBlueprintReq) (*empire.DashboardStateResp, error) {
 	w, err := s.svc.UnlockBlueprint(ctx, req.Code)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) ToggleEdict(ctx context.Context, req *empire.ToggleEdictReq) (*empire.DashboardStateResp, error) {
+	w, err := s.svc.ToggleEdict(ctx, req.Code)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) DispatchExpedition(ctx context.Context, req *empire.DispatchExpeditionReq) (*empire.DashboardStateResp, error) {
+	w, err := s.svc.DispatchExpedition(ctx, req.RouteCode)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) ClaimExpedition(ctx context.Context, _ *empire.ClaimExpeditionReq) (*empire.DashboardStateResp, error) {
+	w, err := s.svc.ClaimExpedition(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) TradeCaravan(ctx context.Context, req *empire.TradeCaravanReq) (*empire.DashboardStateResp, error) {
+	w, err := s.svc.TradeCaravan(ctx, req.OfferCode)
 	if err != nil {
 		return nil, err
 	}

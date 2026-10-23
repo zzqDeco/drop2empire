@@ -13,6 +13,9 @@ struct ResourceLineDTO {
   6: required i64 netRatePerSecMilli (api.body="netRatePerSecMilli")
   7: required bool unlocked (api.body="unlocked")
   8: required string description (api.body="description")
+  9: required i64 capacityMilli (api.body="capacityMilli")
+  10: required i64 grossRatePerSecMilli (api.body="grossRatePerSecMilli")
+  11: required i64 drainRatePerSecMilli (api.body="drainRatePerSecMilli")
 }
 
 struct WorkerJobDTO {
@@ -58,6 +61,41 @@ struct BlueprintNodeDTO {
   9: required bool canUnlock (api.body="canUnlock")
   10: required bool visible (api.body="visible")
   11: required i64 etaSeconds (api.body="etaSeconds")
+}
+
+struct ColonyEdictDTO {
+  1: required string code (api.body="code")
+  2: required string name (api.body="name")
+  3: required string category (api.body="category")
+  4: required string effectSummary (api.body="effectSummary")
+  5: required string drawbackSummary (api.body="drawbackSummary")
+  6: required bool unlocked (api.body="unlocked")
+  7: required bool active (api.body="active")
+}
+
+struct ExpeditionRouteDTO {
+  1: required string routeCode (api.body="routeCode")
+  2: required string name (api.body="name")
+  3: required i32 durationSeconds (api.body="durationSeconds")
+  4: required list<CostItemDTO> costs (api.body="costs")
+  5: required string rewardSummary (api.body="rewardSummary")
+  6: required bool canDispatch (api.body="canDispatch")
+}
+
+struct ActiveExpeditionDTO {
+  1: required string routeCode (api.body="routeCode")
+  2: required string routeName (api.body="routeName")
+  3: required i64 remainingSeconds (api.body="remainingSeconds")
+  4: required i64 totalSeconds (api.body="totalSeconds")
+  5: required bool completed (api.body="completed")
+}
+
+struct CaravanOfferDTO {
+  1: required string offerCode (api.body="offerCode")
+  2: required string title (api.body="title")
+  3: required list<CostItemDTO> costs (api.body="costs")
+  4: required string rewardSummary (api.body="rewardSummary")
+  5: required bool canTrade (api.body="canTrade")
 }
 
 struct ProfessionSpecDTO {
@@ -312,6 +350,11 @@ struct DashboardStateResp {
   19: optional string sessionToken (api.body="sessionToken")
   20: required list<RegistrationInviteDTO> invites (api.body="invites")
   21: optional string createdInviteCode (api.body="createdInviteCode")
+  22: required list<ColonyEdictDTO> edicts (api.body="edicts")
+  23: required list<ExpeditionRouteDTO> expeditionRoutes (api.body="expeditionRoutes")
+  24: optional ActiveExpeditionDTO activeExpedition (api.body="activeExpedition")
+  25: required list<CaravanOfferDTO> caravanOffers (api.body="caravanOffers")
+  26: required bool hydrationWarning (api.body="hydrationWarning")
 }
 
 struct GetDashboardReq {}
@@ -363,6 +406,20 @@ struct SaveAllocationPresetReq {
 
 struct UnlockBlueprintReq {
   1: required string code (api.body="code")
+}
+
+struct ToggleEdictReq {
+  1: required string code (api.body="code")
+}
+
+struct DispatchExpeditionReq {
+  1: required string routeCode (api.body="routeCode")
+}
+
+struct ClaimExpeditionReq {}
+
+struct TradeCaravanReq {
+  1: required string offerCode (api.body="offerCode")
 }
 
 struct ChooseProfessionReq {
@@ -467,4 +524,8 @@ service EmpireService {
   Benchmark30mResp RunBenchmark30m(1: RunBenchmark30mReq req) (api.post="/api/v1/empire/debug/benchmark-30m")
   DashboardStateResp CreateInvite(1: CreateInviteReq req) (api.post="/api/v1/empire/admin/invites")
   DashboardStateResp RevokeInvite(1: RevokeInviteReq req) (api.post="/api/v1/empire/admin/invites/:id/revoke")
+  DashboardStateResp ToggleEdict(1: ToggleEdictReq req) (api.post="/api/v1/empire/colony/toggle-edict")
+  DashboardStateResp DispatchExpedition(1: DispatchExpeditionReq req) (api.post="/api/v1/empire/colony/expedition/dispatch")
+  DashboardStateResp ClaimExpedition(1: ClaimExpeditionReq req) (api.post="/api/v1/empire/colony/expedition/claim")
+  DashboardStateResp TradeCaravan(1: TradeCaravanReq req) (api.post="/api/v1/empire/colony/caravan/trade")
 }

@@ -310,6 +310,30 @@ func (s *Service) UnlockBlueprint(ctx context.Context, code string) (*domain.Wor
 	})
 }
 
+func (s *Service) ToggleEdict(ctx context.Context, code string) (*domain.WorldState, error) {
+	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+		return domain.ToggleEdict(p, code, now)
+	})
+}
+
+func (s *Service) DispatchExpedition(ctx context.Context, routeCode string) (*domain.WorldState, error) {
+	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+		return domain.DispatchExpedition(p, routeCode, now)
+	})
+}
+
+func (s *Service) ClaimExpedition(ctx context.Context) (*domain.WorldState, error) {
+	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+		return domain.ClaimExpedition(p, now)
+	})
+}
+
+func (s *Service) TradeCaravan(ctx context.Context, offerCode string) (*domain.WorldState, error) {
+	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+		return domain.TradeCaravan(p, offerCode, now)
+	})
+}
+
 func (s *Service) ChooseProfession(ctx context.Context, profession string) (*domain.WorldState, error) {
 	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
 		return domain.ChooseProfession(p, profession, now)

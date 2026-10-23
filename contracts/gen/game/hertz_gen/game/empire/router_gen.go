@@ -56,9 +56,13 @@ const (
 	PatternRunBenchmark30m = "POST /api/v1/empire/debug/benchmark-30m"
 	PatternCreateInvite = "POST /api/v1/empire/admin/invites"
 	PatternRevokeInvite = "POST /api/v1/empire/admin/invites/{id}/revoke"
+	PatternToggleEdict = "POST /api/v1/empire/colony/toggle-edict"
+	PatternDispatchExpedition = "POST /api/v1/empire/colony/expedition/dispatch"
+	PatternClaimExpedition = "POST /api/v1/empire/colony/expedition/claim"
+	PatternTradeCaravan = "POST /api/v1/empire/colony/caravan/trade"
 )
 
-// EmpireServiceRoutes lists all 24 route specifications declared on EmpireService.
+// EmpireServiceRoutes lists all 28 route specifications declared on EmpireService.
 var EmpireServiceRoutes = []RouteSpec{
 	{Name: "GetDashboard", Method: "GET", Path: "/api/v1/empire/state", MuxPattern: PatternGetDashboard, RequestType: "GetDashboardReq", ResponseType: "DashboardStateResp"},
 	{Name: "RegisterAccount", Method: "POST", Path: "/api/v1/empire/auth/register", MuxPattern: PatternRegisterAccount, RequestType: "RegisterAccountReq", ResponseType: "DashboardStateResp"},
@@ -84,6 +88,10 @@ var EmpireServiceRoutes = []RouteSpec{
 	{Name: "RunBenchmark30m", Method: "POST", Path: "/api/v1/empire/debug/benchmark-30m", MuxPattern: PatternRunBenchmark30m, RequestType: "RunBenchmark30mReq", ResponseType: "Benchmark30mResp"},
 	{Name: "CreateInvite", Method: "POST", Path: "/api/v1/empire/admin/invites", MuxPattern: PatternCreateInvite, RequestType: "CreateInviteReq", ResponseType: "DashboardStateResp"},
 	{Name: "RevokeInvite", Method: "POST", Path: "/api/v1/empire/admin/invites/:id/revoke", MuxPattern: PatternRevokeInvite, RequestType: "RevokeInviteReq", ResponseType: "DashboardStateResp"},
+	{Name: "ToggleEdict", Method: "POST", Path: "/api/v1/empire/colony/toggle-edict", MuxPattern: PatternToggleEdict, RequestType: "ToggleEdictReq", ResponseType: "DashboardStateResp"},
+	{Name: "DispatchExpedition", Method: "POST", Path: "/api/v1/empire/colony/expedition/dispatch", MuxPattern: PatternDispatchExpedition, RequestType: "DispatchExpeditionReq", ResponseType: "DashboardStateResp"},
+	{Name: "ClaimExpedition", Method: "POST", Path: "/api/v1/empire/colony/expedition/claim", MuxPattern: PatternClaimExpedition, RequestType: "ClaimExpeditionReq", ResponseType: "DashboardStateResp"},
+	{Name: "TradeCaravan", Method: "POST", Path: "/api/v1/empire/colony/caravan/trade", MuxPattern: PatternTradeCaravan, RequestType: "TradeCaravanReq", ResponseType: "DashboardStateResp"},
 }
 
 // EmpireServiceRouteHandlers binds every endpoint in EmpireService to an http.HandlerFunc.
@@ -112,6 +120,10 @@ type EmpireServiceRouteHandlers struct {
 	RunBenchmark30m http.HandlerFunc
 	CreateInvite http.HandlerFunc
 	RevokeInvite http.HandlerFunc
+	ToggleEdict http.HandlerFunc
+	DispatchExpedition http.HandlerFunc
+	ClaimExpedition http.HandlerFunc
+	TradeCaravan http.HandlerFunc
 }
 
 // RegisterEmpireServiceRoutes registers all EmpireService endpoints on mux and panics if any IDL endpoint handler is nil.
@@ -212,6 +224,22 @@ func RegisterEmpireServiceRoutes(mux *http.ServeMux, h EmpireServiceRouteHandler
 		panic("EmpireServiceRouteHandlers.RevokeInvite (" + PatternRevokeInvite + ") is nil")
 	}
 	mux.HandleFunc(PatternRevokeInvite, h.RevokeInvite)
+	if h.ToggleEdict == nil {
+		panic("EmpireServiceRouteHandlers.ToggleEdict (" + PatternToggleEdict + ") is nil")
+	}
+	mux.HandleFunc(PatternToggleEdict, h.ToggleEdict)
+	if h.DispatchExpedition == nil {
+		panic("EmpireServiceRouteHandlers.DispatchExpedition (" + PatternDispatchExpedition + ") is nil")
+	}
+	mux.HandleFunc(PatternDispatchExpedition, h.DispatchExpedition)
+	if h.ClaimExpedition == nil {
+		panic("EmpireServiceRouteHandlers.ClaimExpedition (" + PatternClaimExpedition + ") is nil")
+	}
+	mux.HandleFunc(PatternClaimExpedition, h.ClaimExpedition)
+	if h.TradeCaravan == nil {
+		panic("EmpireServiceRouteHandlers.TradeCaravan (" + PatternTradeCaravan + ") is nil")
+	}
+	mux.HandleFunc(PatternTradeCaravan, h.TradeCaravan)
 }
 
 // RegisterEmpireServer binds EmpireServer methods using HTTPResponder with optional per-route handler overrides.
@@ -650,6 +678,78 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			fn = mw.WrapRoute(RouteSpec{Name: "RevokeInvite", Method: "POST", Path: "/api/v1/empire/admin/invites/:id/revoke", MuxPattern: PatternRevokeInvite, RequestType: "RevokeInviteReq", ResponseType: "DashboardStateResp"}, fn)
 		}
 		h.RevokeInvite = fn
+	}
+	if h.ToggleEdict == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req ToggleEdictReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.ToggleEdict(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "ToggleEdict", Method: "POST", Path: "/api/v1/empire/colony/toggle-edict", MuxPattern: PatternToggleEdict, RequestType: "ToggleEdictReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.ToggleEdict = fn
+	}
+	if h.DispatchExpedition == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req DispatchExpeditionReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.DispatchExpedition(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "DispatchExpedition", Method: "POST", Path: "/api/v1/empire/colony/expedition/dispatch", MuxPattern: PatternDispatchExpedition, RequestType: "DispatchExpeditionReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.DispatchExpedition = fn
+	}
+	if h.ClaimExpedition == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req ClaimExpeditionReq
+			resp, err := srv.ClaimExpedition(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "ClaimExpedition", Method: "POST", Path: "/api/v1/empire/colony/expedition/claim", MuxPattern: PatternClaimExpedition, RequestType: "ClaimExpeditionReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.ClaimExpedition = fn
+	}
+	if h.TradeCaravan == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req TradeCaravanReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.TradeCaravan(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "TradeCaravan", Method: "POST", Path: "/api/v1/empire/colony/caravan/trade", MuxPattern: PatternTradeCaravan, RequestType: "TradeCaravanReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.TradeCaravan = fn
 	}
 	RegisterEmpireServiceRoutes(mux, h)
 }

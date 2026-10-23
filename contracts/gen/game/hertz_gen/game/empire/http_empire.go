@@ -8,14 +8,17 @@ import (
 )
 
 type ResourceLineDTO struct {
-	Key                string `thrift:"key,1,required" json:"key"`
-	Name               string `thrift:"name,2,required" json:"name"`
-	Tier               string `thrift:"tier,3,required" json:"tier"`
-	AmountMilli        int64  `thrift:"amountMilli,4,required" json:"amountMilli"`
-	FrozenMilli        int64  `thrift:"frozenMilli,5,required" json:"frozenMilli"`
-	NetRatePerSecMilli int64  `thrift:"netRatePerSecMilli,6,required" json:"netRatePerSecMilli"`
-	Unlocked           bool   `thrift:"unlocked,7,required" json:"unlocked"`
-	Description        string `thrift:"description,8,required" json:"description"`
+	Key                  string `thrift:"key,1,required" json:"key"`
+	Name                 string `thrift:"name,2,required" json:"name"`
+	Tier                 string `thrift:"tier,3,required" json:"tier"`
+	AmountMilli          int64  `thrift:"amountMilli,4,required" json:"amountMilli"`
+	FrozenMilli          int64  `thrift:"frozenMilli,5,required" json:"frozenMilli"`
+	NetRatePerSecMilli   int64  `thrift:"netRatePerSecMilli,6,required" json:"netRatePerSecMilli"`
+	Unlocked             bool   `thrift:"unlocked,7,required" json:"unlocked"`
+	Description          string `thrift:"description,8,required" json:"description"`
+	CapacityMilli        int64  `thrift:"capacityMilli,9,required" json:"capacityMilli"`
+	GrossRatePerSecMilli int64  `thrift:"grossRatePerSecMilli,10,required" json:"grossRatePerSecMilli"`
+	DrainRatePerSecMilli int64  `thrift:"drainRatePerSecMilli,11,required" json:"drainRatePerSecMilli"`
 }
 
 func NewResourceLineDTO() *ResourceLineDTO {
@@ -55,6 +58,18 @@ func (p *ResourceLineDTO) GetUnlocked() (v bool) {
 
 func (p *ResourceLineDTO) GetDescription() (v string) {
 	return p.Description
+}
+
+func (p *ResourceLineDTO) GetCapacityMilli() (v int64) {
+	return p.CapacityMilli
+}
+
+func (p *ResourceLineDTO) GetGrossRatePerSecMilli() (v int64) {
+	return p.GrossRatePerSecMilli
+}
+
+func (p *ResourceLineDTO) GetDrainRatePerSecMilli() (v int64) {
+	return p.DrainRatePerSecMilli
 }
 
 func (p *ResourceLineDTO) String() string {
@@ -297,6 +312,189 @@ func (p *BlueprintNodeDTO) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("BlueprintNodeDTO(%+v)", *p)
+}
+
+type ColonyEdictDTO struct {
+	Code            string `thrift:"code,1,required" json:"code"`
+	Name            string `thrift:"name,2,required" json:"name"`
+	Category        string `thrift:"category,3,required" json:"category"`
+	EffectSummary   string `thrift:"effectSummary,4,required" json:"effectSummary"`
+	DrawbackSummary string `thrift:"drawbackSummary,5,required" json:"drawbackSummary"`
+	Unlocked        bool   `thrift:"unlocked,6,required" json:"unlocked"`
+	Active          bool   `thrift:"active,7,required" json:"active"`
+}
+
+func NewColonyEdictDTO() *ColonyEdictDTO {
+	return &ColonyEdictDTO{}
+}
+
+func (p *ColonyEdictDTO) InitDefault() {
+}
+
+func (p *ColonyEdictDTO) GetCode() (v string) {
+	return p.Code
+}
+
+func (p *ColonyEdictDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *ColonyEdictDTO) GetCategory() (v string) {
+	return p.Category
+}
+
+func (p *ColonyEdictDTO) GetEffectSummary() (v string) {
+	return p.EffectSummary
+}
+
+func (p *ColonyEdictDTO) GetDrawbackSummary() (v string) {
+	return p.DrawbackSummary
+}
+
+func (p *ColonyEdictDTO) GetUnlocked() (v bool) {
+	return p.Unlocked
+}
+
+func (p *ColonyEdictDTO) GetActive() (v bool) {
+	return p.Active
+}
+
+func (p *ColonyEdictDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ColonyEdictDTO(%+v)", *p)
+}
+
+type ExpeditionRouteDTO struct {
+	RouteCode       string         `thrift:"routeCode,1,required" json:"routeCode"`
+	Name            string         `thrift:"name,2,required" json:"name"`
+	DurationSeconds int32          `thrift:"durationSeconds,3,required" json:"durationSeconds"`
+	Costs           []*CostItemDTO `thrift:"costs,4,required,list<CostItemDTO>" json:"costs"`
+	RewardSummary   string         `thrift:"rewardSummary,5,required" json:"rewardSummary"`
+	CanDispatch     bool           `thrift:"canDispatch,6,required" json:"canDispatch"`
+}
+
+func NewExpeditionRouteDTO() *ExpeditionRouteDTO {
+	return &ExpeditionRouteDTO{}
+}
+
+func (p *ExpeditionRouteDTO) InitDefault() {
+}
+
+func (p *ExpeditionRouteDTO) GetRouteCode() (v string) {
+	return p.RouteCode
+}
+
+func (p *ExpeditionRouteDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *ExpeditionRouteDTO) GetDurationSeconds() (v int32) {
+	return p.DurationSeconds
+}
+
+func (p *ExpeditionRouteDTO) GetCosts() (v []*CostItemDTO) {
+	return p.Costs
+}
+
+func (p *ExpeditionRouteDTO) GetRewardSummary() (v string) {
+	return p.RewardSummary
+}
+
+func (p *ExpeditionRouteDTO) GetCanDispatch() (v bool) {
+	return p.CanDispatch
+}
+
+func (p *ExpeditionRouteDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ExpeditionRouteDTO(%+v)", *p)
+}
+
+type ActiveExpeditionDTO struct {
+	RouteCode        string `thrift:"routeCode,1,required" json:"routeCode"`
+	RouteName        string `thrift:"routeName,2,required" json:"routeName"`
+	RemainingSeconds int64  `thrift:"remainingSeconds,3,required" json:"remainingSeconds"`
+	TotalSeconds     int64  `thrift:"totalSeconds,4,required" json:"totalSeconds"`
+	Completed        bool   `thrift:"completed,5,required" json:"completed"`
+}
+
+func NewActiveExpeditionDTO() *ActiveExpeditionDTO {
+	return &ActiveExpeditionDTO{}
+}
+
+func (p *ActiveExpeditionDTO) InitDefault() {
+}
+
+func (p *ActiveExpeditionDTO) GetRouteCode() (v string) {
+	return p.RouteCode
+}
+
+func (p *ActiveExpeditionDTO) GetRouteName() (v string) {
+	return p.RouteName
+}
+
+func (p *ActiveExpeditionDTO) GetRemainingSeconds() (v int64) {
+	return p.RemainingSeconds
+}
+
+func (p *ActiveExpeditionDTO) GetTotalSeconds() (v int64) {
+	return p.TotalSeconds
+}
+
+func (p *ActiveExpeditionDTO) GetCompleted() (v bool) {
+	return p.Completed
+}
+
+func (p *ActiveExpeditionDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ActiveExpeditionDTO(%+v)", *p)
+}
+
+type CaravanOfferDTO struct {
+	OfferCode     string         `thrift:"offerCode,1,required" json:"offerCode"`
+	Title         string         `thrift:"title,2,required" json:"title"`
+	Costs         []*CostItemDTO `thrift:"costs,3,required,list<CostItemDTO>" json:"costs"`
+	RewardSummary string         `thrift:"rewardSummary,4,required" json:"rewardSummary"`
+	CanTrade      bool           `thrift:"canTrade,5,required" json:"canTrade"`
+}
+
+func NewCaravanOfferDTO() *CaravanOfferDTO {
+	return &CaravanOfferDTO{}
+}
+
+func (p *CaravanOfferDTO) InitDefault() {
+}
+
+func (p *CaravanOfferDTO) GetOfferCode() (v string) {
+	return p.OfferCode
+}
+
+func (p *CaravanOfferDTO) GetTitle() (v string) {
+	return p.Title
+}
+
+func (p *CaravanOfferDTO) GetCosts() (v []*CostItemDTO) {
+	return p.Costs
+}
+
+func (p *CaravanOfferDTO) GetRewardSummary() (v string) {
+	return p.RewardSummary
+}
+
+func (p *CaravanOfferDTO) GetCanTrade() (v bool) {
+	return p.CanTrade
+}
+
+func (p *CaravanOfferDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CaravanOfferDTO(%+v)", *p)
 }
 
 type ProfessionSpecDTO struct {
@@ -1532,6 +1730,11 @@ type DashboardStateResp struct {
 	SessionToken        *string                  `thrift:"sessionToken,19,optional" json:"sessionToken,omitempty"`
 	Invites             []*RegistrationInviteDTO `thrift:"invites,20,required,list<RegistrationInviteDTO>" json:"invites"`
 	CreatedInviteCode   *string                  `thrift:"createdInviteCode,21,optional" json:"createdInviteCode,omitempty"`
+	Edicts              []*ColonyEdictDTO        `thrift:"edicts,22,required,list<ColonyEdictDTO>" json:"edicts"`
+	ExpeditionRoutes    []*ExpeditionRouteDTO    `thrift:"expeditionRoutes,23,required,list<ExpeditionRouteDTO>" json:"expeditionRoutes"`
+	ActiveExpedition    *ActiveExpeditionDTO     `thrift:"activeExpedition,24,optional" json:"activeExpedition,omitempty"`
+	CaravanOffers       []*CaravanOfferDTO       `thrift:"caravanOffers,25,required,list<CaravanOfferDTO>" json:"caravanOffers"`
+	HydrationWarning    bool                     `thrift:"hydrationWarning,26,required" json:"hydrationWarning"`
 }
 
 func NewDashboardStateResp() *DashboardStateResp {
@@ -1650,6 +1853,31 @@ func (p *DashboardStateResp) GetCreatedInviteCode() (v string) {
 	return *p.CreatedInviteCode
 }
 
+func (p *DashboardStateResp) GetEdicts() (v []*ColonyEdictDTO) {
+	return p.Edicts
+}
+
+func (p *DashboardStateResp) GetExpeditionRoutes() (v []*ExpeditionRouteDTO) {
+	return p.ExpeditionRoutes
+}
+
+var DashboardStateResp_ActiveExpedition_DEFAULT *ActiveExpeditionDTO
+
+func (p *DashboardStateResp) GetActiveExpedition() (v *ActiveExpeditionDTO) {
+	if !p.IsSetActiveExpedition() {
+		return DashboardStateResp_ActiveExpedition_DEFAULT
+	}
+	return p.ActiveExpedition
+}
+
+func (p *DashboardStateResp) GetCaravanOffers() (v []*CaravanOfferDTO) {
+	return p.CaravanOffers
+}
+
+func (p *DashboardStateResp) GetHydrationWarning() (v bool) {
+	return p.HydrationWarning
+}
+
 func (p *DashboardStateResp) IsSetPlayer() bool {
 	return p.Player != nil
 }
@@ -1668,6 +1896,10 @@ func (p *DashboardStateResp) IsSetSessionToken() bool {
 
 func (p *DashboardStateResp) IsSetCreatedInviteCode() bool {
 	return p.CreatedInviteCode != nil
+}
+
+func (p *DashboardStateResp) IsSetActiveExpedition() bool {
+	return p.ActiveExpedition != nil
 }
 
 func (p *DashboardStateResp) String() string {
@@ -2007,6 +2239,89 @@ func (p *UnlockBlueprintReq) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("UnlockBlueprintReq(%+v)", *p)
+}
+
+type ToggleEdictReq struct {
+	Code string `thrift:"code,1,required" json:"code"`
+}
+
+func NewToggleEdictReq() *ToggleEdictReq {
+	return &ToggleEdictReq{}
+}
+
+func (p *ToggleEdictReq) InitDefault() {
+}
+
+func (p *ToggleEdictReq) GetCode() (v string) {
+	return p.Code
+}
+
+func (p *ToggleEdictReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ToggleEdictReq(%+v)", *p)
+}
+
+type DispatchExpeditionReq struct {
+	RouteCode string `thrift:"routeCode,1,required" json:"routeCode"`
+}
+
+func NewDispatchExpeditionReq() *DispatchExpeditionReq {
+	return &DispatchExpeditionReq{}
+}
+
+func (p *DispatchExpeditionReq) InitDefault() {
+}
+
+func (p *DispatchExpeditionReq) GetRouteCode() (v string) {
+	return p.RouteCode
+}
+
+func (p *DispatchExpeditionReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("DispatchExpeditionReq(%+v)", *p)
+}
+
+type ClaimExpeditionReq struct {
+}
+
+func NewClaimExpeditionReq() *ClaimExpeditionReq {
+	return &ClaimExpeditionReq{}
+}
+
+func (p *ClaimExpeditionReq) InitDefault() {
+}
+
+func (p *ClaimExpeditionReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ClaimExpeditionReq(%+v)", *p)
+}
+
+type TradeCaravanReq struct {
+	OfferCode string `thrift:"offerCode,1,required" json:"offerCode"`
+}
+
+func NewTradeCaravanReq() *TradeCaravanReq {
+	return &TradeCaravanReq{}
+}
+
+func (p *TradeCaravanReq) InitDefault() {
+}
+
+func (p *TradeCaravanReq) GetOfferCode() (v string) {
+	return p.OfferCode
+}
+
+func (p *TradeCaravanReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("TradeCaravanReq(%+v)", *p)
 }
 
 type ChooseProfessionReq struct {
@@ -2518,4 +2833,12 @@ type EmpireService interface {
 	CreateInvite(ctx context.Context, req *CreateInviteReq) (r *DashboardStateResp, err error)
 
 	RevokeInvite(ctx context.Context, req *RevokeInviteReq) (r *DashboardStateResp, err error)
+
+	ToggleEdict(ctx context.Context, req *ToggleEdictReq) (r *DashboardStateResp, err error)
+
+	DispatchExpedition(ctx context.Context, req *DispatchExpeditionReq) (r *DashboardStateResp, err error)
+
+	ClaimExpedition(ctx context.Context, req *ClaimExpeditionReq) (r *DashboardStateResp, err error)
+
+	TradeCaravan(ctx context.Context, req *TradeCaravanReq) (r *DashboardStateResp, err error)
 }

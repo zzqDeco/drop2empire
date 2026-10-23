@@ -26,7 +26,10 @@ const (
 const (
 	ResWater         = "water"
 	ResWood          = "wood"
+	ResCharcoal      = "charcoal"
 	ResStone         = "stone"
+	ResFlint         = "flint"
+	ResAncientShard  = "ancient_shard"
 	ResIronIngot     = "iron_ingot"
 	ResRation        = "ration"
 	ResAutoPump      = "auto_pump"
@@ -43,23 +46,46 @@ const (
 const (
 	JobWater      = "water"
 	JobWood       = "wood"
+	JobCharcoal   = "charcoal"
 	JobStone      = "stone"
 	JobSmeltIron  = "smelt_iron"
 	JobPrepRation = "prep_ration"
 )
 
-// Blueprint codes (Phase 1 progression & intermediate treasure parts).
+// Blueprint codes (Phase 1 progression, storage expansion, mechanisms & intermediate treasure parts).
 const (
 	BPFirstResident   = "first_resident"
+	BPWaterCistern    = "water_cistern"
+	BPColonyEdicts    = "colony_edicts"
+	BPScoutCamp       = "scout_camp"
 	BPAxeBlueprint    = "axe_blueprint"
+	BPCharcoalKiln    = "charcoal_kiln"
+	BPLumberYard      = "lumber_yard"
 	BPWaterWheel1     = "water_wheel_1"
+	BPSiphonSluice    = "siphon_sluice"
 	BPQuarryTech      = "quarry_tech"
+	BPStoneVault      = "stone_vault"
 	BPStoneSaw1       = "stone_saw_1"
 	BPBasicWorkshop   = "basic_workshop"
 	BPPartValve       = "part_valve"
 	BPPartFrame       = "part_frame"
 	BPPartTablet      = "part_tablet"
 	BPMysteryTreasure = "mystery_treasure"
+)
+
+// Colony Edict & Mechanism toggle codes.
+const (
+	EdictNightShift   = "night_shift"
+	EdictWaterRation  = "water_ration"
+	EdictHydroSaw     = "hydro_saw"
+	EdictSiphonSluice = "siphon_sluice"
+)
+
+// Wasteland Expedition route codes.
+const (
+	ExpRouteWoods   = "exp_woods"
+	ExpRouteQuarry  = "exp_quarry"
+	ExpRouteSanctum = "exp_sanctum"
 )
 
 // Profession codes (GDD 5.2).
@@ -130,6 +156,37 @@ type EquipmentSpec struct {
 	BonusSummary string
 }
 
+type EdictSpec struct {
+	Code             string
+	Name             string
+	Category         string
+	PrerequisiteCode string
+	EffectSummary    string
+	DrawbackSummary  string
+}
+
+type ExpeditionRouteSpec struct {
+	RouteCode       string
+	Name            string
+	DurationSeconds int32
+	CostsMilli      map[string]int64
+	RewardSummary   string
+}
+
+type ActiveExpeditionState struct {
+	RouteCode       string `json:"routeCode"`
+	RouteName       string `json:"routeName"`
+	StartedAtSimSec int64  `json:"startedAtSimSec"`
+	DurationSeconds int64  `json:"durationSeconds"`
+}
+
+type CaravanOfferSpec struct {
+	OfferCode     string
+	Title         string
+	CostsMilli    map[string]int64
+	RewardSummary string
+}
+
 type AllocationPreset struct {
 	Name        string           `json:"name"`
 	Allocations map[string]int32 `json:"allocations"`
@@ -188,8 +245,11 @@ type PlayerState struct {
 	Workers                 map[string]int32   `json:"workers"`
 	ResourcesMilli          map[string]int64   `json:"resourcesMilli"`
 	FrozenResourcesMilli    map[string]int64   `json:"frozenResourcesMilli"`
-	UnlockedBlueprints      map[string]bool    `json:"unlockedBlueprints"`
-	InstalledEquipments     map[string]int32   `json:"installedEquipments"`
+	UnlockedBlueprints      map[string]bool        `json:"unlockedBlueprints"`
+	ActiveEdicts            map[string]bool        `json:"activeEdicts"`
+	ActiveExpedition        *ActiveExpeditionState `json:"activeExpedition,omitempty"`
+	HydrationWarning        bool                   `json:"hydrationWarning"`
+	InstalledEquipments     map[string]int32       `json:"installedEquipments"`
 	Presets                 []AllocationPreset `json:"presets"`
 	GoldBasis               int64              `json:"goldBasis"`
 	GoldFrozenBasis         int64              `json:"goldFrozenBasis"`

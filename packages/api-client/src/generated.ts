@@ -13,6 +13,9 @@ export interface ResourceLineDTO {
   netRatePerSecMilli: number;
   unlocked: boolean;
   description: string;
+  capacityMilli: number;
+  grossRatePerSecMilli: number;
+  drainRatePerSecMilli: number;
 }
 
 export interface WorkerJobDTO {
@@ -58,6 +61,41 @@ export interface BlueprintNodeDTO {
   canUnlock: boolean;
   visible: boolean;
   etaSeconds: number;
+}
+
+export interface ColonyEdictDTO {
+  code: string;
+  name: string;
+  category: string;
+  effectSummary: string;
+  drawbackSummary: string;
+  unlocked: boolean;
+  active: boolean;
+}
+
+export interface ExpeditionRouteDTO {
+  routeCode: string;
+  name: string;
+  durationSeconds: number;
+  costs: CostItemDTO[];
+  rewardSummary: string;
+  canDispatch: boolean;
+}
+
+export interface ActiveExpeditionDTO {
+  routeCode: string;
+  routeName: string;
+  remainingSeconds: number;
+  totalSeconds: number;
+  completed: boolean;
+}
+
+export interface CaravanOfferDTO {
+  offerCode: string;
+  title: string;
+  costs: CostItemDTO[];
+  rewardSummary: string;
+  canTrade: boolean;
 }
 
 export interface ProfessionSpecDTO {
@@ -312,6 +350,11 @@ export interface DashboardStateResp {
   sessionToken?: string;
   invites: RegistrationInviteDTO[];
   createdInviteCode?: string;
+  edicts: ColonyEdictDTO[];
+  expeditionRoutes: ExpeditionRouteDTO[];
+  activeExpedition?: ActiveExpeditionDTO;
+  caravanOffers: CaravanOfferDTO[];
+  hydrationWarning: boolean;
 }
 
 export type GetDashboardReq = Record<string, never>;
@@ -363,6 +406,20 @@ export interface SaveAllocationPresetReq {
 
 export interface UnlockBlueprintReq {
   code: string;
+}
+
+export interface ToggleEdictReq {
+  code: string;
+}
+
+export interface DispatchExpeditionReq {
+  routeCode: string;
+}
+
+export type ClaimExpeditionReq = Record<string, never>;
+
+export interface TradeCaravanReq {
+  offerCode: string;
 }
 
 export interface ChooseProfessionReq {
@@ -661,6 +718,42 @@ export const IDL_ROUTES = {
     path: "/api/v1/empire/admin/invites/:id/revoke",
     clientPath: "/empire/admin/invites/:id/revoke",
     requestType: "RevokeInviteReq",
+    responseType: "DashboardStateResp",
+  },
+  ToggleEdict: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/toggle-edict",
+    clientPath: "/empire/colony/toggle-edict",
+    requestType: "ToggleEdictReq",
+    responseType: "DashboardStateResp",
+  },
+  DispatchExpedition: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/expedition/dispatch",
+    clientPath: "/empire/colony/expedition/dispatch",
+    requestType: "DispatchExpeditionReq",
+    responseType: "DashboardStateResp",
+  },
+  ClaimExpedition: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/expedition/claim",
+    clientPath: "/empire/colony/expedition/claim",
+    requestType: "ClaimExpeditionReq",
+    responseType: "DashboardStateResp",
+  },
+  TradeCaravan: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/caravan/trade",
+    clientPath: "/empire/colony/caravan/trade",
+    requestType: "TradeCaravanReq",
     responseType: "DashboardStateResp",
   },
 } as const;

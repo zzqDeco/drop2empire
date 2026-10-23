@@ -19,6 +19,9 @@ import {
   type SaveAllocationPresetReq,
   type SwitchAccountReq,
   type SwitchGuildReq,
+  type ToggleEdictReq,
+  type DispatchExpeditionReq,
+  type TradeCaravanReq,
   type UnlockBlueprintReq,
 } from "./generated";
 
@@ -176,6 +179,33 @@ export class EmpireClient {
   unlockBlueprint = (req: UnlockBlueprintReq) =>
     this.#request<DashboardStateResp>(IDL_ROUTES.UnlockBlueprint.clientPath, {
       method: IDL_ROUTES.UnlockBlueprint.method,
+      body: JSON.stringify(req),
+    });
+
+  toggleEdict = (req: ToggleEdictReq) =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.ToggleEdict.clientPath, {
+      method: IDL_ROUTES.ToggleEdict.method,
+      body: JSON.stringify(req),
+    });
+
+  dispatchExpedition = (req: DispatchExpeditionReq) =>
+    this.#request<DashboardStateResp>(
+      IDL_ROUTES.DispatchExpedition.clientPath,
+      {
+        method: IDL_ROUTES.DispatchExpedition.method,
+        body: JSON.stringify(req),
+      },
+    );
+
+  claimExpedition = () =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.ClaimExpedition.clientPath, {
+      method: IDL_ROUTES.ClaimExpedition.method,
+      body: JSON.stringify({}),
+    });
+
+  tradeCaravan = (req: TradeCaravanReq) =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.TradeCaravan.clientPath, {
+      method: IDL_ROUTES.TradeCaravan.method,
       body: JSON.stringify(req),
     });
 

@@ -113,3 +113,78 @@ func TestFullLoopProgressionMarketWarAndCollectibles(t *testing.T) {
 		t.Fatalf("invalid collectible minted: %+v", c)
 	}
 }
+
+func TestColonyDepthSystemsConversionEdictsExpeditionsAndCaravan(t *testing.T) {
+	now := time.Date(2026, 10, 24, 1, 0, 0, 0, time.UTC)
+	w := NewDefaultWorld(now)
+	p := w.Players["pioneer"]
+
+	// Initial water cap is 250.000
+	if cap := ResourceCapacityMilli(p, ResWater); cap != 250*ResourceScale {
+		t.Fatalf("expected initial water cap 250000, got %d", cap)
+	}
+
+	// Unlock prerequisites up to Scout Camp, Charcoal Kiln, Siphon Sluice, and Colony Edicts
+	p.PopulationTotal = 18
+	p.Workers[JobWater] = 10
+	p.Workers[JobWood] = 5
+	p.Workers[JobCharcoal] = 3
+	for _, code := range []string{
+		BPFirstResident, BPAxeBlueprint, BPWaterCistern, BPScoutCamp,
+		BPCharcoalKiln, BPColonyEdicts, BPQuarryTech, BPSiphonSluice, BPWaterWheel1,
+	} {
+		p.UnlockedBlueprints[code] = true
+	}
+	p.ActiveEdicts[EdictSiphonSluice] = true
+
+	// Water cap should now be 2400 (from WaterWheel1)
+	if cap := ResourceCapacityMilli(p, ResWater); cap != 2400*ResourceScale {
+		t.Fatalf("expected water wheel cap 2400000, got %d", cap)
+	}
+
+	// Fill water to cap and advance 10 seconds: Siphon Sluice should convert overflow water into Stone + Flint,
+	// while Charcoal Kiln converts Wood into Charcoal.
+	p.ResourcesMilli[ResWater] = 2400 * ResourceScale
+	p.ResourcesMilli[ResWood] = 200 * ResourceScale
+	AdvancePlayerSeconds(p, 10)
+
+	if p.ResourcesMilli[ResCharcoal] <= 0 {
+		t.Fatalf("expected charcoal kiln to produce charcoal from wood, got %d", p.ResourcesMilli[ResCharcoal])
+	}
+	if p.ResourcesMilli[ResStone] <= 0 {
+		t.Fatalf("expected siphon sluice to convert overflowing water into stone, got %d", p.ResourcesMilli[ResStone])
+	}
+
+	// Toggle Night Shift edict on and verify efficiency boost
+	if err := ToggleEdict(p, EdictNightShift, now); err != nil {
+		t.Fatal(err)
+	}
+	if !p.ActiveEdicts[EdictNightShift] {
+		t.Fatal("expected night_shift edict to be active")
+	}
+
+	// Dispatch Wasteland Expedition (Woods route: 20s)
+	if err := DispatchExpedition(p, ExpRouteWoods, now); err != nil {
+		t.Fatal(err)
+	}
+	if p.ActiveExpedition == nil {
+		t.Fatal("expected active expedition to be set")
+	}
+	AdvancePlayerSeconds(p, 25)
+	if err := ClaimExpedition(p, now); err != nil {
+		t.Fatal(err)
+	}
+	if p.ActiveExpedition != nil {
+		t.Fatal("expected active expedition to be cleared after claim")
+	}
+
+	// Trade with Caravan using flint
+	p.ResourcesMilli[ResFlint] = 10 * ResourceScale
+	prevWood := p.ResourcesMilli[ResWood]
+	if err := TradeCaravan(p, "offer_flint_lumber", now); err != nil {
+		t.Fatal(err)
+	}
+	if p.ResourcesMilli[ResWood] <= prevWood {
+		t.Fatalf("expected caravan barter to increase wood, prev=%d cur=%d", prevWood, p.ResourcesMilli[ResWood])
+	}
+}

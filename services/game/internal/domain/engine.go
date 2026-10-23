@@ -107,6 +107,26 @@ func EnsureDefaultAccounts(w *WorldState, now time.Time) {
 	if w.Invites == nil {
 		w.Invites = []RegistrationInvite{}
 	}
+	for _, pl := range w.Players {
+		if pl == nil {
+			continue
+		}
+		if pl.ActiveEdicts == nil {
+			pl.ActiveEdicts = map[string]bool{}
+		}
+		if pl.Workers == nil {
+			pl.Workers = map[string]int32{}
+		}
+		if pl.ResourcesMilli == nil {
+			pl.ResourcesMilli = map[string]int64{}
+		}
+		if pl.FrozenResourcesMilli == nil {
+			pl.FrozenResourcesMilli = map[string]int64{}
+		}
+		if pl.UnlockedBlueprints == nil {
+			pl.UnlockedBlueprints = map[string]bool{}
+		}
+	}
 	if p, ok := w.Players["pioneer"]; ok {
 		if p.PasswordHash == "" {
 			p.PasswordHash = HashPassword("pioneer", "pioneer123")
@@ -238,11 +258,12 @@ func NewBlankPlayer(handle string, now time.Time) *PlayerState {
 		Phase:                1,
 		Profession:           ProfNone,
 		ArtifactName:         "",
-		PopulationTotal:      0,
-		Workers:              map[string]int32{JobWater: 0, JobWood: 0, JobStone: 0, JobSmeltIron: 0, JobPrepRation: 0},
-		ResourcesMilli:       res,
-		FrozenResourcesMilli: frozen,
+		PopulationTotal:         0,
+		Workers:                 map[string]int32{JobWater: 0, JobWood: 0, JobCharcoal: 0, JobStone: 0, JobSmeltIron: 0, JobPrepRation: 0},
+		ResourcesMilli:          res,
+		FrozenResourcesMilli:    frozen,
 		UnlockedBlueprints:      map[string]bool{},
+		ActiveEdicts:            map[string]bool{},
 		InstalledEquipments:     map[string]int32{},
 		Presets:                 []AllocationPreset{},
 		GoldBasis:               0,
@@ -289,6 +310,87 @@ func NextResidentCostMilli(n int32) int64 {
 	return int64(cost) * ResourceScale
 }
 
+func ResourceCapacityMilli(p *PlayerState, resKey string) int64 {
+	switch resKey {
+	case ResWater:
+		capUnits := int64(250)
+		if p.UnlockedBlueprints[BPWaterCistern] {
+			capUnits = 1200
+		}
+		if p.UnlockedBlueprints[BPWaterWheel1] && capUnits < 2400 {
+			capUnits = 2400
+		}
+		if p.UnlockedBlueprints[BPStoneVault] && capUnits < 6000 {
+			capUnits = 6000
+		}
+		if p.UnlockedBlueprints[BPBasicWorkshop] && capUnits < 30000 {
+			capUnits = 30000
+		}
+		return capUnits * ResourceScale
+
+	case ResWood:
+		capUnits := int64(450)
+		if p.UnlockedBlueprints[BPLumberYard] {
+			capUnits = 1500
+		}
+		if p.UnlockedBlueprints[BPStoneVault] && capUnits < 2500 {
+			capUnits = 2500
+		}
+		if p.UnlockedBlueprints[BPBasicWorkshop] && capUnits < 15000 {
+			capUnits = 15000
+		}
+		return capUnits * ResourceScale
+
+	case ResCharcoal:
+		capUnits := int64(250)
+		if p.UnlockedBlueprints[BPLumberYard] {
+			capUnits = 800
+		}
+		if p.UnlockedBlueprints[BPBasicWorkshop] && capUnits < 4000 {
+			capUnits = 4000
+		}
+		return capUnits * ResourceScale
+
+	case ResStone:
+		capUnits := int64(350)
+		if p.UnlockedBlueprints[BPStoneVault] {
+			capUnits = 1500
+		}
+		if p.UnlockedBlueprints[BPBasicWorkshop] && capUnits < 10000 {
+			capUnits = 10000
+		}
+		return capUnits * ResourceScale
+
+	case ResFlint, ResAncientShard:
+		return 500 * ResourceScale
+
+	case ResIronIngot, ResRation:
+		return 2000 * ResourceScale
+
+	default:
+		return 0
+	}
+}
+
+func addResourceWithCap(p *PlayerState, resKey string, deltaMilli int64) int64 {
+	if deltaMilli <= 0 {
+		return 0
+	}
+	capMilli := ResourceCapacityMilli(p, resKey)
+	cur := p.ResourcesMilli[resKey]
+	if capMilli <= 0 {
+		p.ResourcesMilli[resKey] = cur + deltaMilli
+		return 0
+	}
+	if cur+deltaMilli <= capMilli {
+		p.ResourcesMilli[resKey] = cur + deltaMilli
+		return 0
+	}
+	overflow := (cur + deltaMilli) - capMilli
+	p.ResourcesMilli[resKey] = capMilli
+	return overflow
+}
+
 type ComputedJob struct {
 	JobKey                 string
 	Name                   string
@@ -312,12 +414,16 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 	// Base efficiency is 100%
 	waterEff := int64(100)
 	woodEff := int64(100)
+	charcoalEff := int64(100)
 	stoneEff := int64(100)
 	ironEff := int64(100)
 	rationEff := int64(100)
 
 	if p.UnlockedBlueprints[BPWaterWheel1] {
 		waterEff += 25
+	}
+	if p.UnlockedBlueprints[BPLumberYard] {
+		charcoalEff += 20
 	}
 	if p.UnlockedBlueprints[BPStoneSaw1] {
 		woodEff += 25
@@ -333,6 +439,28 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 		stoneEff += 30
 	}
 
+	// Colony Edicts & Mechanisms modifiers
+	if p.ActiveEdicts[EdictNightShift] && p.UnlockedBlueprints[BPColonyEdicts] && (p.ResourcesMilli[ResWood] > 0 || p.Workers[JobWood] > 0) {
+		waterEff += 45
+		woodEff += 45
+		charcoalEff += 45
+		stoneEff += 45
+		ironEff += 45
+		rationEff += 45
+	}
+	if p.ActiveEdicts[EdictWaterRation] && p.UnlockedBlueprints[BPColonyEdicts] {
+		waterEff -= 15
+		woodEff -= 15
+		charcoalEff -= 15
+		stoneEff -= 15
+		ironEff -= 15
+		rationEff -= 15
+	}
+	if p.ActiveEdicts[EdictHydroSaw] && p.UnlockedBlueprints[BPWaterWheel1] && p.ResourcesMilli[ResWater] > 0 {
+		woodEff += 40
+		charcoalEff += 40
+	}
+
 	switch p.Profession {
 	case ProfScientist:
 		waterEff += 15
@@ -341,20 +469,32 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 	case ProfAlchemist:
 		rationEff += 20
 		waterEff += 10
+		charcoalEff += 15
 	case ProfMage:
 		stoneEff += 20
 		rationEff += 15
 	case ProfArtisan:
 		ironEff += 25
 		woodEff += 15
+		charcoalEff += 20
 	}
 
 	// Installed cross-profession equipment bonuses (GDD 5.3)
 	waterEff += pumpCount*15 + catalystCount*12
 	woodEff += pumpCount*15 + toolsetCount*15 + catalystCount*12
+	charcoalEff += toolsetCount*15 + catalystCount*12
 	stoneEff += scrollCount*15 + catalystCount*12
 	ironEff += toolsetCount*15 + catalystCount*12
 	rationEff += scrollCount*15 + catalystCount*12
+
+	// Dehydration penalty: if population >= 2 and water stock is 0 while water balance is negative
+	if p.HydrationWarning {
+		woodEff = (woodEff * 50) / 100
+		charcoalEff = (charcoalEff * 50) / 100
+		stoneEff = (stoneEff * 50) / 100
+		ironEff = (ironEff * 50) / 100
+		rationEff = (rationEff * 50) / 100
+	}
 
 	specs := []struct {
 		key       string
@@ -374,7 +514,7 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 			effPct:    waterEff,
 			unlocked:  p.PopulationTotal > 0,
 			hint:      "1 人口解锁",
-			inputNote: "产出水",
+			inputNote: "产出净水",
 		},
 		{
 			key:       JobWood,
@@ -384,7 +524,17 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 			effPct:    woodEff,
 			unlocked:  p.UnlockedBlueprints[BPAxeBlueprint],
 			hint:      "解锁斧头蓝图",
-			inputNote: "产出木材",
+			inputNote: "产出木材 · 伴生燧石",
+		},
+		{
+			key:       JobCharcoal,
+			name:      "烧炭",
+			outRes:    ResCharcoal,
+			baseMilli: 280, // 0.28 charcoal/s per worker
+			effPct:    charcoalEff,
+			unlocked:  p.UnlockedBlueprints[BPCharcoalKiln],
+			hint:      "解锁砖砌炭窑",
+			inputNote: "消耗 0.30 木/s → 木炭",
 		},
 		{
 			key:       JobStone,
@@ -394,27 +544,27 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 			effPct:    stoneEff,
 			unlocked:  p.UnlockedBlueprints[BPQuarryTech],
 			hint:      "解锁采石技术",
-			inputNote: "产出石材",
+			inputNote: "产出石材 · 伴生残片",
 		},
 		{
 			key:       JobSmeltIron,
 			name:      "炼铁",
 			outRes:    ResIronIngot,
-			baseMilli: 80, // 0.08 iron/s per worker
+			baseMilli: 110, // 0.11 iron/s per worker
 			effPct:    ironEff,
 			unlocked:  p.UnlockedBlueprints[BPBasicWorkshop] && p.Profession != ProfNone,
 			hint:      "选定职业解锁",
-			inputNote: "产出铁锭",
+			inputNote: "消耗石+炭 → 铁锭",
 		},
 		{
 			key:       JobPrepRation,
 			name:      "制粮",
 			outRes:    ResRation,
-			baseMilli: 120, // 0.12 ration/s per worker
+			baseMilli: 150, // 0.15 ration/s per worker
 			effPct:    rationEff,
 			unlocked:  p.UnlockedBlueprints[BPBasicWorkshop] && p.Profession != ProfNone,
 			hint:      "选定职业解锁",
-			inputNote: "产出军粮",
+			inputNote: "消耗水+木 → 军粮",
 		},
 	}
 
@@ -443,12 +593,152 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 	return out
 }
 
-func NetResourceRatesPerSecMilli(p *PlayerState) map[string]int64 {
-	rates := make(map[string]int64, len(ResourceCatalog))
-	for _, j := range ComputeJobs(p) {
-		rates[j.OutputResourceKey] += j.TotalOutputPerSecMilli
+func ComputeResourceFlows(p *PlayerState) (gross map[string]int64, drain map[string]int64, net map[string]int64) {
+	gross = make(map[string]int64, len(ResourceCatalog))
+	drain = make(map[string]int64, len(ResourceCatalog))
+	net = make(map[string]int64, len(ResourceCatalog))
+
+	jobs := ComputeJobs(p)
+	jobMap := make(map[string]ComputedJob, len(jobs))
+	for _, j := range jobs {
+		jobMap[j.JobKey] = j
 	}
-	return rates
+
+	// 1. Primary extraction outputs (Water, Wood, Stone) + Byproduct procs
+	gross[ResWater] += jobMap[JobWater].TotalOutputPerSecMilli
+
+	woodOut := jobMap[JobWood].TotalOutputPerSecMilli
+	gross[ResWood] += woodOut
+	if woodOut > 0 {
+		flintMult := int64(1)
+		if p.UnlockedBlueprints[BPStoneSaw1] {
+			flintMult = 2
+		}
+		gross[ResFlint] += (woodOut * flintMult) / 30
+	}
+
+	stoneOut := jobMap[JobStone].TotalOutputPerSecMilli
+	gross[ResStone] += stoneOut
+	if stoneOut > 0 {
+		procMult := int64(1)
+		if p.UnlockedBlueprints[BPStoneSaw1] {
+			procMult = 2
+		}
+		gross[ResFlint] += (stoneOut * procMult) / 16
+		gross[ResAncientShard] += (stoneOut * procMult) / 45
+	}
+
+	// 2. Colony survival upkeep & edict drains
+	if p.PopulationTotal >= 2 {
+		perPopWater := int64(180) // 0.18 water/s per resident
+		if p.ActiveEdicts[EdictWaterRation] && p.UnlockedBlueprints[BPColonyEdicts] {
+			perPopWater = 90
+		}
+		if p.ActiveEdicts[EdictNightShift] && p.UnlockedBlueprints[BPColonyEdicts] {
+			perPopWater += 140
+		}
+		drain[ResWater] += int64(p.PopulationTotal) * perPopWater
+	}
+	if p.ActiveEdicts[EdictHydroSaw] && p.UnlockedBlueprints[BPWaterWheel1] && p.ResourcesMilli[ResWater] > 0 {
+		drain[ResWater] += 1500
+	}
+	if p.ActiveEdicts[EdictNightShift] && p.UnlockedBlueprints[BPColonyEdicts] && (p.ResourcesMilli[ResWood] > 0 || gross[ResWood] > 0) {
+		drain[ResWood] += 400
+	}
+
+	// 3. Downstream Conversion: Charcoal Kiln (Wood -> Charcoal)
+	if cj := jobMap[JobCharcoal]; cj.Assigned > 0 && cj.TotalOutputPerSecMilli > 0 {
+		woodNeed := int64(cj.Assigned) * 300
+		if p.ResourcesMilli[ResWood] > 0 || gross[ResWood] >= drain[ResWood]+woodNeed {
+			drain[ResWood] += woodNeed
+			gross[ResCharcoal] += cj.TotalOutputPerSecMilli
+		} else if availWood := gross[ResWood] - drain[ResWood]; availWood > 0 {
+			drain[ResWood] += availWood
+			gross[ResCharcoal] += (cj.TotalOutputPerSecMilli * availWood) / woodNeed
+		}
+	}
+
+	// 4. Downstream Conversion: Blast Furnace (Stone + Charcoal -> Iron Ingot)
+	if ij := jobMap[JobSmeltIron]; ij.Assigned > 0 && ij.TotalOutputPerSecMilli > 0 {
+		stoneNeed := int64(ij.Assigned) * 180
+		coalNeed := int64(ij.Assigned) * 100
+		hasStone := p.ResourcesMilli[ResStone] > 0 || gross[ResStone] >= stoneNeed
+		hasCoal := p.ResourcesMilli[ResCharcoal] > 0 || gross[ResCharcoal] >= coalNeed || p.ResourcesMilli[ResWood] > 0
+		if hasStone && hasCoal {
+			drain[ResStone] += stoneNeed
+			if p.ResourcesMilli[ResCharcoal] > 0 || gross[ResCharcoal] > 0 {
+				drain[ResCharcoal] += coalNeed
+			} else {
+				drain[ResWood] += coalNeed
+			}
+			gross[ResIronIngot] += ij.TotalOutputPerSecMilli
+		}
+	}
+
+	// 5. Downstream Conversion: Quartermaster Ration (Water + Wood -> Ration)
+	if rj := jobMap[JobPrepRation]; rj.Assigned > 0 && rj.TotalOutputPerSecMilli > 0 {
+		waterNeed := int64(rj.Assigned) * 220
+		woodNeed := int64(rj.Assigned) * 100
+		if (p.ResourcesMilli[ResWater] > 0 || gross[ResWater] >= drain[ResWater]+waterNeed) &&
+			(p.ResourcesMilli[ResWood] > 0 || gross[ResWood] >= drain[ResWood]+woodNeed) {
+			drain[ResWater] += waterNeed
+			drain[ResWood] += woodNeed
+			gross[ResRation] += rj.TotalOutputPerSecMilli
+		}
+	}
+
+	// 6. Siphon Sluice Mechanism: when water is at capacity and net water is positive, siphon overflow into Stone + Flint
+	waterCap := ResourceCapacityMilli(p, ResWater)
+	if p.ActiveEdicts[EdictSiphonSluice] && p.UnlockedBlueprints[BPSiphonSluice] &&
+		waterCap > 0 && p.ResourcesMilli[ResWater] >= waterCap && gross[ResWater] > drain[ResWater] {
+		overflow := gross[ResWater] - drain[ResWater]
+		drain[ResWater] += overflow
+		gross[ResStone] += overflow / 10
+		gross[ResFlint] += overflow / 80
+	}
+
+	for _, r := range ResourceCatalog {
+		net[r.Key] = gross[r.Key] - drain[r.Key]
+	}
+	return gross, drain, net
+}
+
+func NetResourceRatesPerSecMilli(p *PlayerState) map[string]int64 {
+	_, _, net := ComputeResourceFlows(p)
+	return net
+}
+
+func applyElapsedSimMs(p *PlayerState, simMs int64) {
+	if simMs <= 0 {
+		return
+	}
+	_, _, net := ComputeResourceFlows(p)
+	siphonOn := p.ActiveEdicts[EdictSiphonSluice] && p.UnlockedBlueprints[BPSiphonSluice]
+
+	for _, r := range ResourceCatalog {
+		rate := net[r.Key]
+		if rate == 0 {
+			continue
+		}
+		delta := (rate * simMs) / 1000
+		if delta > 0 {
+			overflow := addResourceWithCap(p, r.Key, delta)
+			if r.Key == ResWater && overflow > 0 && siphonOn {
+				addResourceWithCap(p, ResStone, overflow/10)
+				addResourceWithCap(p, ResFlint, overflow/80)
+			}
+		} else if delta < 0 {
+			rem := p.ResourcesMilli[r.Key] + delta
+			if rem < 0 {
+				rem = 0
+			}
+			p.ResourcesMilli[r.Key] = rem
+		}
+	}
+
+	// Update hydration warning state after stock update
+	grossAfter, drainAfter, _ := ComputeResourceFlows(p)
+	p.HydrationWarning = p.PopulationTotal >= 2 && p.ResourcesMilli[ResWater] == 0 && grossAfter[ResWater] < drainAfter[ResWater]
 }
 
 // SettleProduction performs tickless authoritative production settlement for the elapsed interval [LastSettledAt, now].
@@ -474,17 +764,7 @@ func SettleProduction(p *PlayerState, now time.Time) {
 		capped = true
 	}
 
-	rates := NetResourceRatesPerSecMilli(p)
-	for resKey, rateMilliPerSec := range rates {
-		if rateMilliPerSec <= 0 {
-			continue
-		}
-		deltaMilli := (rateMilliPerSec * simMs) / 1000
-		if deltaMilli > 0 {
-			p.ResourcesMilli[resKey] += deltaMilli
-		}
-	}
-
+	applyElapsedSimMs(p, simMs)
 	p.SimulatedElapsedSeconds += simMs / 1000
 	p.LastSettledAt = nowUTC
 	if capped {
@@ -500,12 +780,7 @@ func AdvancePlayerSeconds(p *PlayerState, sec int64) {
 	if sec > OfflineCapSeconds {
 		sec = OfflineCapSeconds
 	}
-	rates := NetResourceRatesPerSecMilli(p)
-	for resKey, rateMilliPerSec := range rates {
-		if rateMilliPerSec > 0 {
-			p.ResourcesMilli[resKey] += rateMilliPerSec * sec
-		}
-	}
+	applyElapsedSimMs(p, sec*1000)
 	p.SimulatedElapsedSeconds += sec
 }
 
@@ -531,8 +806,18 @@ func GatherWater(p *PlayerState, clicks int32, now time.Time) error {
 		perClickMilli = 2 * ResourceScale
 	}
 	gain := int64(clicks) * perClickMilli
-	p.ResourcesMilli[ResWater] += gain
+	overflow := addResourceWithCap(p, ResWater, gain)
+	if overflow > 0 && p.ActiveEdicts[EdictSiphonSluice] && p.UnlockedBlueprints[BPSiphonSluice] {
+		addResourceWithCap(p, ResStone, overflow/10)
+		addResourceWithCap(p, ResFlint, overflow/80)
+	}
+	prevClicks := p.TotalManualClicks
 	p.TotalManualClicks += int64(clicks)
+	// Every 4th manual click after unlocking First Resident procs +0.5 Flint Crystal
+	if p.UnlockedBlueprints[BPFirstResident] && (p.TotalManualClicks/4) > (prevClicks/4) {
+		procs := (p.TotalManualClicks / 4) - (prevClicks / 4)
+		addResourceWithCap(p, ResFlint, procs*500)
+	}
 	if p.TotalManualClicks == 10 && p.PopulationTotal == 0 {
 		AppendLog(p, now, "PRODUCTION", "已累计 10 滴水！右侧【招募居民】入口已就绪，立即招募首位居民开启自动取水。")
 	}
@@ -586,6 +871,9 @@ func AllocateWorkers(p *PlayerState, mode string, entries map[string]int32, pres
 			if k == JobWood && !p.UnlockedBlueprints[BPAxeBlueprint] {
 				return ErrPrecondition("job_locked", "尚未解锁【斧头蓝图】，无法分配伐木工")
 			}
+			if k == JobCharcoal && !p.UnlockedBlueprints[BPCharcoalKiln] {
+				return ErrPrecondition("job_locked", "尚未解锁【砖砌炭窑】，无法分配烧炭工")
+			}
 			if k == JobStone && !p.UnlockedBlueprints[BPQuarryTech] {
 				return ErrPrecondition("job_locked", "尚未解锁【采石技术】，无法分配采石工")
 			}
@@ -610,7 +898,7 @@ func AllocateWorkers(p *PlayerState, mode string, entries map[string]int32, pres
 						}
 						p.Workers[JobWater] -= needTransfer
 					} else {
-						for _, src := range []string{JobPrepRation, JobSmeltIron, JobStone, JobWood} {
+						for _, src := range []string{JobPrepRation, JobSmeltIron, JobStone, JobCharcoal, JobWood} {
 							if needTransfer <= 0 {
 								break
 							}
@@ -929,6 +1217,13 @@ func UnlockBlueprint(w *WorldState, p *PlayerState, code string, now time.Time) 
 	}
 	p.UnlockedBlueprints[code] = true
 
+	if code == BPSiphonSluice {
+		if p.ActiveEdicts == nil {
+			p.ActiveEdicts = map[string]bool{}
+		}
+		p.ActiveEdicts[EdictSiphonSluice] = true
+	}
+
 	if code == BPMysteryTreasure {
 		if p.Phase < 2 {
 			p.Phase = 2
@@ -946,6 +1241,157 @@ func UnlockBlueprint(w *WorldState, p *PlayerState, code string, now time.Time) 
 	} else {
 		AppendLog(p, now, "BLUEPRINT", fmt.Sprintf("已解锁【%s】：%s", spec.Name, spec.EffectSummary))
 	}
+	return nil
+}
+
+func ToggleEdict(p *PlayerState, code string, now time.Time) error {
+	var spec *EdictSpec
+	for i := range EdictCatalog {
+		if EdictCatalog[i].Code == code {
+			spec = &EdictCatalog[i]
+			break
+		}
+	}
+	if spec == nil {
+		return ErrNotFound("未知的聚落政令或机关")
+	}
+	if spec.PrerequisiteCode != "" && !p.UnlockedBlueprints[spec.PrerequisiteCode] {
+		return ErrPrecondition("edict_locked", "尚未解锁该政令或机关的前置建筑")
+	}
+	if p.ActiveEdicts == nil {
+		p.ActiveEdicts = map[string]bool{}
+	}
+	nextState := !p.ActiveEdicts[code]
+	p.ActiveEdicts[code] = nextState
+	if nextState {
+		if code == EdictNightShift {
+			p.ActiveEdicts[EdictWaterRation] = false
+		} else if code == EdictWaterRation {
+			p.ActiveEdicts[EdictNightShift] = false
+		}
+		AppendLog(p, now, "PRODUCTION", fmt.Sprintf("已开启【%s】：%s（代价：%s）。", spec.Name, spec.EffectSummary, spec.DrawbackSummary))
+	} else {
+		AppendLog(p, now, "PRODUCTION", fmt.Sprintf("已停用【%s】。", spec.Name))
+	}
+	return nil
+}
+
+func DispatchExpedition(p *PlayerState, routeCode string, now time.Time) error {
+	if !p.UnlockedBlueprints[BPScoutCamp] {
+		return ErrPrecondition("scout_camp_locked", "请先建造【荒原斥候营】后再派遣远征队")
+	}
+	if p.ActiveExpedition != nil {
+		return ErrPrecondition("expedition_busy", "当前已有斥候小队在外探索，请等待其归来")
+	}
+	var spec *ExpeditionRouteSpec
+	for i := range ExpeditionCatalog {
+		if ExpeditionCatalog[i].RouteCode == routeCode {
+			spec = &ExpeditionCatalog[i]
+			break
+		}
+	}
+	if spec == nil {
+		return ErrNotFound("未知的远征探索路线")
+	}
+	for resKey, reqMilli := range spec.CostsMilli {
+		if p.ResourcesMilli[resKey] < reqMilli {
+			return ErrPrecondition("insufficient_resource", fmt.Sprintf("%s不足：远征需要 %.1f", ResourceName(resKey), float64(reqMilli)/1000.0))
+		}
+	}
+	for resKey, reqMilli := range spec.CostsMilli {
+		p.ResourcesMilli[resKey] -= reqMilli
+	}
+	p.ActiveExpedition = &ActiveExpeditionState{
+		RouteCode:       spec.RouteCode,
+		RouteName:       spec.Name,
+		StartedAtSimSec: p.SimulatedElapsedSeconds,
+		DurationSeconds: int64(spec.DurationSeconds),
+	}
+	AppendLog(p, now, "PRODUCTION", fmt.Sprintf("斥候小队已出发前往【%s】（预计耗时 %d 秒）。", spec.Name, spec.DurationSeconds))
+	return nil
+}
+
+func ClaimExpedition(p *PlayerState, now time.Time) error {
+	if p.ActiveExpedition == nil {
+		return ErrPrecondition("no_expedition", "当前没有正在进行的远征")
+	}
+	elapsed := p.SimulatedElapsedSeconds - p.ActiveExpedition.StartedAtSimSec
+	if elapsed < p.ActiveExpedition.DurationSeconds {
+		rem := p.ActiveExpedition.DurationSeconds - elapsed
+		return ErrPrecondition("expedition_in_progress", fmt.Sprintf("斥候仍在探索中，还需 %d 秒归来", rem))
+	}
+	route := p.ActiveExpedition.RouteCode
+	p.ActiveExpedition = nil
+
+	switch route {
+	case ExpRouteWoods:
+		addResourceWithCap(p, ResWood, 45*ResourceScale)
+		addResourceWithCap(p, ResFlint, 3*ResourceScale)
+		if p.SimulatedElapsedSeconds%2 == 0 {
+			p.PopulationTotal++
+			p.Workers[JobWater]++
+			AppendLog(p, now, "PRODUCTION", "★ 斥候自【枯木林】归来：带回 +45 木材、+3 燧石结晶，并救回 +1 名荒原流民！")
+		} else {
+			AppendLog(p, now, "PRODUCTION", "★ 斥候自【枯木林】归来：带回 +45 木材、+3 燧石结晶。")
+		}
+	case ExpRouteQuarry:
+		addResourceWithCap(p, ResStone, 35*ResourceScale)
+		addResourceWithCap(p, ResFlint, 4*ResourceScale)
+		addResourceWithCap(p, ResAncientShard, 1*ResourceScale)
+		AppendLog(p, now, "PRODUCTION", "★ 斥候自【断崖古矿道】归来：带回 +35 石材、+4 燧石结晶、+1 古文明残片！")
+	case ExpRouteSanctum:
+		addResourceWithCap(p, ResAncientShard, 3*ResourceScale)
+		addResourceWithCap(p, ResStone, 80*ResourceScale)
+		addResourceWithCap(p, ResIronIngot, 6*ResourceScale)
+		AppendLog(p, now, "PRODUCTION", "★ 斥候自【沉没圣殿】归来：带回 +3 古文明残片、+80 石材、+6 铁锭！")
+	default:
+		addResourceWithCap(p, ResWood, 30*ResourceScale)
+	}
+	return nil
+}
+
+func TradeCaravan(p *PlayerState, offerCode string, now time.Time) error {
+	if !p.UnlockedBlueprints[BPScoutCamp] {
+		return ErrPrecondition("scout_camp_locked", "请先建造【荒原斥候营】点亮信标以吸引流浪行商")
+	}
+	var spec *CaravanOfferSpec
+	for i := range CaravanOfferCatalog {
+		if CaravanOfferCatalog[i].OfferCode == offerCode {
+			spec = &CaravanOfferCatalog[i]
+			break
+		}
+	}
+	if spec == nil {
+		return ErrNotFound("未知的行商契约")
+	}
+	for resKey, reqMilli := range spec.CostsMilli {
+		if p.ResourcesMilli[resKey] < reqMilli {
+			return ErrPrecondition("insufficient_resource", fmt.Sprintf("%s不足：需要 %.1f", ResourceName(resKey), float64(reqMilli)/1000.0))
+		}
+	}
+	for resKey, reqMilli := range spec.CostsMilli {
+		p.ResourcesMilli[resKey] -= reqMilli
+	}
+
+	switch offerCode {
+	case "offer_flint_lumber":
+		addResourceWithCap(p, ResWood, 50*ResourceScale)
+		addResourceWithCap(p, ResWater, 60*ResourceScale)
+	case "offer_wood_stone":
+		addResourceWithCap(p, ResStone, 35*ResourceScale)
+		addResourceWithCap(p, ResFlint, 2*ResourceScale)
+	case "offer_charcoal_shard":
+		addResourceWithCap(p, ResAncientShard, 2*ResourceScale)
+		addResourceWithCap(p, ResWater, 120*ResourceScale)
+	case "offer_refugee_escort":
+		p.PopulationTotal += 2
+		p.Workers[JobWater] += 2
+	case "offer_shard_supply":
+		addResourceWithCap(p, ResWater, 700*ResourceScale)
+		addResourceWithCap(p, ResWood, 280*ResourceScale)
+		addResourceWithCap(p, ResStone, 110*ResourceScale)
+	}
+	AppendLog(p, now, "MARKET", fmt.Sprintf("已与流浪行商完成契约【%s】：%s。", spec.Title, spec.RewardSummary))
 	return nil
 }
 

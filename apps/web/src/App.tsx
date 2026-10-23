@@ -883,16 +883,24 @@ export function App() {
     blueprints.find((b) => b.code === "axe_blueprint")?.unlocked ?? false;
   const quarryUnlocked =
     blueprints.find((b) => b.code === "quarry_tech")?.unlocked ?? false;
+  const scoutCampUnlocked =
+    blueprints.find((b) => b.code === "scout_camp")?.unlocked ?? false;
   const workshopUnlocked =
     blueprints.find((b) => b.code === "basic_workshop")?.unlocked ?? false;
   const treasureUnlocked =
     blueprints.find((b) => b.code === "mystery_treasure")?.unlocked ?? false;
 
   const perClickWaterMilli = firstResBpUnlocked ? 2000 : 1000;
-  const liveWaterMilli =
+  const rawLiveWaterMilli =
     waterRes.amountMilli +
     inFlightClicks * perClickWaterMilli +
     Math.floor(waterRes.netRatePerSecMilli * interpSeconds);
+  const liveWaterMilli = Math.max(
+    0,
+    waterRes.capacityMilli > 0
+      ? Math.min(waterRes.capacityMilli, rawLiveWaterMilli)
+      : rawLiveWaterMilli,
+  );
   const totalClicks = player.totalManualClicks + inFlightClicks;
 
   const handleGatherWater = () => {
@@ -1073,6 +1081,7 @@ export function App() {
 
   const unlockedResources = resources.filter((r) => r.unlocked);
   const unlockedJobs = jobs.filter((j) => j.unlocked);
+  const unlockedEdicts = (state.edicts ?? []).filter((e) => e.unlocked);
   const activeBlueprints = blueprints.filter(
     (bp) => bp.visible && !bp.unlocked,
   );
@@ -1321,6 +1330,12 @@ export function App() {
             </span>
           </div>
 
+          {state.hydrationWarning && (
+            <div className="status-banner status-danger" role="alert">
+              <span>⚠️ 聚落断水：非汲水岗位效率 -50%</span>
+            </div>
+          )}
+
           <div className="water-hero-box">
             <div className="water-readout">
               <span className="water-label">💧 水</span>
@@ -1328,7 +1343,9 @@ export function App() {
                 {formatResource(liveWaterMilli, 1)}
               </strong>
               <span className="water-rate mono-num">
-                {formatRate(waterRes.netRatePerSecMilli)}
+                {waterRes.capacityMilli > 0
+                  ? `/ ${formatResource(waterRes.capacityMilli, 0)} · ${formatRate(waterRes.netRatePerSecMilli)}`
+                  : formatRate(waterRes.netRatePerSecMilli)}
               </span>
             </div>
             <button
@@ -1356,17 +1373,28 @@ export function App() {
                   <tr>
                     <th>物资</th>
                     {showAdvancedWorld && <th>类型</th>}
-                    <th className="num-col">库存</th>
-                    <th className="num-col">产出</th>
+                    <th className="num-col">库存 / 上限</th>
+                    <th className="num-col">净速</th>
                   </tr>
                 </thead>
                 <tbody>
                   {unlockedResources.map((r) => {
-                    const liveAmt =
+                    const rawLive =
                       r.key === "water"
                         ? liveWaterMilli
                         : r.amountMilli +
                           Math.floor(r.netRatePerSecMilli * interpSeconds);
+                    const liveAmt = Math.max(
+                      0,
+                      r.capacityMilli > 0
+                        ? Math.min(r.capacityMilli, rawLive)
+                        : rawLive,
+                    );
+                    const isContinuous =
+                      r.tier === "basic" ||
+                      r.key === "charcoal" ||
+                      r.key === "flint" ||
+                      r.key === "ancient_shard";
                     return (
                       <tr key={r.key} className="res-row-enter">
                         <td className="res-name-cell">
@@ -1384,14 +1412,26 @@ export function App() {
                         )}
                         <td className="num-col mono-num">
                           {formatResource(
-                            r.tier === "basic" ? liveAmt : r.amountMilli,
-                            r.tier === "basic" ? 1 : 0,
+                            isContinuous ? liveAmt : r.amountMilli,
+                            r.tier === "basic" || r.key === "charcoal" ? 1 : 1,
+                          )}
+                          {r.capacityMilli > 0 && (
+                            <small className="metric-sub mono-num">
+                              {" "}
+                              / {formatResource(r.capacityMilli, 0)}
+                            </small>
                           )}
                         </td>
                         <td
-                          className={`num-col mono-num ${r.netRatePerSecMilli > 0 ? "rate-pos" : "rate-zero"}`}
+                          className={`num-col mono-num ${
+                            r.netRatePerSecMilli > 0
+                              ? "rate-pos"
+                              : r.netRatePerSecMilli < 0
+                                ? "cost-lack"
+                                : "rate-zero"
+                          }`}
                         >
-                          {r.netRatePerSecMilli > 0
+                          {r.netRatePerSecMilli !== 0
                             ? formatRate(r.netRatePerSecMilli)
                             : "—"}
                         </td>
@@ -1483,14 +1523,15 @@ export function App() {
                     <div className="job-info">
                       <div className="job-title-line">
                         <strong>{job.name}</strong>
-                        {job.efficiencyPct > 100 && (
+                        {job.efficiencyPct !== 100 && (
                           <span className="tag-badge mono-num">
                             {job.efficiencyPct}%
                           </span>
                         )}
                       </div>
                       <small className="job-sub mono-num">
-                        {(job.effectiveRateMilli / 1000).toFixed(2)}/s
+                        {(job.effectiveRateMilli / 1000).toFixed(2)}/s ·{" "}
+                        {job.inputSummary}
                       </small>
                     </div>
 
@@ -1540,6 +1581,48 @@ export function App() {
                 );
               })}
             </div>
+
+            {unlockedEdicts.length > 0 && (
+              <div className="blueprint-list">
+                <hr className="ink-divider" />
+                {unlockedEdicts.map((ed) => (
+                  <article
+                    key={ed.code}
+                    className={`bp-card ${ed.active ? "bp-ready" : ""}`}
+                  >
+                    <div className="bp-top">
+                      <div>
+                        <strong>{ed.name}</strong>
+                        <span
+                          className={`tag-badge ${ed.active ? "tag-success" : ""}`}
+                        >
+                          {ed.active ? "已启用" : "待命"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className={
+                          ed.active
+                            ? "btn-outline btn-sm"
+                            : "btn-primary btn-sm"
+                        }
+                        disabled={busy}
+                        onClick={() =>
+                          void runAction(() =>
+                            api.toggleEdict({ code: ed.code }),
+                          )
+                        }
+                      >
+                        {ed.active ? "关闭" : "开启"}
+                      </button>
+                    </div>
+                    <p className="bp-desc">
+                      {ed.effectSummary}（{ed.drawbackSummary}）
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
 
             {quarryUnlocked && (
               <div className="preset-bar">
@@ -1722,6 +1805,150 @@ export function App() {
           </div>
         </section>
       </main>
+
+      {/* Wasteland Expeditions & Caravan Barter: ONLY rendered after Scout Camp unlocks */}
+      {scoutCampUnlocked && (
+        <section
+          className="dashboard-grid dashboard-grid-2col"
+          aria-label="荒原探索与游商驿站"
+        >
+          <section className="panel" aria-label="荒原斥候营">
+            <div className="panel-header">
+              <div className="panel-title">
+                <Compass size={ICON.sm} />
+                <h2>荒原斥候营</h2>
+              </div>
+              <span className="tag-badge mono-num">
+                {state.activeExpedition
+                  ? state.activeExpedition.completed
+                    ? "可收获"
+                    : `探索中 ${state.activeExpedition.remainingSeconds}s`
+                  : "斥候待命"}
+              </span>
+            </div>
+
+            {state.activeExpedition && (
+              <div className="recruit-card">
+                <div className="recruit-meta">
+                  <div className="recruit-head">
+                    <strong>{state.activeExpedition.routeName}</strong>
+                    <span className="tag-badge mono-num">
+                      {state.activeExpedition.completed
+                        ? "已归营"
+                        : `${state.activeExpedition.remainingSeconds}s / ${state.activeExpedition.totalSeconds}s`}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={!state.activeExpedition.completed || busy}
+                  onClick={() => void runAction(() => api.claimExpedition())}
+                >
+                  {state.activeExpedition.completed ? "领取收获" : "勘探中..."}
+                </button>
+              </div>
+            )}
+
+            <div className="blueprint-list">
+              {(state.expeditionRoutes ?? []).map((rt) => (
+                <article
+                  key={rt.routeCode}
+                  className={`bp-card ${rt.canDispatch ? "bp-ready" : ""}`}
+                >
+                  <div className="bp-top">
+                    <strong>{rt.name}</strong>
+                    <span className="tag-badge mono-num">
+                      {rt.durationSeconds}s
+                    </span>
+                  </div>
+                  <p className="bp-desc">{rt.rewardSummary}</p>
+                  <div className="bp-footer">
+                    <div className="bp-costs">
+                      {rt.costs.map((c) => {
+                        const ok = c.currentMilli >= c.requiredMilli;
+                        return (
+                          <span
+                            key={c.resourceKey}
+                            className={`cost-chip mono-num ${ok ? "cost-ok" : "cost-lack"}`}
+                          >
+                            {c.resourceName} {formatResource(c.currentMilli, 0)}
+                            /{formatResource(c.requiredMilli, 0)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-primary btn-sm"
+                      disabled={!rt.canDispatch || busy}
+                      onClick={() =>
+                        void runAction(() =>
+                          api.dispatchExpedition({ routeCode: rt.routeCode }),
+                        )
+                      }
+                    >
+                      派遣
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel" aria-label="游商驿站">
+            <div className="panel-header">
+              <div className="panel-title">
+                <TrendingUp size={ICON.sm} />
+                <h2>游商驿站</h2>
+              </div>
+              <span className="tag-badge">以物易物</span>
+            </div>
+
+            <div className="blueprint-list">
+              {(state.caravanOffers ?? []).map((cf) => (
+                <article
+                  key={cf.offerCode}
+                  className={`bp-card ${cf.canTrade ? "bp-ready" : ""}`}
+                >
+                  <div className="bp-top">
+                    <strong>{cf.title}</strong>
+                    <span className="tag-badge">{cf.rewardSummary}</span>
+                  </div>
+                  <div className="bp-footer">
+                    <div className="bp-costs">
+                      {cf.costs.map((c) => {
+                        const ok = c.currentMilli >= c.requiredMilli;
+                        return (
+                          <span
+                            key={c.resourceKey}
+                            className={`cost-chip mono-num ${ok ? "cost-ok" : "cost-lack"}`}
+                          >
+                            {c.resourceName} {formatResource(c.currentMilli, 0)}
+                            /{formatResource(c.requiredMilli, 0)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-primary btn-sm"
+                      disabled={!cf.canTrade || busy}
+                      onClick={() =>
+                        void runAction(() =>
+                          api.tradeCaravan({ offerCode: cf.offerCode }),
+                        )
+                      }
+                    >
+                      易物
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </section>
+      )}
 
       {/* Lower Workspace Tabs: ONLY rendered AFTER choosing a profession */}
       {showAdvancedWorld && (
