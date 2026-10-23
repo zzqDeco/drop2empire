@@ -22,6 +22,11 @@ import {
   type ToggleEdictReq,
   type DispatchExpeditionReq,
   type TradeCaravanReq,
+  type EquipCosmeticReq,
+  type LearnRaidBlueprintReq,
+  type ManageRaidGearReq,
+  type DraftRaidBuffReq,
+  type FinishRaidReq,
   type UnlockBlueprintReq,
 } from "./generated";
 
@@ -206,6 +211,45 @@ export class EmpireClient {
   tradeCaravan = (req: TradeCaravanReq) =>
     this.#request<DashboardStateResp>(IDL_ROUTES.TradeCaravan.clientPath, {
       method: IDL_ROUTES.TradeCaravan.method,
+      body: JSON.stringify(req),
+    });
+
+  equipCosmetic = (req: EquipCosmeticReq) =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.EquipCosmetic.clientPath, {
+      method: IDL_ROUTES.EquipCosmetic.method,
+      body: JSON.stringify(req),
+    });
+
+  learnRaidBlueprint = (req: LearnRaidBlueprintReq) =>
+    this.#request<DashboardStateResp>(
+      IDL_ROUTES.LearnRaidBlueprint.clientPath,
+      {
+        method: IDL_ROUTES.LearnRaidBlueprint.method,
+        body: JSON.stringify(req),
+      },
+    );
+
+  manageRaidGear = (req: ManageRaidGearReq) =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.ManageRaidGear.clientPath, {
+      method: IDL_ROUTES.ManageRaidGear.method,
+      body: JSON.stringify(req),
+    });
+
+  draftRaidBuff = (req: DraftRaidBuffReq) =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.DraftRaidBuff.clientPath, {
+      method: IDL_ROUTES.DraftRaidBuff.method,
+      body: JSON.stringify(req),
+    });
+
+  startRaid = () =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.StartRaid.clientPath, {
+      method: IDL_ROUTES.StartRaid.method,
+      body: JSON.stringify({}),
+    });
+
+  finishRaid = (req: FinishRaidReq) =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.FinishRaid.clientPath, {
+      method: IDL_ROUTES.FinishRaid.method,
       body: JSON.stringify(req),
     });
 

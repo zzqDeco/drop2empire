@@ -187,4 +187,78 @@ func TestColonyDepthSystemsConversionEdictsExpeditionsAndCaravan(t *testing.T) {
 	if p.ResourcesMilli[ResWood] <= prevWood {
 		t.Fatalf("expected caravan barter to increase wood, prev=%d cur=%d", prevWood, p.ResourcesMilli[ResWood])
 	}
+
+	// Verify 54 buff card catalog and 3-card draft + 4-slot cap
+	if len(RaidBuffCardCatalog) < 54 {
+		t.Fatalf("expected at least 54 raid buff cards, got %d", len(RaidBuffCardCatalog))
+	}
+	EnsureRaidState(p)
+	if len(p.RaidLoadout.DraftPoolCards) != 3 {
+		t.Fatalf("expected 3 draft pool cards, got %d", len(p.RaidLoadout.DraftPoolCards))
+	}
+	p.ResourcesMilli[ResWater] = 2000 * ResourceScale
+	p.ResourcesMilli[ResWood] = 1000 * ResourceScale
+	p.ResourcesMilli[ResCharcoal] = 500 * ResourceScale
+	p.ResourcesMilli[ResStone] = 1000 * ResourceScale
+	p.ResourcesMilli[ResFlint] = 50 * ResourceScale
+
+	for i := 0; i < 5; i++ {
+		pick := p.RaidLoadout.DraftPoolCards[0]
+		if err := DraftRaidBuff(p, "buy", pick, 0, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(p.RaidLoadout.EquippedBuffCards) != 4 {
+		t.Fatalf("expected equipped buff cards capped at 4 slots, got %d", len(p.RaidLoadout.EquippedBuffCards))
+	}
+
+	// Test Tier 1 direct crafting & Tier 2 single-use blueprint learning
+	if err := ManageRaidGear(p, "craft", "gear_wood_spear", now); err != nil {
+		t.Fatal(err)
+	}
+	if err := ManageRaidGear(p, "craft", "gear_repeat_crossbow", now); err == nil {
+		t.Fatal("expected crafting Tier 2 crossbow without learning blueprint to fail")
+	}
+	p.ResourcesMilli[ResBPCrossbow] = 1 * ResourceScale
+	if err := LearnRaidBlueprint(p, ResBPCrossbow, now); err != nil {
+		t.Fatal(err)
+	}
+	if p.ResourcesMilli[ResBPCrossbow] != 0 {
+		t.Fatalf("expected single-use blueprint to be destroyed upon learning, remaining=%d", p.ResourcesMilli[ResBPCrossbow])
+	}
+	if err := ManageRaidGear(p, "craft", "gear_repeat_crossbow", now); err != nil {
+		t.Fatalf("expected crafting crossbow after learning blueprint to succeed, got %v", err)
+	}
+
+	// Test StartRaid & FinishRaid (EXTRACTED vs MIA hardcore penalty)
+	if err := StartRaid(p, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := FinishRaid(p, "EXTRACTED", []string{ResCosObsidianCrown, ResMeteorOre}, []string{ResAncientShard}, nil, 3, 5, 1, now); err != nil {
+		t.Fatal(err)
+	}
+	if p.ResourcesMilli[ResCosObsidianCrown] < ResourceScale {
+		t.Fatal("expected extracted S1 legendary cosmetic to be awarded")
+	}
+	if err := EquipCosmetic(p, "headgear", ResCosObsidianCrown, now); err != nil {
+		t.Fatal(err)
+	}
+
+	// Start another raid and suffer MIA: equipped weapon is lost, backpack is lost, only Safe Box (1 slot) survives!
+	if err := StartRaid(p, now); err != nil {
+		t.Fatal(err)
+	}
+	prevMeteor := p.ResourcesMilli[ResMeteorOre]
+	if err := FinishRaid(p, "MIA", []string{ResCosAstralWings}, []string{ResMeteorOre}, nil, 2, 3, 0, now); err != nil {
+		t.Fatal(err)
+	}
+	if p.ResourcesMilli[ResCosAstralWings] != 0 {
+		t.Fatal("expected backpack loot to be lost on MIA")
+	}
+	if p.ResourcesMilli[ResMeteorOre] != prevMeteor+ResourceScale {
+		t.Fatal("expected safe box item to be preserved on MIA")
+	}
+	if p.RaidLoadout.WeaponKey != "" {
+		t.Fatalf("expected equipped weapon to be destroyed on MIA, got %s", p.RaidLoadout.WeaponKey)
+	}
 }

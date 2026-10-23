@@ -137,13 +137,13 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		if meta.Key == domain.ResFlint && (p.UnlockedBlueprints[domain.BPWaterCistern] || p.UnlockedBlueprints[domain.BPScoutCamp]) {
 			unlocked = true
 		}
-		if meta.Key == domain.ResAncientShard && p.UnlockedBlueprints[domain.BPScoutCamp] {
+		if (meta.Key == domain.ResAncientShard || meta.Key == domain.ResMeteorOre) && p.UnlockedBlueprints[domain.BPScoutCamp] {
 			unlocked = true
 		}
 		if (meta.Key == domain.ResIronIngot || meta.Key == domain.ResRation) && p.UnlockedBlueprints[domain.BPBasicWorkshop] && p.Profession != domain.ProfNone {
 			unlocked = true
 		}
-		if p.Profession != domain.ProfNone {
+		if p.Profession != domain.ProfNone && meta.Tier != "blueprint" && meta.Tier != "cosmetic" {
 			unlocked = true
 		}
 		capMilli := domain.ResourceCapacityMilli(p, meta.Key)
@@ -609,7 +609,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		}
 	}
 
-	costOrderAll := []string{domain.ResWater, domain.ResWood, domain.ResCharcoal, domain.ResStone, domain.ResFlint, domain.ResAncientShard, domain.ResIronIngot, domain.ResRation}
+	costOrderAll := []string{domain.ResWater, domain.ResWood, domain.ResCharcoal, domain.ResStone, domain.ResFlint, domain.ResAncientShard, domain.ResMeteorOre, domain.ResIronIngot, domain.ResRation}
 
 	edictsDTO := make([]*empire.ColonyEdictDTO, 0, len(domain.EdictCatalog))
 	for _, ed := range domain.EdictCatalog {
@@ -713,6 +713,196 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 
 	hydrationWarn := p.HydrationWarning
 
+	domain.EnsureRaidState(p)
+	equippedCosDTO := &empire.EquippedCosmeticsDTO{
+		Headgear:  p.EquippedCosmetics["headgear"],
+		Mantle:    p.EquippedCosmetics["mantle"],
+		HeldRelic: p.EquippedCosmetics["held_relic"],
+		Companion: p.EquippedCosmetics["companion"],
+	}
+
+	cosmeticsDTO := make([]*empire.CosmeticSpecDTO, 0, len(domain.CosmeticCatalog))
+	for _, cs := range domain.CosmeticCatalog {
+		owned := int32(p.ResourcesMilli[cs.ItemKey] / domain.ResourceScale)
+		eq := p.EquippedCosmetics[cs.Slot] == cs.ItemKey
+		cosmeticsDTO = append(cosmeticsDTO, &empire.CosmeticSpecDTO{
+			ItemKey:      cs.ItemKey,
+			Name:         cs.Name,
+			Slot:         cs.Slot,
+			Rarity:       cs.Rarity,
+			SeasonTag:    cs.SeasonTag,
+			VisualEffect: cs.VisualEffect,
+			OwnedCount:   owned,
+			Equipped:     eq,
+		})
+	}
+
+	raidGearsDTO := make([]*empire.RaidGearSpecDTO, 0, len(domain.RaidGearCatalog))
+	for _, rg := range domain.RaidGearCatalog {
+		bpOwned := int32(0)
+		recipeUnlocked := rg.BlueprintKey == ""
+		if rg.BlueprintKey != "" {
+			bpOwned = int32(p.ResourcesMilli[rg.BlueprintKey] / domain.ResourceScale)
+			recipeUnlocked = p.LearnedRaidBlueprints[rg.BlueprintKey]
+		}
+		owned := p.RaidGearInventory[rg.ItemKey]
+		eq := false
+		switch rg.Category {
+		case "weapon":
+			eq = p.RaidLoadout.WeaponKey == rg.ItemKey && owned > 0
+		case "armor":
+			eq = p.RaidLoadout.ArmorKey == rg.ItemKey && owned > 0
+		case "boots":
+			eq = p.RaidLoadout.BootsKey == rg.ItemKey && owned > 0
+		case "safe_box":
+			eq = p.RaidLoadout.SafeBoxKey == rg.ItemKey && owned > 0
+		case "potion":
+			for _, pk := range p.RaidLoadout.EquippedPotions {
+				if pk == rg.ItemKey && owned > 0 {
+					eq = true
+					break
+				}
+			}
+		}
+
+		costsDTO := make([]*empire.CostItemDTO, 0, len(rg.CostsMilli))
+		canCraft := recipeUnlocked && !(rg.Category == "safe_box" && owned > 0)
+		for _, rKey := range costOrderAll {
+			reqMilli, exists := rg.CostsMilli[rKey]
+			if !exists {
+				continue
+			}
+			curMilli := p.ResourcesMilli[rKey]
+			if curMilli < reqMilli {
+				canCraft = false
+			}
+			costsDTO = append(costsDTO, &empire.CostItemDTO{
+				ResourceKey:   rKey,
+				ResourceName:  domain.ResourceName(rKey),
+				RequiredMilli: reqMilli,
+				CurrentMilli:  curMilli,
+				EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
+			})
+		}
+
+		raidGearsDTO = append(raidGearsDTO, &empire.RaidGearSpecDTO{
+			ItemKey:            rg.ItemKey,
+			Name:               rg.Name,
+			Category:           rg.Category,
+			Tier:               rg.Tier,
+			BlueprintKey:       rg.BlueprintKey,
+			BlueprintName:      rg.BlueprintName,
+			BlueprintOwnedCount: bpOwned,
+			RecipeUnlocked:     recipeUnlocked,
+			OwnedCount:         owned,
+			Equipped:           eq,
+			StatSummary:        rg.StatSummary,
+			AtkBonus:           rg.AtkBonus,
+			HpBonus:            rg.HpBonus,
+			DefBonus:           rg.DefBonus,
+			MoveCooldownMs:     rg.MoveCooldownMs,
+			SafeSlots:          rg.SafeSlots,
+			Costs:              costsDTO,
+			CanCraft:           canCraft,
+		})
+	}
+
+	mapBuffCardDTO := func(code string) *empire.RaidBuffCardDTO {
+		spec, ok := domain.FindRaidBuffCardSpec(code)
+		if !ok {
+			return nil
+		}
+		costsDTO := make([]*empire.CostItemDTO, 0, len(spec.CostsMilli))
+		canBuy := true
+		for _, rKey := range costOrderAll {
+			reqMilli, exists := spec.CostsMilli[rKey]
+			if !exists {
+				continue
+			}
+			curMilli := p.ResourcesMilli[rKey]
+			if curMilli < reqMilli {
+				canBuy = false
+			}
+			costsDTO = append(costsDTO, &empire.CostItemDTO{
+				ResourceKey:   rKey,
+				ResourceName:  domain.ResourceName(rKey),
+				RequiredMilli: reqMilli,
+				CurrentMilli:  curMilli,
+				EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
+			})
+		}
+		return &empire.RaidBuffCardDTO{
+			CardCode:      spec.CardCode,
+			Name:          spec.Name,
+			Category:      spec.Category,
+			Rarity:        spec.Rarity,
+			EffectSummary: spec.EffectSummary,
+			Costs:         costsDTO,
+			CanBuy:        canBuy,
+		}
+	}
+
+	equippedBuffsDTO := make([]*empire.RaidBuffCardDTO, 0, len(p.RaidLoadout.EquippedBuffCards))
+	for _, code := range p.RaidLoadout.EquippedBuffCards {
+		if dto := mapBuffCardDTO(code); dto != nil {
+			equippedBuffsDTO = append(equippedBuffsDTO, dto)
+		}
+	}
+	draftPoolDTO := make([]*empire.RaidBuffCardDTO, 0, len(p.RaidLoadout.DraftPoolCards))
+	for _, code := range p.RaidLoadout.DraftPoolCards {
+		if dto := mapBuffCardDTO(code); dto != nil {
+			draftPoolDTO = append(draftPoolDTO, dto)
+		}
+	}
+
+	rerollCostsDTO := make([]*empire.CostItemDTO, 0, len(domain.RaidRerollCostsMilli))
+	canReroll := true
+	for _, rKey := range costOrderAll {
+		reqMilli, exists := domain.RaidRerollCostsMilli[rKey]
+		if !exists {
+			continue
+		}
+		curMilli := p.ResourcesMilli[rKey]
+		if curMilli < reqMilli {
+			canReroll = false
+		}
+		rerollCostsDTO = append(rerollCostsDTO, &empire.CostItemDTO{
+			ResourceKey:   rKey,
+			ResourceName:  domain.ResourceName(rKey),
+			RequiredMilli: reqMilli,
+			CurrentMilli:  curMilli,
+			EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
+		})
+	}
+
+	maxHP, atk, def, moveCD, durSec, bagCap, safeSlots := domain.ComputeRaidLoadoutStats(p)
+	eqPotions := make([]string, 0, len(p.RaidLoadout.EquippedPotions))
+	for _, pk := range p.RaidLoadout.EquippedPotions {
+		if p.RaidGearInventory[pk] > 0 {
+			eqPotions = append(eqPotions, pk)
+		}
+	}
+
+	raidLoadoutDTO := &empire.RaidLoadoutStateDTO{
+		WeaponKey:           p.RaidLoadout.WeaponKey,
+		ArmorKey:            p.RaidLoadout.ArmorKey,
+		BootsKey:            p.RaidLoadout.BootsKey,
+		SafeBoxKey:          p.RaidLoadout.SafeBoxKey,
+		SafeSlotCount:       safeSlots,
+		EquippedPotions:     eqPotions,
+		EquippedBuffCards:   equippedBuffsDTO,
+		DraftPoolCards:      draftPoolDTO,
+		RerollCosts:         rerollCostsDTO,
+		CanReroll:           canReroll,
+		TotalMaxHp:          maxHP,
+		TotalAtk:            atk,
+		TotalDef:            def,
+		MoveCooldownMs:      moveCD,
+		RaidDurationSeconds: durSec,
+		BackpackCapacity:    bagCap,
+		ActiveRaidSeed:      p.RaidLoadout.ActiveRaidSeed,
+	}
+
 	return &empire.DashboardStateResp{
 		ServerTime:          time.Now().UTC().Format(time.RFC3339),
 		Player:              playerDTO,
@@ -738,6 +928,10 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		ActiveExpedition:    activeExpeditionDTO,
 		CaravanOffers:       caravanOffersDTO,
 		HydrationWarning:    hydrationWarn,
+		EquippedCosmetics:   equippedCosDTO,
+		Cosmetics:           cosmeticsDTO,
+		RaidGears:           raidGearsDTO,
+		RaidLoadout:         raidLoadoutDTO,
 	}
 }
 
@@ -886,6 +1080,72 @@ func (s *Server) ClaimExpedition(ctx context.Context, _ *empire.ClaimExpeditionR
 
 func (s *Server) TradeCaravan(ctx context.Context, req *empire.TradeCaravanReq) (*empire.DashboardStateResp, error) {
 	w, err := s.svc.TradeCaravan(ctx, req.OfferCode)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) EquipCosmetic(ctx context.Context, req *empire.EquipCosmeticReq) (*empire.DashboardStateResp, error) {
+	w, err := s.svc.EquipCosmetic(ctx, req.Slot, req.ItemKey)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) LearnRaidBlueprint(ctx context.Context, req *empire.LearnRaidBlueprintReq) (*empire.DashboardStateResp, error) {
+	w, err := s.svc.LearnRaidBlueprint(ctx, req.BlueprintKey)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) ManageRaidGear(ctx context.Context, req *empire.ManageRaidGearReq) (*empire.DashboardStateResp, error) {
+	w, err := s.svc.ManageRaidGear(ctx, req.Action, req.ItemKey)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) DraftRaidBuff(ctx context.Context, req *empire.DraftRaidBuffReq) (*empire.DashboardStateResp, error) {
+	var cardCode string
+	if req.CardCode != nil {
+		cardCode = *req.CardCode
+	}
+	var replaceSlot int32 = -1
+	if req.ReplaceSlot != nil {
+		replaceSlot = *req.ReplaceSlot
+	}
+	w, err := s.svc.DraftRaidBuff(ctx, req.Action, cardCode, replaceSlot)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) StartRaid(ctx context.Context, _ *empire.StartRaidReq) (*empire.DashboardStateResp, error) {
+	w, err := s.svc.StartRaid(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) FinishRaid(ctx context.Context, req *empire.FinishRaidReq) (*empire.DashboardStateResp, error) {
+	var zv, co, bk int32
+	if req.ZonesVisited != nil {
+		zv = *req.ZonesVisited
+	}
+	if req.ChestsOpened != nil {
+		co = *req.ChestsOpened
+	}
+	if req.BossesKilled != nil {
+		bk = *req.BossesKilled
+	}
+	w, err := s.svc.FinishRaid(ctx, req.Status, req.BackpackLootKeys, req.SafeBoxLootKeys, req.UsedPotionKeys, zv, co, bk)
 	if err != nil {
 		return nil, err
 	}

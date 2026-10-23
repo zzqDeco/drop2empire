@@ -126,6 +126,7 @@ func EnsureDefaultAccounts(w *WorldState, now time.Time) {
 		if pl.UnlockedBlueprints == nil {
 			pl.UnlockedBlueprints = map[string]bool{}
 		}
+		EnsureRaidState(pl)
 	}
 	if p, ok := w.Players["pioneer"]; ok {
 		if p.PasswordHash == "" {
@@ -231,6 +232,22 @@ func NewDefaultWorld(now time.Time) *WorldState {
 	veteran.ResourcesMilli[ResArcherKit] = 12 * ResourceScale
 	veteran.ResourcesMilli[ResCavalryKit] = 10 * ResourceScale
 	veteran.ResourcesMilli[ResSeasonChest] = 2 * ResourceScale
+	veteran.ResourcesMilli[ResFlint] = 14 * ResourceScale
+	veteran.ResourcesMilli[ResAncientShard] = 5 * ResourceScale
+	veteran.ResourcesMilli[ResMeteorOre] = 2 * ResourceScale
+	veteran.ResourcesMilli[ResBPCrossbow] = 1 * ResourceScale
+	veteran.ResourcesMilli[ResBPSpringBoots] = 1 * ResourceScale
+	veteran.ResourcesMilli[ResCosSteamCrown] = 1 * ResourceScale
+	veteran.ResourcesMilli[ResCosHydroWings] = 1 * ResourceScale
+	veteran.ResourcesMilli[ResCosAlchLantern] = 1 * ResourceScale
+	veteran.ResourcesMilli[ResCosMechOwl] = 1 * ResourceScale
+	veteran.EquippedCosmetics = map[string]string{
+		"headgear":   ResCosSteamCrown,
+		"mantle":     ResCosHydroWings,
+		"held_relic": ResCosAlchLantern,
+		"companion":  ResCosMechOwl,
+	}
+	EnsureRaidState(veteran)
 	veteran.InstalledEquipments[ResAutoPump] = 2
 	veteran.InstalledEquipments[ResAlchCatalyst] = 1
 	veteran.ActivityPoints = 260
@@ -278,6 +295,7 @@ func NewBlankPlayer(handle string, now time.Time) *PlayerState {
 		LastOfflineSummary:      "",
 		EventLogs:               []EventEntry{},
 	}
+	EnsureRaidState(p)
 	AppendLog(p, now, "PRODUCTION", "文明起点：点击【手动打水 +1】积攒最初的 10 滴水，招募第一位居民开启自动化。")
 	return p
 }
@@ -361,7 +379,7 @@ func ResourceCapacityMilli(p *PlayerState, resKey string) int64 {
 		}
 		return capUnits * ResourceScale
 
-	case ResFlint, ResAncientShard:
+	case ResFlint, ResAncientShard, ResMeteorOre:
 		return 500 * ResourceScale
 
 	case ResIronIngot, ResRation:

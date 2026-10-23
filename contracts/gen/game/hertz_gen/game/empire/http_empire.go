@@ -497,6 +497,361 @@ func (p *CaravanOfferDTO) String() string {
 	return fmt.Sprintf("CaravanOfferDTO(%+v)", *p)
 }
 
+type CosmeticSpecDTO struct {
+	ItemKey      string `thrift:"itemKey,1,required" json:"itemKey"`
+	Name         string `thrift:"name,2,required" json:"name"`
+	Slot         string `thrift:"slot,3,required" json:"slot"`
+	Rarity       string `thrift:"rarity,4,required" json:"rarity"`
+	SeasonTag    string `thrift:"seasonTag,5,required" json:"seasonTag"`
+	VisualEffect string `thrift:"visualEffect,6,required" json:"visualEffect"`
+	OwnedCount   int32  `thrift:"ownedCount,7,required" json:"ownedCount"`
+	Equipped     bool   `thrift:"equipped,8,required" json:"equipped"`
+}
+
+func NewCosmeticSpecDTO() *CosmeticSpecDTO {
+	return &CosmeticSpecDTO{}
+}
+
+func (p *CosmeticSpecDTO) InitDefault() {
+}
+
+func (p *CosmeticSpecDTO) GetItemKey() (v string) {
+	return p.ItemKey
+}
+
+func (p *CosmeticSpecDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *CosmeticSpecDTO) GetSlot() (v string) {
+	return p.Slot
+}
+
+func (p *CosmeticSpecDTO) GetRarity() (v string) {
+	return p.Rarity
+}
+
+func (p *CosmeticSpecDTO) GetSeasonTag() (v string) {
+	return p.SeasonTag
+}
+
+func (p *CosmeticSpecDTO) GetVisualEffect() (v string) {
+	return p.VisualEffect
+}
+
+func (p *CosmeticSpecDTO) GetOwnedCount() (v int32) {
+	return p.OwnedCount
+}
+
+func (p *CosmeticSpecDTO) GetEquipped() (v bool) {
+	return p.Equipped
+}
+
+func (p *CosmeticSpecDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CosmeticSpecDTO(%+v)", *p)
+}
+
+type EquippedCosmeticsDTO struct {
+	Headgear  string `thrift:"headgear,1,required" json:"headgear"`
+	Mantle    string `thrift:"mantle,2,required" json:"mantle"`
+	HeldRelic string `thrift:"heldRelic,3,required" json:"heldRelic"`
+	Companion string `thrift:"companion,4,required" json:"companion"`
+}
+
+func NewEquippedCosmeticsDTO() *EquippedCosmeticsDTO {
+	return &EquippedCosmeticsDTO{}
+}
+
+func (p *EquippedCosmeticsDTO) InitDefault() {
+}
+
+func (p *EquippedCosmeticsDTO) GetHeadgear() (v string) {
+	return p.Headgear
+}
+
+func (p *EquippedCosmeticsDTO) GetMantle() (v string) {
+	return p.Mantle
+}
+
+func (p *EquippedCosmeticsDTO) GetHeldRelic() (v string) {
+	return p.HeldRelic
+}
+
+func (p *EquippedCosmeticsDTO) GetCompanion() (v string) {
+	return p.Companion
+}
+
+func (p *EquippedCosmeticsDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("EquippedCosmeticsDTO(%+v)", *p)
+}
+
+type RaidGearSpecDTO struct {
+	ItemKey             string         `thrift:"itemKey,1,required" json:"itemKey"`
+	Name                string         `thrift:"name,2,required" json:"name"`
+	Category            string         `thrift:"category,3,required" json:"category"`
+	Tier                int32          `thrift:"tier,4,required" json:"tier"`
+	BlueprintKey        string         `thrift:"blueprintKey,5,required" json:"blueprintKey"`
+	BlueprintName       string         `thrift:"blueprintName,6,required" json:"blueprintName"`
+	BlueprintOwnedCount int32          `thrift:"blueprintOwnedCount,7,required" json:"blueprintOwnedCount"`
+	RecipeUnlocked      bool           `thrift:"recipeUnlocked,8,required" json:"recipeUnlocked"`
+	OwnedCount          int32          `thrift:"ownedCount,9,required" json:"ownedCount"`
+	Equipped            bool           `thrift:"equipped,10,required" json:"equipped"`
+	StatSummary         string         `thrift:"statSummary,11,required" json:"statSummary"`
+	AtkBonus            int32          `thrift:"atkBonus,12,required" json:"atkBonus"`
+	HpBonus             int32          `thrift:"hpBonus,13,required" json:"hpBonus"`
+	DefBonus            int32          `thrift:"defBonus,14,required" json:"defBonus"`
+	MoveCooldownMs      int32          `thrift:"moveCooldownMs,15,required" json:"moveCooldownMs"`
+	SafeSlots           int32          `thrift:"safeSlots,16,required" json:"safeSlots"`
+	Costs               []*CostItemDTO `thrift:"costs,17,required,list<CostItemDTO>" json:"costs"`
+	CanCraft            bool           `thrift:"canCraft,18,required" json:"canCraft"`
+}
+
+func NewRaidGearSpecDTO() *RaidGearSpecDTO {
+	return &RaidGearSpecDTO{}
+}
+
+func (p *RaidGearSpecDTO) InitDefault() {
+}
+
+func (p *RaidGearSpecDTO) GetItemKey() (v string) {
+	return p.ItemKey
+}
+
+func (p *RaidGearSpecDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *RaidGearSpecDTO) GetCategory() (v string) {
+	return p.Category
+}
+
+func (p *RaidGearSpecDTO) GetTier() (v int32) {
+	return p.Tier
+}
+
+func (p *RaidGearSpecDTO) GetBlueprintKey() (v string) {
+	return p.BlueprintKey
+}
+
+func (p *RaidGearSpecDTO) GetBlueprintName() (v string) {
+	return p.BlueprintName
+}
+
+func (p *RaidGearSpecDTO) GetBlueprintOwnedCount() (v int32) {
+	return p.BlueprintOwnedCount
+}
+
+func (p *RaidGearSpecDTO) GetRecipeUnlocked() (v bool) {
+	return p.RecipeUnlocked
+}
+
+func (p *RaidGearSpecDTO) GetOwnedCount() (v int32) {
+	return p.OwnedCount
+}
+
+func (p *RaidGearSpecDTO) GetEquipped() (v bool) {
+	return p.Equipped
+}
+
+func (p *RaidGearSpecDTO) GetStatSummary() (v string) {
+	return p.StatSummary
+}
+
+func (p *RaidGearSpecDTO) GetAtkBonus() (v int32) {
+	return p.AtkBonus
+}
+
+func (p *RaidGearSpecDTO) GetHpBonus() (v int32) {
+	return p.HpBonus
+}
+
+func (p *RaidGearSpecDTO) GetDefBonus() (v int32) {
+	return p.DefBonus
+}
+
+func (p *RaidGearSpecDTO) GetMoveCooldownMs() (v int32) {
+	return p.MoveCooldownMs
+}
+
+func (p *RaidGearSpecDTO) GetSafeSlots() (v int32) {
+	return p.SafeSlots
+}
+
+func (p *RaidGearSpecDTO) GetCosts() (v []*CostItemDTO) {
+	return p.Costs
+}
+
+func (p *RaidGearSpecDTO) GetCanCraft() (v bool) {
+	return p.CanCraft
+}
+
+func (p *RaidGearSpecDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RaidGearSpecDTO(%+v)", *p)
+}
+
+type RaidBuffCardDTO struct {
+	CardCode      string         `thrift:"cardCode,1,required" json:"cardCode"`
+	Name          string         `thrift:"name,2,required" json:"name"`
+	Category      string         `thrift:"category,3,required" json:"category"`
+	Rarity        string         `thrift:"rarity,4,required" json:"rarity"`
+	EffectSummary string         `thrift:"effectSummary,5,required" json:"effectSummary"`
+	Costs         []*CostItemDTO `thrift:"costs,6,required,list<CostItemDTO>" json:"costs"`
+	CanBuy        bool           `thrift:"canBuy,7,required" json:"canBuy"`
+}
+
+func NewRaidBuffCardDTO() *RaidBuffCardDTO {
+	return &RaidBuffCardDTO{}
+}
+
+func (p *RaidBuffCardDTO) InitDefault() {
+}
+
+func (p *RaidBuffCardDTO) GetCardCode() (v string) {
+	return p.CardCode
+}
+
+func (p *RaidBuffCardDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *RaidBuffCardDTO) GetCategory() (v string) {
+	return p.Category
+}
+
+func (p *RaidBuffCardDTO) GetRarity() (v string) {
+	return p.Rarity
+}
+
+func (p *RaidBuffCardDTO) GetEffectSummary() (v string) {
+	return p.EffectSummary
+}
+
+func (p *RaidBuffCardDTO) GetCosts() (v []*CostItemDTO) {
+	return p.Costs
+}
+
+func (p *RaidBuffCardDTO) GetCanBuy() (v bool) {
+	return p.CanBuy
+}
+
+func (p *RaidBuffCardDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RaidBuffCardDTO(%+v)", *p)
+}
+
+type RaidLoadoutStateDTO struct {
+	WeaponKey           string             `thrift:"weaponKey,1,required" json:"weaponKey"`
+	ArmorKey            string             `thrift:"armorKey,2,required" json:"armorKey"`
+	BootsKey            string             `thrift:"bootsKey,3,required" json:"bootsKey"`
+	SafeBoxKey          string             `thrift:"safeBoxKey,4,required" json:"safeBoxKey"`
+	SafeSlotCount       int32              `thrift:"safeSlotCount,5,required" json:"safeSlotCount"`
+	EquippedPotions     []string           `thrift:"equippedPotions,6,required,list<string>" json:"equippedPotions"`
+	EquippedBuffCards   []*RaidBuffCardDTO `thrift:"equippedBuffCards,7,required,list<RaidBuffCardDTO>" json:"equippedBuffCards"`
+	DraftPoolCards      []*RaidBuffCardDTO `thrift:"draftPoolCards,8,required,list<RaidBuffCardDTO>" json:"draftPoolCards"`
+	RerollCosts         []*CostItemDTO     `thrift:"rerollCosts,9,required,list<CostItemDTO>" json:"rerollCosts"`
+	CanReroll           bool               `thrift:"canReroll,10,required" json:"canReroll"`
+	TotalMaxHp          int32              `thrift:"totalMaxHp,11,required" json:"totalMaxHp"`
+	TotalAtk            int32              `thrift:"totalAtk,12,required" json:"totalAtk"`
+	TotalDef            int32              `thrift:"totalDef,13,required" json:"totalDef"`
+	MoveCooldownMs      int32              `thrift:"moveCooldownMs,14,required" json:"moveCooldownMs"`
+	RaidDurationSeconds int32              `thrift:"raidDurationSeconds,15,required" json:"raidDurationSeconds"`
+	BackpackCapacity    int32              `thrift:"backpackCapacity,16,required" json:"backpackCapacity"`
+	ActiveRaidSeed      int64              `thrift:"activeRaidSeed,17,required" json:"activeRaidSeed"`
+}
+
+func NewRaidLoadoutStateDTO() *RaidLoadoutStateDTO {
+	return &RaidLoadoutStateDTO{}
+}
+
+func (p *RaidLoadoutStateDTO) InitDefault() {
+}
+
+func (p *RaidLoadoutStateDTO) GetWeaponKey() (v string) {
+	return p.WeaponKey
+}
+
+func (p *RaidLoadoutStateDTO) GetArmorKey() (v string) {
+	return p.ArmorKey
+}
+
+func (p *RaidLoadoutStateDTO) GetBootsKey() (v string) {
+	return p.BootsKey
+}
+
+func (p *RaidLoadoutStateDTO) GetSafeBoxKey() (v string) {
+	return p.SafeBoxKey
+}
+
+func (p *RaidLoadoutStateDTO) GetSafeSlotCount() (v int32) {
+	return p.SafeSlotCount
+}
+
+func (p *RaidLoadoutStateDTO) GetEquippedPotions() (v []string) {
+	return p.EquippedPotions
+}
+
+func (p *RaidLoadoutStateDTO) GetEquippedBuffCards() (v []*RaidBuffCardDTO) {
+	return p.EquippedBuffCards
+}
+
+func (p *RaidLoadoutStateDTO) GetDraftPoolCards() (v []*RaidBuffCardDTO) {
+	return p.DraftPoolCards
+}
+
+func (p *RaidLoadoutStateDTO) GetRerollCosts() (v []*CostItemDTO) {
+	return p.RerollCosts
+}
+
+func (p *RaidLoadoutStateDTO) GetCanReroll() (v bool) {
+	return p.CanReroll
+}
+
+func (p *RaidLoadoutStateDTO) GetTotalMaxHp() (v int32) {
+	return p.TotalMaxHp
+}
+
+func (p *RaidLoadoutStateDTO) GetTotalAtk() (v int32) {
+	return p.TotalAtk
+}
+
+func (p *RaidLoadoutStateDTO) GetTotalDef() (v int32) {
+	return p.TotalDef
+}
+
+func (p *RaidLoadoutStateDTO) GetMoveCooldownMs() (v int32) {
+	return p.MoveCooldownMs
+}
+
+func (p *RaidLoadoutStateDTO) GetRaidDurationSeconds() (v int32) {
+	return p.RaidDurationSeconds
+}
+
+func (p *RaidLoadoutStateDTO) GetBackpackCapacity() (v int32) {
+	return p.BackpackCapacity
+}
+
+func (p *RaidLoadoutStateDTO) GetActiveRaidSeed() (v int64) {
+	return p.ActiveRaidSeed
+}
+
+func (p *RaidLoadoutStateDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RaidLoadoutStateDTO(%+v)", *p)
+}
+
 type ProfessionSpecDTO struct {
 	Code             string   `thrift:"code,1,required" json:"code"`
 	Name             string   `thrift:"name,2,required" json:"name"`
@@ -1735,6 +2090,10 @@ type DashboardStateResp struct {
 	ActiveExpedition    *ActiveExpeditionDTO     `thrift:"activeExpedition,24,optional" json:"activeExpedition,omitempty"`
 	CaravanOffers       []*CaravanOfferDTO       `thrift:"caravanOffers,25,required,list<CaravanOfferDTO>" json:"caravanOffers"`
 	HydrationWarning    bool                     `thrift:"hydrationWarning,26,required" json:"hydrationWarning"`
+	EquippedCosmetics   *EquippedCosmeticsDTO    `thrift:"equippedCosmetics,27,required" json:"equippedCosmetics"`
+	Cosmetics           []*CosmeticSpecDTO       `thrift:"cosmetics,28,required,list<CosmeticSpecDTO>" json:"cosmetics"`
+	RaidGears           []*RaidGearSpecDTO       `thrift:"raidGears,29,required,list<RaidGearSpecDTO>" json:"raidGears"`
+	RaidLoadout         *RaidLoadoutStateDTO     `thrift:"raidLoadout,30,required" json:"raidLoadout"`
 }
 
 func NewDashboardStateResp() *DashboardStateResp {
@@ -1878,6 +2237,32 @@ func (p *DashboardStateResp) GetHydrationWarning() (v bool) {
 	return p.HydrationWarning
 }
 
+var DashboardStateResp_EquippedCosmetics_DEFAULT *EquippedCosmeticsDTO
+
+func (p *DashboardStateResp) GetEquippedCosmetics() (v *EquippedCosmeticsDTO) {
+	if !p.IsSetEquippedCosmetics() {
+		return DashboardStateResp_EquippedCosmetics_DEFAULT
+	}
+	return p.EquippedCosmetics
+}
+
+func (p *DashboardStateResp) GetCosmetics() (v []*CosmeticSpecDTO) {
+	return p.Cosmetics
+}
+
+func (p *DashboardStateResp) GetRaidGears() (v []*RaidGearSpecDTO) {
+	return p.RaidGears
+}
+
+var DashboardStateResp_RaidLoadout_DEFAULT *RaidLoadoutStateDTO
+
+func (p *DashboardStateResp) GetRaidLoadout() (v *RaidLoadoutStateDTO) {
+	if !p.IsSetRaidLoadout() {
+		return DashboardStateResp_RaidLoadout_DEFAULT
+	}
+	return p.RaidLoadout
+}
+
 func (p *DashboardStateResp) IsSetPlayer() bool {
 	return p.Player != nil
 }
@@ -1900,6 +2285,14 @@ func (p *DashboardStateResp) IsSetCreatedInviteCode() bool {
 
 func (p *DashboardStateResp) IsSetActiveExpedition() bool {
 	return p.ActiveExpedition != nil
+}
+
+func (p *DashboardStateResp) IsSetEquippedCosmetics() bool {
+	return p.EquippedCosmetics != nil
+}
+
+func (p *DashboardStateResp) IsSetRaidLoadout() bool {
+	return p.RaidLoadout != nil
 }
 
 func (p *DashboardStateResp) String() string {
@@ -2322,6 +2715,255 @@ func (p *TradeCaravanReq) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("TradeCaravanReq(%+v)", *p)
+}
+
+type EquipCosmeticReq struct {
+	Slot    string `thrift:"slot,1,required" json:"slot"`
+	ItemKey string `thrift:"itemKey,2,required" json:"itemKey"`
+}
+
+func NewEquipCosmeticReq() *EquipCosmeticReq {
+	return &EquipCosmeticReq{}
+}
+
+func (p *EquipCosmeticReq) InitDefault() {
+}
+
+func (p *EquipCosmeticReq) GetSlot() (v string) {
+	return p.Slot
+}
+
+func (p *EquipCosmeticReq) GetItemKey() (v string) {
+	return p.ItemKey
+}
+
+func (p *EquipCosmeticReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("EquipCosmeticReq(%+v)", *p)
+}
+
+type LearnRaidBlueprintReq struct {
+	BlueprintKey string `thrift:"blueprintKey,1,required" json:"blueprintKey"`
+}
+
+func NewLearnRaidBlueprintReq() *LearnRaidBlueprintReq {
+	return &LearnRaidBlueprintReq{}
+}
+
+func (p *LearnRaidBlueprintReq) InitDefault() {
+}
+
+func (p *LearnRaidBlueprintReq) GetBlueprintKey() (v string) {
+	return p.BlueprintKey
+}
+
+func (p *LearnRaidBlueprintReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("LearnRaidBlueprintReq(%+v)", *p)
+}
+
+type ManageRaidGearReq struct {
+	Action  string `thrift:"action,1,required" json:"action"`
+	ItemKey string `thrift:"itemKey,2,required" json:"itemKey"`
+}
+
+func NewManageRaidGearReq() *ManageRaidGearReq {
+	return &ManageRaidGearReq{}
+}
+
+func (p *ManageRaidGearReq) InitDefault() {
+}
+
+func (p *ManageRaidGearReq) GetAction() (v string) {
+	return p.Action
+}
+
+func (p *ManageRaidGearReq) GetItemKey() (v string) {
+	return p.ItemKey
+}
+
+func (p *ManageRaidGearReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ManageRaidGearReq(%+v)", *p)
+}
+
+type DraftRaidBuffReq struct {
+	Action      string  `thrift:"action,1,required" json:"action"`
+	CardCode    *string `thrift:"cardCode,2,optional" json:"cardCode,omitempty"`
+	ReplaceSlot *int32  `thrift:"replaceSlot,3,optional" json:"replaceSlot,omitempty"`
+}
+
+func NewDraftRaidBuffReq() *DraftRaidBuffReq {
+	return &DraftRaidBuffReq{}
+}
+
+func (p *DraftRaidBuffReq) InitDefault() {
+}
+
+func (p *DraftRaidBuffReq) GetAction() (v string) {
+	return p.Action
+}
+
+var DraftRaidBuffReq_CardCode_DEFAULT string
+
+func (p *DraftRaidBuffReq) GetCardCode() (v string) {
+	if !p.IsSetCardCode() {
+		return DraftRaidBuffReq_CardCode_DEFAULT
+	}
+	return *p.CardCode
+}
+
+var DraftRaidBuffReq_ReplaceSlot_DEFAULT int32
+
+func (p *DraftRaidBuffReq) GetReplaceSlot() (v int32) {
+	if !p.IsSetReplaceSlot() {
+		return DraftRaidBuffReq_ReplaceSlot_DEFAULT
+	}
+	return *p.ReplaceSlot
+}
+
+func (p *DraftRaidBuffReq) IsSetCardCode() bool {
+	return p.CardCode != nil
+}
+
+func (p *DraftRaidBuffReq) IsSetReplaceSlot() bool {
+	return p.ReplaceSlot != nil
+}
+
+func (p *DraftRaidBuffReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("DraftRaidBuffReq(%+v)", *p)
+}
+
+type StartRaidReq struct {
+}
+
+func NewStartRaidReq() *StartRaidReq {
+	return &StartRaidReq{}
+}
+
+func (p *StartRaidReq) InitDefault() {
+}
+
+func (p *StartRaidReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("StartRaidReq(%+v)", *p)
+}
+
+type FinishRaidReq struct {
+	Status           string   `thrift:"status,1,required" json:"status"`
+	BackpackLootKeys []string `thrift:"backpackLootKeys,2,optional,list<string>" json:"backpackLootKeys,omitempty"`
+	SafeBoxLootKeys  []string `thrift:"safeBoxLootKeys,3,optional,list<string>" json:"safeBoxLootKeys,omitempty"`
+	UsedPotionKeys   []string `thrift:"usedPotionKeys,4,optional,list<string>" json:"usedPotionKeys,omitempty"`
+	ZonesVisited     *int32   `thrift:"zonesVisited,5,optional" json:"zonesVisited,omitempty"`
+	ChestsOpened     *int32   `thrift:"chestsOpened,6,optional" json:"chestsOpened,omitempty"`
+	BossesKilled     *int32   `thrift:"bossesKilled,7,optional" json:"bossesKilled,omitempty"`
+}
+
+func NewFinishRaidReq() *FinishRaidReq {
+	return &FinishRaidReq{}
+}
+
+func (p *FinishRaidReq) InitDefault() {
+}
+
+func (p *FinishRaidReq) GetStatus() (v string) {
+	return p.Status
+}
+
+var FinishRaidReq_BackpackLootKeys_DEFAULT []string
+
+func (p *FinishRaidReq) GetBackpackLootKeys() (v []string) {
+	if !p.IsSetBackpackLootKeys() {
+		return FinishRaidReq_BackpackLootKeys_DEFAULT
+	}
+	return p.BackpackLootKeys
+}
+
+var FinishRaidReq_SafeBoxLootKeys_DEFAULT []string
+
+func (p *FinishRaidReq) GetSafeBoxLootKeys() (v []string) {
+	if !p.IsSetSafeBoxLootKeys() {
+		return FinishRaidReq_SafeBoxLootKeys_DEFAULT
+	}
+	return p.SafeBoxLootKeys
+}
+
+var FinishRaidReq_UsedPotionKeys_DEFAULT []string
+
+func (p *FinishRaidReq) GetUsedPotionKeys() (v []string) {
+	if !p.IsSetUsedPotionKeys() {
+		return FinishRaidReq_UsedPotionKeys_DEFAULT
+	}
+	return p.UsedPotionKeys
+}
+
+var FinishRaidReq_ZonesVisited_DEFAULT int32
+
+func (p *FinishRaidReq) GetZonesVisited() (v int32) {
+	if !p.IsSetZonesVisited() {
+		return FinishRaidReq_ZonesVisited_DEFAULT
+	}
+	return *p.ZonesVisited
+}
+
+var FinishRaidReq_ChestsOpened_DEFAULT int32
+
+func (p *FinishRaidReq) GetChestsOpened() (v int32) {
+	if !p.IsSetChestsOpened() {
+		return FinishRaidReq_ChestsOpened_DEFAULT
+	}
+	return *p.ChestsOpened
+}
+
+var FinishRaidReq_BossesKilled_DEFAULT int32
+
+func (p *FinishRaidReq) GetBossesKilled() (v int32) {
+	if !p.IsSetBossesKilled() {
+		return FinishRaidReq_BossesKilled_DEFAULT
+	}
+	return *p.BossesKilled
+}
+
+func (p *FinishRaidReq) IsSetBackpackLootKeys() bool {
+	return p.BackpackLootKeys != nil
+}
+
+func (p *FinishRaidReq) IsSetSafeBoxLootKeys() bool {
+	return p.SafeBoxLootKeys != nil
+}
+
+func (p *FinishRaidReq) IsSetUsedPotionKeys() bool {
+	return p.UsedPotionKeys != nil
+}
+
+func (p *FinishRaidReq) IsSetZonesVisited() bool {
+	return p.ZonesVisited != nil
+}
+
+func (p *FinishRaidReq) IsSetChestsOpened() bool {
+	return p.ChestsOpened != nil
+}
+
+func (p *FinishRaidReq) IsSetBossesKilled() bool {
+	return p.BossesKilled != nil
+}
+
+func (p *FinishRaidReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FinishRaidReq(%+v)", *p)
 }
 
 type ChooseProfessionReq struct {
@@ -2841,4 +3483,16 @@ type EmpireService interface {
 	ClaimExpedition(ctx context.Context, req *ClaimExpeditionReq) (r *DashboardStateResp, err error)
 
 	TradeCaravan(ctx context.Context, req *TradeCaravanReq) (r *DashboardStateResp, err error)
+
+	EquipCosmetic(ctx context.Context, req *EquipCosmeticReq) (r *DashboardStateResp, err error)
+
+	LearnRaidBlueprint(ctx context.Context, req *LearnRaidBlueprintReq) (r *DashboardStateResp, err error)
+
+	ManageRaidGear(ctx context.Context, req *ManageRaidGearReq) (r *DashboardStateResp, err error)
+
+	DraftRaidBuff(ctx context.Context, req *DraftRaidBuffReq) (r *DashboardStateResp, err error)
+
+	StartRaid(ctx context.Context, req *StartRaidReq) (r *DashboardStateResp, err error)
+
+	FinishRaid(ctx context.Context, req *FinishRaidReq) (r *DashboardStateResp, err error)
 }

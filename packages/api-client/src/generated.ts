@@ -98,6 +98,75 @@ export interface CaravanOfferDTO {
   canTrade: boolean;
 }
 
+export interface CosmeticSpecDTO {
+  itemKey: string;
+  name: string;
+  slot: string;
+  rarity: string;
+  seasonTag: string;
+  visualEffect: string;
+  ownedCount: number;
+  equipped: boolean;
+}
+
+export interface EquippedCosmeticsDTO {
+  headgear: string;
+  mantle: string;
+  heldRelic: string;
+  companion: string;
+}
+
+export interface RaidGearSpecDTO {
+  itemKey: string;
+  name: string;
+  category: string;
+  tier: number;
+  blueprintKey: string;
+  blueprintName: string;
+  blueprintOwnedCount: number;
+  recipeUnlocked: boolean;
+  ownedCount: number;
+  equipped: boolean;
+  statSummary: string;
+  atkBonus: number;
+  hpBonus: number;
+  defBonus: number;
+  moveCooldownMs: number;
+  safeSlots: number;
+  costs: CostItemDTO[];
+  canCraft: boolean;
+}
+
+export interface RaidBuffCardDTO {
+  cardCode: string;
+  name: string;
+  category: string;
+  rarity: string;
+  effectSummary: string;
+  costs: CostItemDTO[];
+  canBuy: boolean;
+}
+
+export interface RaidLoadoutStateDTO {
+  weaponKey: string;
+  armorKey: string;
+  bootsKey: string;
+  safeBoxKey: string;
+  safeSlotCount: number;
+  equippedPotions: string[];
+  equippedBuffCards: RaidBuffCardDTO[];
+  draftPoolCards: RaidBuffCardDTO[];
+  rerollCosts: CostItemDTO[];
+  canReroll: boolean;
+  totalMaxHp: number;
+  totalAtk: number;
+  totalDef: number;
+  moveCooldownMs: number;
+  raidDurationSeconds: number;
+  backpackCapacity: number;
+  activeRaidSeed: number;
+}
+
 export interface ProfessionSpecDTO {
   code: string;
   name: string;
@@ -355,6 +424,10 @@ export interface DashboardStateResp {
   activeExpedition?: ActiveExpeditionDTO;
   caravanOffers: CaravanOfferDTO[];
   hydrationWarning: boolean;
+  equippedCosmetics: EquippedCosmeticsDTO;
+  cosmetics: CosmeticSpecDTO[];
+  raidGears: RaidGearSpecDTO[];
+  raidLoadout: RaidLoadoutStateDTO;
 }
 
 export type GetDashboardReq = Record<string, never>;
@@ -420,6 +493,38 @@ export type ClaimExpeditionReq = Record<string, never>;
 
 export interface TradeCaravanReq {
   offerCode: string;
+}
+
+export interface EquipCosmeticReq {
+  slot: string;
+  itemKey: string;
+}
+
+export interface LearnRaidBlueprintReq {
+  blueprintKey: string;
+}
+
+export interface ManageRaidGearReq {
+  action: string;
+  itemKey: string;
+}
+
+export interface DraftRaidBuffReq {
+  action: string;
+  cardCode?: string;
+  replaceSlot?: number;
+}
+
+export type StartRaidReq = Record<string, never>;
+
+export interface FinishRaidReq {
+  status: string;
+  backpackLootKeys?: string[];
+  safeBoxLootKeys?: string[];
+  usedPotionKeys?: string[];
+  zonesVisited?: number;
+  chestsOpened?: number;
+  bossesKilled?: number;
 }
 
 export interface ChooseProfessionReq {
@@ -754,6 +859,60 @@ export const IDL_ROUTES = {
     path: "/api/v1/empire/colony/caravan/trade",
     clientPath: "/empire/colony/caravan/trade",
     requestType: "TradeCaravanReq",
+    responseType: "DashboardStateResp",
+  },
+  EquipCosmetic: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/cosmetic/equip",
+    clientPath: "/empire/colony/cosmetic/equip",
+    requestType: "EquipCosmeticReq",
+    responseType: "DashboardStateResp",
+  },
+  LearnRaidBlueprint: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/raid/learn-blueprint",
+    clientPath: "/empire/colony/raid/learn-blueprint",
+    requestType: "LearnRaidBlueprintReq",
+    responseType: "DashboardStateResp",
+  },
+  ManageRaidGear: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/raid/gear",
+    clientPath: "/empire/colony/raid/gear",
+    requestType: "ManageRaidGearReq",
+    responseType: "DashboardStateResp",
+  },
+  DraftRaidBuff: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/raid/buff",
+    clientPath: "/empire/colony/raid/buff",
+    requestType: "DraftRaidBuffReq",
+    responseType: "DashboardStateResp",
+  },
+  StartRaid: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/raid/start",
+    clientPath: "/empire/colony/raid/start",
+    requestType: "StartRaidReq",
+    responseType: "DashboardStateResp",
+  },
+  FinishRaid: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/raid/finish",
+    clientPath: "/empire/colony/raid/finish",
+    requestType: "FinishRaidReq",
     responseType: "DashboardStateResp",
   },
 } as const;

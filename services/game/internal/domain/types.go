@@ -30,6 +30,7 @@ const (
 	ResStone         = "stone"
 	ResFlint         = "flint"
 	ResAncientShard  = "ancient_shard"
+	ResMeteorOre     = "meteor_ore"
 	ResIronIngot     = "iron_ingot"
 	ResRation        = "ration"
 	ResAutoPump      = "auto_pump"
@@ -40,6 +41,32 @@ const (
 	ResArcherKit     = "archer_kit"
 	ResCavalryKit    = "cavalry_kit"
 	ResSeasonChest   = "season_chest"
+
+	// Single-use tradable Raid Blueprints (found in 2D Raid, consumed to unlock seasonal crafting or traded on Market).
+	ResBPCrossbow       = "bp_crossbow"
+	ResBPTitanHammer    = "bp_titan_hammer"
+	ResBPCarapaceArmor  = "bp_carapace_armor"
+	ResBPHydroArmor     = "bp_hydro_armor"
+	ResBPSpringBoots    = "bp_spring_boots"
+	ResBPHermesBoots    = "bp_hermes_boots"
+	ResBPCipherSafe     = "bp_cipher_safe"
+	ResBPAetherSafe     = "bp_aether_safe"
+	ResBPScavengeElixir = "bp_scavenge_elixir"
+	ResBPBerserkElixir  = "bp_berserk_elixir"
+
+	// Season-Limited Animated Avatar Cosmetics (tradable on Market & equippable on Lord Avatar + 2D Map token).
+	ResCosGoggles       = "cos_goggles"
+	ResCosSteamCrown    = "cos_steam_crown"
+	ResCosObsidianCrown = "cos_obsidian_crown"
+	ResCosSandCloak     = "cos_sand_cloak"
+	ResCosHydroWings    = "cos_hydro_wings"
+	ResCosAstralWings   = "cos_astral_wings"
+	ResCosCompass       = "cos_compass"
+	ResCosAlchLantern   = "cos_alch_lantern"
+	ResCosThunderStaff  = "cos_thunder_staff"
+	ResCosWoodFrog      = "cos_wood_frog"
+	ResCosMechOwl       = "cos_mech_owl"
+	ResCosAetherDrake   = "cos_aether_drake"
 )
 
 // Worker job keys.
@@ -187,6 +214,57 @@ type CaravanOfferSpec struct {
 	RewardSummary string
 }
 
+type CosmeticSpec struct {
+	ItemKey      string
+	Name         string
+	Slot         string // "headgear", "mantle", "held_relic", "companion"
+	Rarity       string // "RARE", "EPIC", "LEGENDARY"
+	SeasonTag    string
+	VisualEffect string
+}
+
+type RaidGearSpec struct {
+	ItemKey        string
+	Name           string
+	Category       string // "weapon", "armor", "boots", "safe_box", "potion"
+	Tier           int32  // 1 (direct buy/craft), 2 (single-use blueprint), 3 (abyssal blueprint)
+	BlueprintKey   string // "" for Tier 1
+	BlueprintName  string
+	StatSummary    string
+	AtkBonus       int32
+	HpBonus        int32
+	DefBonus       int32
+	MoveCooldownMs int32
+	SafeSlots      int32
+	CostsMilli     map[string]int64
+}
+
+type RaidBuffCardSpec struct {
+	CardCode      string
+	Name          string
+	Category      string // "time", "vision", "scavenge", "offense", "defense", "tactical"
+	Rarity        string // "COMMON", "RARE", "EPIC"
+	EffectSummary string
+	CostsMilli    map[string]int64
+	DurationBonus int32
+	HpBonus       int32
+	AtkBonus      int32
+	DefBonus      int32
+	MoveSpeedPct  int32
+	BagBonus      int32
+}
+
+type RaidLoadoutState struct {
+	WeaponKey         string   `json:"weaponKey"`
+	ArmorKey          string   `json:"armorKey"`
+	BootsKey          string   `json:"bootsKey"`
+	SafeBoxKey        string   `json:"safeBoxKey"`
+	EquippedPotions   []string `json:"equippedPotions"`
+	EquippedBuffCards []string `json:"equippedBuffCards"`
+	DraftPoolCards    []string `json:"draftPoolCards"`
+	ActiveRaidSeed    int64    `json:"activeRaidSeed"`
+}
+
 type AllocationPreset struct {
 	Name        string           `json:"name"`
 	Allocations map[string]int32 `json:"allocations"`
@@ -249,6 +327,10 @@ type PlayerState struct {
 	ActiveEdicts            map[string]bool        `json:"activeEdicts"`
 	ActiveExpedition        *ActiveExpeditionState `json:"activeExpedition,omitempty"`
 	HydrationWarning        bool                   `json:"hydrationWarning"`
+	EquippedCosmetics       map[string]string      `json:"equippedCosmetics"`
+	LearnedRaidBlueprints   map[string]bool        `json:"learnedRaidBlueprints"`
+	RaidGearInventory       map[string]int32       `json:"raidGearInventory"`
+	RaidLoadout             RaidLoadoutState       `json:"raidLoadout"`
 	InstalledEquipments     map[string]int32       `json:"installedEquipments"`
 	Presets                 []AllocationPreset `json:"presets"`
 	GoldBasis               int64              `json:"goldBasis"`

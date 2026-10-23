@@ -60,9 +60,15 @@ const (
 	PatternDispatchExpedition = "POST /api/v1/empire/colony/expedition/dispatch"
 	PatternClaimExpedition = "POST /api/v1/empire/colony/expedition/claim"
 	PatternTradeCaravan = "POST /api/v1/empire/colony/caravan/trade"
+	PatternEquipCosmetic = "POST /api/v1/empire/colony/cosmetic/equip"
+	PatternLearnRaidBlueprint = "POST /api/v1/empire/colony/raid/learn-blueprint"
+	PatternManageRaidGear = "POST /api/v1/empire/colony/raid/gear"
+	PatternDraftRaidBuff = "POST /api/v1/empire/colony/raid/buff"
+	PatternStartRaid = "POST /api/v1/empire/colony/raid/start"
+	PatternFinishRaid = "POST /api/v1/empire/colony/raid/finish"
 )
 
-// EmpireServiceRoutes lists all 28 route specifications declared on EmpireService.
+// EmpireServiceRoutes lists all 34 route specifications declared on EmpireService.
 var EmpireServiceRoutes = []RouteSpec{
 	{Name: "GetDashboard", Method: "GET", Path: "/api/v1/empire/state", MuxPattern: PatternGetDashboard, RequestType: "GetDashboardReq", ResponseType: "DashboardStateResp"},
 	{Name: "RegisterAccount", Method: "POST", Path: "/api/v1/empire/auth/register", MuxPattern: PatternRegisterAccount, RequestType: "RegisterAccountReq", ResponseType: "DashboardStateResp"},
@@ -92,6 +98,12 @@ var EmpireServiceRoutes = []RouteSpec{
 	{Name: "DispatchExpedition", Method: "POST", Path: "/api/v1/empire/colony/expedition/dispatch", MuxPattern: PatternDispatchExpedition, RequestType: "DispatchExpeditionReq", ResponseType: "DashboardStateResp"},
 	{Name: "ClaimExpedition", Method: "POST", Path: "/api/v1/empire/colony/expedition/claim", MuxPattern: PatternClaimExpedition, RequestType: "ClaimExpeditionReq", ResponseType: "DashboardStateResp"},
 	{Name: "TradeCaravan", Method: "POST", Path: "/api/v1/empire/colony/caravan/trade", MuxPattern: PatternTradeCaravan, RequestType: "TradeCaravanReq", ResponseType: "DashboardStateResp"},
+	{Name: "EquipCosmetic", Method: "POST", Path: "/api/v1/empire/colony/cosmetic/equip", MuxPattern: PatternEquipCosmetic, RequestType: "EquipCosmeticReq", ResponseType: "DashboardStateResp"},
+	{Name: "LearnRaidBlueprint", Method: "POST", Path: "/api/v1/empire/colony/raid/learn-blueprint", MuxPattern: PatternLearnRaidBlueprint, RequestType: "LearnRaidBlueprintReq", ResponseType: "DashboardStateResp"},
+	{Name: "ManageRaidGear", Method: "POST", Path: "/api/v1/empire/colony/raid/gear", MuxPattern: PatternManageRaidGear, RequestType: "ManageRaidGearReq", ResponseType: "DashboardStateResp"},
+	{Name: "DraftRaidBuff", Method: "POST", Path: "/api/v1/empire/colony/raid/buff", MuxPattern: PatternDraftRaidBuff, RequestType: "DraftRaidBuffReq", ResponseType: "DashboardStateResp"},
+	{Name: "StartRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/start", MuxPattern: PatternStartRaid, RequestType: "StartRaidReq", ResponseType: "DashboardStateResp"},
+	{Name: "FinishRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/finish", MuxPattern: PatternFinishRaid, RequestType: "FinishRaidReq", ResponseType: "DashboardStateResp"},
 }
 
 // EmpireServiceRouteHandlers binds every endpoint in EmpireService to an http.HandlerFunc.
@@ -124,6 +136,12 @@ type EmpireServiceRouteHandlers struct {
 	DispatchExpedition http.HandlerFunc
 	ClaimExpedition http.HandlerFunc
 	TradeCaravan http.HandlerFunc
+	EquipCosmetic http.HandlerFunc
+	LearnRaidBlueprint http.HandlerFunc
+	ManageRaidGear http.HandlerFunc
+	DraftRaidBuff http.HandlerFunc
+	StartRaid http.HandlerFunc
+	FinishRaid http.HandlerFunc
 }
 
 // RegisterEmpireServiceRoutes registers all EmpireService endpoints on mux and panics if any IDL endpoint handler is nil.
@@ -240,6 +258,30 @@ func RegisterEmpireServiceRoutes(mux *http.ServeMux, h EmpireServiceRouteHandler
 		panic("EmpireServiceRouteHandlers.TradeCaravan (" + PatternTradeCaravan + ") is nil")
 	}
 	mux.HandleFunc(PatternTradeCaravan, h.TradeCaravan)
+	if h.EquipCosmetic == nil {
+		panic("EmpireServiceRouteHandlers.EquipCosmetic (" + PatternEquipCosmetic + ") is nil")
+	}
+	mux.HandleFunc(PatternEquipCosmetic, h.EquipCosmetic)
+	if h.LearnRaidBlueprint == nil {
+		panic("EmpireServiceRouteHandlers.LearnRaidBlueprint (" + PatternLearnRaidBlueprint + ") is nil")
+	}
+	mux.HandleFunc(PatternLearnRaidBlueprint, h.LearnRaidBlueprint)
+	if h.ManageRaidGear == nil {
+		panic("EmpireServiceRouteHandlers.ManageRaidGear (" + PatternManageRaidGear + ") is nil")
+	}
+	mux.HandleFunc(PatternManageRaidGear, h.ManageRaidGear)
+	if h.DraftRaidBuff == nil {
+		panic("EmpireServiceRouteHandlers.DraftRaidBuff (" + PatternDraftRaidBuff + ") is nil")
+	}
+	mux.HandleFunc(PatternDraftRaidBuff, h.DraftRaidBuff)
+	if h.StartRaid == nil {
+		panic("EmpireServiceRouteHandlers.StartRaid (" + PatternStartRaid + ") is nil")
+	}
+	mux.HandleFunc(PatternStartRaid, h.StartRaid)
+	if h.FinishRaid == nil {
+		panic("EmpireServiceRouteHandlers.FinishRaid (" + PatternFinishRaid + ") is nil")
+	}
+	mux.HandleFunc(PatternFinishRaid, h.FinishRaid)
 }
 
 // RegisterEmpireServer binds EmpireServer methods using HTTPResponder with optional per-route handler overrides.
@@ -750,6 +792,116 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			fn = mw.WrapRoute(RouteSpec{Name: "TradeCaravan", Method: "POST", Path: "/api/v1/empire/colony/caravan/trade", MuxPattern: PatternTradeCaravan, RequestType: "TradeCaravanReq", ResponseType: "DashboardStateResp"}, fn)
 		}
 		h.TradeCaravan = fn
+	}
+	if h.EquipCosmetic == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req EquipCosmeticReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.EquipCosmetic(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "EquipCosmetic", Method: "POST", Path: "/api/v1/empire/colony/cosmetic/equip", MuxPattern: PatternEquipCosmetic, RequestType: "EquipCosmeticReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.EquipCosmetic = fn
+	}
+	if h.LearnRaidBlueprint == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req LearnRaidBlueprintReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.LearnRaidBlueprint(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "LearnRaidBlueprint", Method: "POST", Path: "/api/v1/empire/colony/raid/learn-blueprint", MuxPattern: PatternLearnRaidBlueprint, RequestType: "LearnRaidBlueprintReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.LearnRaidBlueprint = fn
+	}
+	if h.ManageRaidGear == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req ManageRaidGearReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.ManageRaidGear(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "ManageRaidGear", Method: "POST", Path: "/api/v1/empire/colony/raid/gear", MuxPattern: PatternManageRaidGear, RequestType: "ManageRaidGearReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.ManageRaidGear = fn
+	}
+	if h.DraftRaidBuff == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req DraftRaidBuffReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.DraftRaidBuff(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "DraftRaidBuff", Method: "POST", Path: "/api/v1/empire/colony/raid/buff", MuxPattern: PatternDraftRaidBuff, RequestType: "DraftRaidBuffReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.DraftRaidBuff = fn
+	}
+	if h.StartRaid == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req StartRaidReq
+			resp, err := srv.StartRaid(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "StartRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/start", MuxPattern: PatternStartRaid, RequestType: "StartRaidReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.StartRaid = fn
+	}
+	if h.FinishRaid == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req FinishRaidReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.FinishRaid(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "FinishRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/finish", MuxPattern: PatternFinishRaid, RequestType: "FinishRaidReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.FinishRaid = fn
 	}
 	RegisterEmpireServiceRoutes(mux, h)
 }

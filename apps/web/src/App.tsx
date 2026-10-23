@@ -41,6 +41,11 @@ import {
 } from "./format";
 import { ProceduralRelicSVG } from "./ProceduralRelicSVG";
 import { WarGraphMapSVG } from "./WarGraphMapSVG";
+import { LordAvatarSVG } from "./LordAvatarSVG";
+import {
+  LordProfileWardrobeBar,
+  WastelandRaidPanel,
+} from "./WastelandRaidPanel";
 
 type BottomTab = "craft" | "market" | "war" | "collectibles" | "chronicle";
 type AuthMode = "login" | "register";
@@ -1160,6 +1165,13 @@ export function App() {
       <header className="topbar">
         <div className="brand-cluster">
           <div className="brand-emblem">D2E</div>
+          <LordAvatarSVG
+            cosmetics={state.equippedCosmetics}
+            weaponKey={state.raidLoadout?.weaponKey}
+            armorKey={state.raidLoadout?.armorKey}
+            bootsKey={state.raidLoadout?.bootsKey}
+            size="mini"
+          />
           <div className="brand-titles">
             <div className="brand-main">
               <span>滴水成城</span>
@@ -1264,6 +1276,9 @@ export function App() {
           {storyChapter.text}
         </span>
       </section>
+
+      {/* Always-visible Animated Lord Profile & S1 Wardrobe Bar */}
+      <LordProfileWardrobeBar state={state} busy={busy} runAction={runAction} />
 
       {/* Profession Selection Gate */}
       {showProfessionChoice && (
@@ -1806,95 +1821,13 @@ export function App() {
         </section>
       </main>
 
-      {/* Wasteland Expeditions & Caravan Barter: ONLY rendered after Scout Camp unlocks */}
+      {/* Wasteland Multi-Zone Portal Extraction Roguelite & Caravan Barter: ONLY rendered after Scout Camp unlocks */}
       {scoutCampUnlocked && (
         <section
           className="dashboard-grid dashboard-grid-2col"
           aria-label="荒原探索与游商驿站"
         >
-          <section className="panel" aria-label="荒原斥候营">
-            <div className="panel-header">
-              <div className="panel-title">
-                <Compass size={ICON.sm} />
-                <h2>荒原斥候营</h2>
-              </div>
-              <span className="tag-badge mono-num">
-                {state.activeExpedition
-                  ? state.activeExpedition.completed
-                    ? "可收获"
-                    : `探索中 ${state.activeExpedition.remainingSeconds}s`
-                  : "斥候待命"}
-              </span>
-            </div>
-
-            {state.activeExpedition && (
-              <div className="recruit-card">
-                <div className="recruit-meta">
-                  <div className="recruit-head">
-                    <strong>{state.activeExpedition.routeName}</strong>
-                    <span className="tag-badge mono-num">
-                      {state.activeExpedition.completed
-                        ? "已归营"
-                        : `${state.activeExpedition.remainingSeconds}s / ${state.activeExpedition.totalSeconds}s`}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={!state.activeExpedition.completed || busy}
-                  onClick={() => void runAction(() => api.claimExpedition())}
-                >
-                  {state.activeExpedition.completed ? "领取收获" : "勘探中..."}
-                </button>
-              </div>
-            )}
-
-            <div className="blueprint-list">
-              {(state.expeditionRoutes ?? []).map((rt) => (
-                <article
-                  key={rt.routeCode}
-                  className={`bp-card ${rt.canDispatch ? "bp-ready" : ""}`}
-                >
-                  <div className="bp-top">
-                    <strong>{rt.name}</strong>
-                    <span className="tag-badge mono-num">
-                      {rt.durationSeconds}s
-                    </span>
-                  </div>
-                  <p className="bp-desc">{rt.rewardSummary}</p>
-                  <div className="bp-footer">
-                    <div className="bp-costs">
-                      {rt.costs.map((c) => {
-                        const ok = c.currentMilli >= c.requiredMilli;
-                        return (
-                          <span
-                            key={c.resourceKey}
-                            className={`cost-chip mono-num ${ok ? "cost-ok" : "cost-lack"}`}
-                          >
-                            {c.resourceName} {formatResource(c.currentMilli, 0)}
-                            /{formatResource(c.requiredMilli, 0)}
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn-primary btn-sm"
-                      disabled={!rt.canDispatch || busy}
-                      onClick={() =>
-                        void runAction(() =>
-                          api.dispatchExpedition({ routeCode: rt.routeCode }),
-                        )
-                      }
-                    >
-                      派遣
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
+          <WastelandRaidPanel state={state} busy={busy} runAction={runAction} />
 
           <section className="panel" aria-label="游商驿站">
             <div className="panel-header">

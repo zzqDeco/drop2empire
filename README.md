@@ -1,51 +1,125 @@
-# 滴水成城 · Drop to Empire (D2E)
+# Drop to Empire (滴水成城 · D2E)
 
-> **从手动打出第一滴水，到管理人口与生产、选择专属职业、参与全球玩家现货市场，最终投入每晚 20:00 结算的商会城池战争，争夺唯一序列号与随机 UV 采样的程序化赛季藏品。**
+**Drop to Empire (滴水成城)** is an authoritative web strategy and economic simulation game that evolves from a minimalist single-button water-gathering prologue into a coupled multi-resource settlement builder, a 2D multi-zone portal extraction roguelite, a global central limit order book (CLOB) spot market, and a daily 20:00 chamber territory war.
 
-本项目为《滴水成城》（[`docs/gdd-v1.md`](docs/gdd-v1.md) & [`docs/gdd-v2-economy-and-systems.md`](docs/gdd-v2-economy-and-systems.md)）全栈 Web 实现，采用与 `teamie` 一致的契约先行（Thrift IDL 代码生成）、Go Hertz + PostgreSQL 4 层六边形 Clean DDD 架构，以及 **Blueprint & Ink（纸墨工程制图风 + 严格等宽数字 + Token 自动化门禁）** 前端体系。
-
----
-
-## 核心特性（覆盖 GDD M1 + M2 + M3 全闭环）
-
-1. **M1 · 第一阶段：0–30 分钟文明起点与宝藏三部件**
-   - **信息渐进披露**：第 0 秒仅展示「手动打水」与水源读数；累计 10 滴水开放居民招募（首位居民自动上岗打水 `+2.00/s`）；随人口解锁「斧头蓝图」「木制引水轮」「采石技术」「石刃联动锯台」「基础工坊」。
-   - **消除第 9–30 分钟挂机空窗期**：在工坊至「神秘的宝藏」之间引入「导水阀芯」「承压木框」「铭文石板」三件套制造目标，每 3–5 分钟提供一次显著的产能倍率正反馈。
-   - **内置 30 分钟数值模拟器**：一键对比 GDD 4.4 原始基准策略（`29:51`）与 V1 三部件均衡策略、激进动态调仓策略的各节点达成时间。
-2. **M2 · 第二阶段：四职业终身抉择、跨职业设备槽与全球现货交易所**
-   - **四职业分工**：**科学家**（自动抽水机）、**炼金术士**（赫尔墨斯催化剂）、**魔法师**（星界附魔卷轴）、**工匠**（泰坦精锻工具组）。
-   - **跨职业工坊插槽**：玩家无法直接制造其他职业的独占制品，但可在交易所向对应职业采购并加装至自身工坊插槽以叠加单人效率。
-   - **现货限价订单簿与宏观货币恒等式**：支持 `BID / ASK` 限价挂单、资产冻结与撤单、价格-时间优先原子撮合、`1.00%` 交易税（`0.50%` 永久销毁 + `0.50%` 归入中央公共财政），实时校验 `M_已发行 = M_玩家持有 + M_订单冻结 + M_做市储备 + M_公共财政`。
-3. **M3 · 第三阶段：七日商会图结构战争与 CS 式程序化外观收藏品**
-   - **图结构补给线与三兵种克制**：8 节点 10 边拓扑地图（曜石大本营 ↔ 西境前哨 ↔ 北侧据点 / 南侧渡口 ↔ 中央宝藏城 ★ ↔ 东境前哨 ↔ 白银大本营），严格校验补给线连通性、每日个人 100 点军备预算上限、城池统一 `+25%` 防御加成、步/弓/骑加权克制矩阵（`1.15x / 1.00x / 0.90x`）与胜方 `20%` / 败方 `40%` 军备战损。
-   - **程序化赛季藏品**：使用战争获得的活动点数兑换「S1·墨械典藏宝箱」，开箱按 `pattern_seed`、`uv_offset_x/y`、`uv_scale`、`uv_rotation`、`palette_id` 与稀有度（60/28/10/2%）铸造具有全球唯一 `item_id` 的工程蚀刻风格藏品。
+Built with the same engineering discipline as `teamie`, `drop2empire` enforces **Contract-First Thrift IDL code generation**, a **4-Layer Hexagonal Clean DDD** Go backend (`services/game`), **fixed-point monetary accounting**, **SSH-tunneled admin plane isolation**, and the **Blueprint & Ink** frontend design system (`apps/web`).
 
 ---
 
-## 仓库结构
+## Architecture Overview
 
-| 路径 | 说明 |
+```mermaid
+flowchart LR
+  Player["Player Browser (/)"] -->|HTTPS :8443| CaddyPub["Caddy Public Edge (:8443)"]
+  Admin["Operator SSH Tunnel (/admin)"] -->|Loopback 127.0.0.1:18480| CaddyAdm["Caddy Admin Edge (:18480)"]
+
+  CaddyPub -->|Static SPA| Web["React 19 Web Dist"]
+  CaddyPub -->|/api/v1/empire/* (Blocks /admin/* -> 403)| Game["Game Service · Hertz (:8080)"]
+  CaddyAdm -->|X-D2E-Admin-Tunnel: 1| Game
+
+  Game -->|Transactional JSONB + Advisory Locks| PG[("PostgreSQL 17")]
+```
+
+### Core Engineering Principles
+
+1. **Physical Admin Plane Isolation & Invitation-Only Onboarding**:
+   - Public registration is strictly invitation-only (`D2E-XXXX-XXXX` single-use codes or `D2E_BOOTSTRAP_INVITE_CODE` for the first account).
+   - The public HTTPS edge (`:8443`) rejects all `/admin*` and `/api/v1/empire/admin/*` traffic with `HTTP 403`. The operator console (`/admin`) is bound exclusively to host loopback (`127.0.0.1:18480`) and accessed via SSH local port forwarding (`ssh -L 18480:127.0.0.1:18480`).
+2. **4-Layer Hexagonal Clean DDD**:
+   - `services/game/internal` is partitioned into `domain` (Go standard library only), `app` (use-case & transaction orchestration), `adapter/http` (generated Hertz route bindings), and `infra/pg` (PostgreSQL persistence), guarded by AST-level architecture tests (`internal/arch_test.go`).
+3. **Unified Thrift IDL Pipeline**:
+   - [`contracts/game/http_empire.thrift`](contracts/game/http_empire.thrift) is the single source of truth for all HTTP DTOs and routes. Running `make gen` (`./ops/codegen.sh`) deterministically generates Go Hertz route binders (`contracts/gen/game`) and the TypeScript client SDK (`packages/api-client/src/generated.ts`).
+4. **Authoritative Fixed-Point Accounting & Economic Isolation**:
+   - Resources use integer `Milli` units (`1.000 = 1,000`) and currency uses integer `Basis` units (`1.0000 Gold = 10,000`), preserving the global Monetary Supply Identity ($M_{\text{issued}} = M_{\text{player}} + M_{\text{escrow}} + M_{\text{npc}} + M_{\text{treasury}}$).
+   - The 2D Wasteland Extraction Roguelite is strictly isolated from settlement production: it consumes settlement resources and yields only non-producible tactical consumables, single-use tradable blueprints (`bp_*`), and ultra-low-drop-rate tradable seasonal cosmetics (`cos_*`).
+5. **Blueprint & Ink Design System & Zero-Spoiler Progressive Disclosure**:
+   - Design tokens (`apps/web/src/tokens.css`) and tabular monospace numerals (`.mono-num`) are enforced by automated tests (`design-tokens.test.ts`).
+   - The opening stage (`Population == 0`) anchors the `[打水]` button in a fixed 3-slot grid so it never shifts or teleports, progressively unfolding settlement, wasteland raid, market, and war panels as milestones are unlocked.
+
+---
+
+## Product & Gameplay Capabilities
+
+### 1. Coupled Settlement Production, Storage Siphon & Colony Edicts (Micro)
+- **8-Resource Supply Chain & Procs**: Water (`💧`), Wood (`🪵`), Charcoal (`🔥` converted from Wood), Stone (`🪨`), Flint (`✨` deterministic proc from manual water clicks, logging, and quarrying), Ancient Shards (`🏺`), Iron Ingots (`⚙️` smelted from Stone + Charcoal), and Rations (`🍞`).
+- **Upkeep, Storage Caps & 10:1 Overflow Siphon**: Residents consume `0.18 Water/s` (`-50%` non-water job efficiency if dehydrated). Unlocking **Siphon Sluice (`虹吸冲矿槽`)** automatically converts overflowing water at full storage into Stone (`10:1`) and Flint (`80:1`).
+- **Real-Time Edicts & Caravan Barter**: Toggle **Night Shift (`篝火夜班令`)**, **Water Rationing (`节水配给制`)**, **Hydro Hammer (`水压联动水锤`)**, and trade surplus resources for refugees or relic caches at the **Caravan Post (`游商驿站`)**.
+
+### 2. Wasteland 2D Multi-Zone Portal Extraction Roguelite (Micro & Seasonal)
+- **4 Portal-Connected Biome Zones**: Each raid generates 4 distinct 2D grids (`外围·沙暴荒原 11×7`, `北境·断崖古矿坑 9×9`, `南境·枯木迷林 10×8`, `核心·沉没黑曜圣殿 8×8`) linked by interactive **Rift Portals (`🌀`)** with Fog of War.
+- **Real-Time Sandstorm Countdown, Movement Rate Limits & Tiered Chest Channeling**:
+  - Real-time countdown (`180s+`), movement cooldown rate limit (`360ms/格` base, accelerated down to `95~155ms/格` by equipping Boots, Potions, and Buff Cards), and 5-tier channeling progress bars (`破旧木箱 1.2s`, `铁皮军需箱 2.4s`, `远古机关石棺 4.0s`, `深渊黑曜秘宝库 6.2s`, `呼叫撤离信标 3.0s`).
+- **Out-of-Raid Armory, Seasonal Safebox (`1→5 Slots`) & Single-Use Tradable Blueprints (`bp_*`)**:
+  - T1 gear is crafted directly from settlement resources; T2/T3 Weapons, Armor, Boots, Potions, and Safeboxes require **single-use blueprints (`bp_*`)** looted in raids or bought on the Spot Market.
+  - Learning a blueprint **destroys the blueprint item (`-1`)** and permanently unlocks crafting that gear for the current season. On raid death or timeout (`MIA`), worn gear and regular backpack loot are lost, while items placed inside the **Seasonal Safebox (`1→5 slots`)** are 100% preserved.
+- **54 Pre-Departure Buff Cards**: 3-pick-1 draft with resource rerolls (max 4 carried) across 6 tactical categories (`time`, `vision`, `scavenge`, `offense`, `defense`, `tactical`), with zero guaranteed-cosmetic-drop cards.
+
+### 3. Always-On Animated Lord Avatar (`LordAvatarSVG`) & S1 Cosmetics
+- **12 Tradable S1 Animated Cosmetics (`cos_*`)**: Headgear, Mantle, Held Relic, and Floating Companion slots with strict low natural drop rates (`0.22%~0.85%` for Legendary items in Abyssal Vaults).
+- **Dual Real-Time Projection**: Your equipped animated cartoon character renders both in the **always-visible Lord Profile & Wardrobe Bar** under the story banner AND **directly as your moving player token on the 2D Wasteland Raid grid**.
+
+### 4. Four Professions, CLOB Spot Market & 20:00 Chamber Territory War (Macro)
+- **4 Interlocked Professions**: Scientist (`自动抽水机`), Alchemist (`赫尔墨斯催化剂`), Mage (`星界附魔卷轴`), and Artisan (`泰坦精锻工具组`).
+- **Price-Time Priority CLOB Market**: Trade resources, cross-profession devices, war gear, unlearned raid blueprints (`bp_*`), and S1 animated cosmetics (`cos_*`) with `1.00%` transaction tax (`0.50%` burned + `0.50%` to imperial treasury).
+- **8-Node Chamber Territory War**: Obsidian vs. Argent 7-day war across an 8-node supply-line graph with Infantry/Archer/Cavalry counter-matrix (`1.15x / 0.90x`), daily 20:00 authoritative resolution, treasury gold stipends, and unique UV-etched procedural collectibles (`ProceduralRelicSVG`).
+
+---
+
+## Repository Structure
+
+| Path | Description |
 | :--- | :--- |
-| [`contracts/`](contracts) | 统一 Thrift IDL (`contracts/game/http_empire.thrift`) 与自动生成的 Go 契约模块 (`contracts/gen/game`) |
-| [`pkg/`](pkg) | 共享 Go 基础技术机制 (`postgres`, `httpx`, `observability`) |
-| [`services/game/`](services/game) | 4 层 Clean DDD 游戏权威服务 (`cmd/`, `internal/{domain,app,adapter,infra}` + `arch_test.go`) |
-| [`packages/api-client/`](packages/api-client) | Thrift 自动生成的 TypeScript SDK 与 `EmpireClient` |
-| [`apps/web/`](apps/web) | React 19 / TypeScript / Vite 单屏 Dashboard 应用（含 `tokens.css` 与 `design-tokens.test.ts`） |
-| [`tools/`](tools) | 确定性 Thrift-to-Go HTTP 路由生成器与 Thrift-to-TS SDK 生成器 |
-| [`ops/`](ops) | 代码生成 (`codegen.sh`) 与 Clean DDD 架构门禁 (`check-architecture.sh`) |
+| [`contracts/`](contracts) | Canonical Thrift IDL (`game/http_empire.thrift`) and generated Go Hertz route module (`gen/game`) |
+| [`pkg/`](pkg) | Shared Go technical packages (`postgres`, `httpx`, `observability`) |
+| [`services/game/`](services/game) | 4-layer Clean DDD authoritative game service (`cmd/`, `internal/{domain,app,adapter,infra}`, `arch_test.go`) |
+| [`packages/api-client/`](packages/api-client) | Typed browser HTTP client and Thrift-generated DTOs/routes (`src/generated.ts`) |
+| [`apps/web/`](apps/web) | React 19 / TypeScript / Vite application (`App.tsx`, `WastelandRaidPanel.tsx`, `LordAvatarSVG.tsx`, `tokens.css`) |
+| [`tools/`](tools) | Deterministic Thrift-to-Go HTTP router generator and Thrift-to-TypeScript SDK generator |
+| [`deploy/`](deploy) | Production Docker Compose (`docker-compose.prod.yml`), dual-listener `Caddyfile`, and multi-stage Dockerfiles |
+| [`ops/`](ops) | Code generation (`codegen.sh`), Clean DDD architecture check (`check-architecture.sh`), and Aliyun deployment (`deploy-aliyun.sh`) |
+| [`docs/`](docs) | Modular architecture, HTTP contract, and 4D game design documentation (`01-overall`, `02-macro`, `03-micro`, `04-seasons`) |
 
 ---
 
-## 快速启动与验证
+## Verification & Production Delivery
 
 ```sh
-# 1. 架构门禁与全量测试（Go 后端 + PostgreSQL + 前端 Lint/Vitest/Build）
+# 1. Regenerate Go & TypeScript bindings from Thrift IDL
+make gen
+
+# 2. Verify 4-layer Clean DDD boundaries and zero uncommitted codegen drift
 make check-arch
+
+# 3. Run full Go (-race + go vet) and Web (tsc + eslint + vitest + vite build) verification suite
 make test
 
-# 2. 启动后端权威服务（默认监听 127.0.0.1:8080，自动连接本地 PostgreSQL drop2empire 库）
-make dev-backend
-
-# 3. 启动前端开发服务器（默认监听 http://localhost:5180）
-make dev-web
+# 4. Deploy to production (Caddy :8443 public HTTPS + 127.0.0.1:18480 SSH loopback admin)
+make deploy
 ```
+
+---
+
+## Documentation Index
+
+- **Engineering & Governance**
+  - [Engineering Instructions & Invariants (`AGENTS.md`)](AGENTS.md)
+  - [Contributing & Architecture Guide (`CONTRIBUTING.md`)](CONTRIBUTING.md)
+  - [Documentation Master Index & 4D Taxonomy (`docs/README.md`)](docs/README.md)
+- **Architecture & Contracts**
+  - [System Overview & Plane Isolation (`docs/architecture/overview.md`)](docs/architecture/overview.md)
+  - [Unified Thrift IDL & 4-Layer Clean DDD (`docs/architecture/ddd-idl.md`)](docs/architecture/ddd-idl.md)
+  - [Empire HTTP API Contract (`docs/contracts/http-v1.md`)](docs/contracts/http-v1.md)
+- **01 · Overall Design (整体设计 — 跨赛季恒定愿景与生命周期)**
+  - [Core Vision, Pillars & Progressive Disclosure (`docs/design/01-overall/vision-and-pillars.md`)](docs/design/01-overall/vision-and-pillars.md)
+  - [Three-Phase Lifecycle & Core Loops (`docs/design/01-overall/lifecycle-and-loops.md`)](docs/design/01-overall/lifecycle-and-loops.md)
+- **02 · Macro Design (宏观设计 — 全服货币、市场、分工与领土战争)**
+  - [Macro Monetary Ledger & CLOB Market (`docs/design/02-macro/monetary-and-clob-market.md`)](docs/design/02-macro/monetary-and-clob-market.md)
+  - [Four-Profession Division & Economy Boundaries (`docs/design/02-macro/profession-and-economy-boundary.md`)](docs/design/02-macro/profession-and-economy-boundary.md)
+  - [Chamber Territory War & 20:00 Settlement (`docs/design/02-macro/chamber-war-macro.md`)](docs/design/02-macro/chamber-war-macro.md)
+- **03 · Micro Design (微观设计 — 单人聚落产线、2D 搜打撤肉鸽机制与动态形象)**
+  - [Settlement Production, Storage Siphon, Edicts & Caravan (`docs/design/03-micro/settlement-production-and-edicts.md`)](docs/design/03-micro/settlement-production-and-edicts.md)
+  - [Wasteland 2D Multi-Zone Portal Extraction Roguelite (`docs/design/03-micro/wasteland-2d-extraction-roguelite.md`)](docs/design/03-micro/wasteland-2d-extraction-roguelite.md)
+  - [Animated Lord Avatar & Procedural Relics (`docs/design/03-micro/avatar-and-procedural-relics.md`)](docs/design/03-micro/avatar-and-procedural-relics.md)
+- **04 · Seasonal Design (赛季设计 — 赛季重置法则与当季专属内容表)**
+  - [Seasonal Lifecycle & Reset/Retention Boundary (`docs/design/04-seasons/season-framework.md`)](docs/design/04-seasons/season-framework.md)
+  - [Season 1: Obsidian Awakening Catalog (`docs/design/04-seasons/s1-obsidian-awakening.md`)](docs/design/04-seasons/s1-obsidian-awakening.md)

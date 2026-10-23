@@ -98,6 +98,75 @@ struct CaravanOfferDTO {
   5: required bool canTrade (api.body="canTrade")
 }
 
+struct CosmeticSpecDTO {
+  1: required string itemKey (api.body="itemKey")
+  2: required string name (api.body="name")
+  3: required string slot (api.body="slot")
+  4: required string rarity (api.body="rarity")
+  5: required string seasonTag (api.body="seasonTag")
+  6: required string visualEffect (api.body="visualEffect")
+  7: required i32 ownedCount (api.body="ownedCount")
+  8: required bool equipped (api.body="equipped")
+}
+
+struct EquippedCosmeticsDTO {
+  1: required string headgear (api.body="headgear")
+  2: required string mantle (api.body="mantle")
+  3: required string heldRelic (api.body="heldRelic")
+  4: required string companion (api.body="companion")
+}
+
+struct RaidGearSpecDTO {
+  1: required string itemKey (api.body="itemKey")
+  2: required string name (api.body="name")
+  3: required string category (api.body="category")
+  4: required i32 tier (api.body="tier")
+  5: required string blueprintKey (api.body="blueprintKey")
+  6: required string blueprintName (api.body="blueprintName")
+  7: required i32 blueprintOwnedCount (api.body="blueprintOwnedCount")
+  8: required bool recipeUnlocked (api.body="recipeUnlocked")
+  9: required i32 ownedCount (api.body="ownedCount")
+  10: required bool equipped (api.body="equipped")
+  11: required string statSummary (api.body="statSummary")
+  12: required i32 atkBonus (api.body="atkBonus")
+  13: required i32 hpBonus (api.body="hpBonus")
+  14: required i32 defBonus (api.body="defBonus")
+  15: required i32 moveCooldownMs (api.body="moveCooldownMs")
+  16: required i32 safeSlots (api.body="safeSlots")
+  17: required list<CostItemDTO> costs (api.body="costs")
+  18: required bool canCraft (api.body="canCraft")
+}
+
+struct RaidBuffCardDTO {
+  1: required string cardCode (api.body="cardCode")
+  2: required string name (api.body="name")
+  3: required string category (api.body="category")
+  4: required string rarity (api.body="rarity")
+  5: required string effectSummary (api.body="effectSummary")
+  6: required list<CostItemDTO> costs (api.body="costs")
+  7: required bool canBuy (api.body="canBuy")
+}
+
+struct RaidLoadoutStateDTO {
+  1: required string weaponKey (api.body="weaponKey")
+  2: required string armorKey (api.body="armorKey")
+  3: required string bootsKey (api.body="bootsKey")
+  4: required string safeBoxKey (api.body="safeBoxKey")
+  5: required i32 safeSlotCount (api.body="safeSlotCount")
+  6: required list<string> equippedPotions (api.body="equippedPotions")
+  7: required list<RaidBuffCardDTO> equippedBuffCards (api.body="equippedBuffCards")
+  8: required list<RaidBuffCardDTO> draftPoolCards (api.body="draftPoolCards")
+  9: required list<CostItemDTO> rerollCosts (api.body="rerollCosts")
+  10: required bool canReroll (api.body="canReroll")
+  11: required i32 totalMaxHp (api.body="totalMaxHp")
+  12: required i32 totalAtk (api.body="totalAtk")
+  13: required i32 totalDef (api.body="totalDef")
+  14: required i32 moveCooldownMs (api.body="moveCooldownMs")
+  15: required i32 raidDurationSeconds (api.body="raidDurationSeconds")
+  16: required i32 backpackCapacity (api.body="backpackCapacity")
+  17: required i64 activeRaidSeed (api.body="activeRaidSeed")
+}
+
 struct ProfessionSpecDTO {
   1: required string code (api.body="code")
   2: required string name (api.body="name")
@@ -355,6 +424,10 @@ struct DashboardStateResp {
   24: optional ActiveExpeditionDTO activeExpedition (api.body="activeExpedition")
   25: required list<CaravanOfferDTO> caravanOffers (api.body="caravanOffers")
   26: required bool hydrationWarning (api.body="hydrationWarning")
+  27: required EquippedCosmeticsDTO equippedCosmetics (api.body="equippedCosmetics")
+  28: required list<CosmeticSpecDTO> cosmetics (api.body="cosmetics")
+  29: required list<RaidGearSpecDTO> raidGears (api.body="raidGears")
+  30: required RaidLoadoutStateDTO raidLoadout (api.body="raidLoadout")
 }
 
 struct GetDashboardReq {}
@@ -420,6 +493,38 @@ struct ClaimExpeditionReq {}
 
 struct TradeCaravanReq {
   1: required string offerCode (api.body="offerCode")
+}
+
+struct EquipCosmeticReq {
+  1: required string slot (api.body="slot")
+  2: required string itemKey (api.body="itemKey")
+}
+
+struct LearnRaidBlueprintReq {
+  1: required string blueprintKey (api.body="blueprintKey")
+}
+
+struct ManageRaidGearReq {
+  1: required string action (api.body="action")
+  2: required string itemKey (api.body="itemKey")
+}
+
+struct DraftRaidBuffReq {
+  1: required string action (api.body="action")
+  2: optional string cardCode (api.body="cardCode")
+  3: optional i32 replaceSlot (api.body="replaceSlot")
+}
+
+struct StartRaidReq {}
+
+struct FinishRaidReq {
+  1: required string status (api.body="status")
+  2: optional list<string> backpackLootKeys (api.body="backpackLootKeys")
+  3: optional list<string> safeBoxLootKeys (api.body="safeBoxLootKeys")
+  4: optional list<string> usedPotionKeys (api.body="usedPotionKeys")
+  5: optional i32 zonesVisited (api.body="zonesVisited")
+  6: optional i32 chestsOpened (api.body="chestsOpened")
+  7: optional i32 bossesKilled (api.body="bossesKilled")
 }
 
 struct ChooseProfessionReq {
@@ -528,4 +633,10 @@ service EmpireService {
   DashboardStateResp DispatchExpedition(1: DispatchExpeditionReq req) (api.post="/api/v1/empire/colony/expedition/dispatch")
   DashboardStateResp ClaimExpedition(1: ClaimExpeditionReq req) (api.post="/api/v1/empire/colony/expedition/claim")
   DashboardStateResp TradeCaravan(1: TradeCaravanReq req) (api.post="/api/v1/empire/colony/caravan/trade")
+  DashboardStateResp EquipCosmetic(1: EquipCosmeticReq req) (api.post="/api/v1/empire/colony/cosmetic/equip")
+  DashboardStateResp LearnRaidBlueprint(1: LearnRaidBlueprintReq req) (api.post="/api/v1/empire/colony/raid/learn-blueprint")
+  DashboardStateResp ManageRaidGear(1: ManageRaidGearReq req) (api.post="/api/v1/empire/colony/raid/gear")
+  DashboardStateResp DraftRaidBuff(1: DraftRaidBuffReq req) (api.post="/api/v1/empire/colony/raid/buff")
+  DashboardStateResp StartRaid(1: StartRaidReq req) (api.post="/api/v1/empire/colony/raid/start")
+  DashboardStateResp FinishRaid(1: FinishRaidReq req) (api.post="/api/v1/empire/colony/raid/finish")
 }

@@ -48,3 +48,34 @@ for svc in services/*; do
     fi
   fi
 done
+
+# 6. Modular governance & 4D game design documentation gate
+required_docs=(
+  "AGENTS.md"
+  "CONTRIBUTING.md"
+  "README.md"
+  "docs/README.md"
+  "docs/architecture/overview.md"
+  "docs/architecture/ddd-idl.md"
+  "docs/contracts/http-v1.md"
+  "docs/design/01-overall/vision-and-pillars.md"
+  "docs/design/01-overall/lifecycle-and-loops.md"
+  "docs/design/02-macro/monetary-and-clob-market.md"
+  "docs/design/02-macro/profession-and-economy-boundary.md"
+  "docs/design/02-macro/chamber-war-macro.md"
+  "docs/design/03-micro/settlement-production-and-edicts.md"
+  "docs/design/03-micro/wasteland-2d-extraction-roguelite.md"
+  "docs/design/03-micro/avatar-and-procedural-relics.md"
+  "docs/design/04-seasons/season-framework.md"
+  "docs/design/04-seasons/s1-obsidian-awakening.md"
+)
+for doc in "${required_docs[@]}"; do
+  if [[ ! -f "${doc}" ]]; then
+    echo "Missing required modular governance/design document: ${doc}" >&2
+    exit 1
+  fi
+done
+if compgen -G "docs/gdd-*.md" >/dev/null; then
+  echo "Monolithic docs/gdd-*.md files are forbidden; place specs in docs/design/{01-overall,02-macro,03-micro,04-seasons}/" >&2
+  exit 1
+fi

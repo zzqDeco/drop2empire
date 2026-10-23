@@ -7,6 +7,7 @@ var ResourceCatalog = []ResourceMeta{
 	{Key: ResStone, Name: "石材", Tier: "basic", Description: "工程与冶炼矿石", Tradable: true, InitPriceBasis: 9500},
 	{Key: ResFlint, Name: "燧石结晶", Tier: "relic", Description: "采集伴生晶矿 · 用于机关与游商易物", Tradable: true, InitPriceBasis: 28000},
 	{Key: ResAncientShard, Name: "古文明残片", Tier: "relic", Description: "远征与深层采掘所得 · 远古遗物核心", Tradable: true, InitPriceBasis: 65000},
+	{Key: ResMeteorOre, Name: "星陨秘银", Tier: "relic", Description: "荒原秘境搜出 · 高阶军械与黑市硬通货", Tradable: true, InitPriceBasis: 145000},
 	{Key: ResIronIngot, Name: "铁锭", Tier: "intermediate", Description: "高炉吞吐石材与木炭精炼", Tradable: true, InitPriceBasis: 32000},
 	{Key: ResRation, Name: "军粮", Tier: "intermediate", Description: "消耗净水与木材封装", Tradable: true, InitPriceBasis: 24000},
 	{Key: ResAutoPump, Name: "自动抽水机", Tier: "profession", Description: "科学家制品 · 打水/伐木 +15%", Tradable: true, InitPriceBasis: 185000},
@@ -17,6 +18,32 @@ var ResourceCatalog = []ResourceMeta{
 	{Key: ResArcherKit, Name: "长弓兵军备", Tier: "war", Description: "弓兵编制 · 克骑兵", Tradable: true, InitPriceBasis: 102000},
 	{Key: ResCavalryKit, Name: "铁骑兵军备", Tier: "war", Description: "骑兵编制 · 克步兵", Tradable: true, InitPriceBasis: 112000},
 	{Key: ResSeasonChest, Name: "S1·墨械宝箱", Tier: "season", Description: "开启获得随机纹理藏品", Tradable: true, InitPriceBasis: 450000},
+
+	// Tradable Single-Use Raid Blueprints (consumed on learn to unlock season crafting, or traded on Market)
+	{Key: ResBPCrossbow, Name: "★图纸：墨械连发手弩", Tier: "blueprint", Description: "一次性蓝图 · 研读解锁本赛季 T2 武器打造（可交易）", Tradable: true, InitPriceBasis: 220000},
+	{Key: ResBPTitanHammer, Name: "★★图纸：泰坦裂地重锤", Tier: "blueprint", Description: "一次性蓝图 · 研读解锁本赛季 T3 武器打造（可交易）", Tradable: true, InitPriceBasis: 580000},
+	{Key: ResBPCarapaceArmor, Name: "★图纸：沙虫壳胸甲", Tier: "blueprint", Description: "一次性蓝图 · 研读解锁本赛季 T2 护甲打造（可交易）", Tradable: true, InitPriceBasis: 210000},
+	{Key: ResBPHydroArmor, Name: "★★图纸：水压动力重甲", Tier: "blueprint", Description: "一次性蓝图 · 研读解锁本赛季 T3 护甲打造（可交易）", Tradable: true, InitPriceBasis: 620000},
+	{Key: ResBPSpringBoots, Name: "★图纸：墨械弹簧战靴", Tier: "blueprint", Description: "一次性蓝图 · 研读解锁本赛季 T2 战靴打造（可交易）", Tradable: true, InitPriceBasis: 240000},
+	{Key: ResBPHermesBoots, Name: "★★图纸：赫尔墨斯风行靴", Tier: "blueprint", Description: "一次性蓝图 · 研读解锁本赛季 T3 极速靴打造（可交易）", Tradable: true, InitPriceBasis: 680000},
+	{Key: ResBPCipherSafe, Name: "★图纸：墨械密码保险箱", Tier: "blueprint", Description: "一次性蓝图 · 研读解锁本赛季 3 格安全箱打造（可交易）", Tradable: true, InitPriceBasis: 360000},
+	{Key: ResBPAetherSafe, Name: "★★图纸：泰坦次元保险箱", Tier: "blueprint", Description: "一次性蓝图 · 研读解锁本赛季 5 格安全箱打造（可交易）", Tradable: true, InitPriceBasis: 950000},
+	{Key: ResBPScavengeElixir, Name: "★图纸：速搜合剂配方", Tier: "blueprint", Description: "一次性蓝图 · 研读解锁本赛季速搜药水调配（可交易）", Tradable: true, InitPriceBasis: 190000},
+	{Key: ResBPBerserkElixir, Name: "★★图纸：狂暴圣水配方", Tier: "blueprint", Description: "一次性蓝图 · 研读解锁本赛季免死圣水调配（可交易）", Tradable: true, InitPriceBasis: 520000},
+
+	// Tradable Season-Limited Animated Avatar Cosmetics
+	{Key: ResCosGoggles, Name: "荒原防风护目镜", Tier: "cosmetic", Description: "罕见头饰 · 领主与地图形象可穿戴（可交易）", Tradable: true, InitPriceBasis: 320000},
+	{Key: ResCosSteamCrown, Name: "墨械蒸汽齿轮冠", Tier: "cosmetic", Description: "史诗头饰 · 动态旋转黄铜齿轮（可交易）", Tradable: true, InitPriceBasis: 880000},
+	{Key: ResCosObsidianCrown, Name: "★S1·曜石星辉王冠", Tier: "cosmetic", Description: "S1传说限定头饰 · 悬浮黑曜星环特效（可交易）", Tradable: true, InitPriceBasis: 2800000},
+	{Key: ResCosSandCloak, Name: "沙行旅人斗篷", Tier: "cosmetic", Description: "罕见背饰 · 荒原防风披风（可交易）", Tradable: true, InitPriceBasis: 310000},
+	{Key: ResCosHydroWings, Name: "阿基米德水翼背甲", Tier: "cosmetic", Description: "史诗背饰 · 水压喷流羽翼（可交易）", Tradable: true, InitPriceBasis: 920000},
+	{Key: ResCosAstralWings, Name: "★S1·星界流光羽翼", Tier: "cosmetic", Description: "S1传说限定背饰 · 双翼动态扇动与星轨（可交易）", Tradable: true, InitPriceBasis: 3200000},
+	{Key: ResCosCompass, Name: "寻脉青铜罗盘", Tier: "cosmetic", Description: "罕见手持 · 磁针摆动罗盘（可交易）", Tradable: true, InitPriceBasis: 300000},
+	{Key: ResCosAlchLantern, Name: "赫尔墨斯荧光提灯", Tier: "cosmetic", Description: "史诗手持 · 翠绿炼金火苗跳动（可交易）", Tradable: true, InitPriceBasis: 860000},
+	{Key: ResCosThunderStaff, Name: "★S1·泰坦雷鸣权杖", Tier: "cosmetic", Description: "S1传说限定手持 · 脉冲电弧核心（可交易）", Tradable: true, InitPriceBasis: 2950000},
+	{Key: ResCosWoodFrog, Name: "汲水发条木蛙", Tier: "cosmetic", Description: "罕见随从 · 蹦跳机巧木蛙（可交易）", Tradable: true, InitPriceBasis: 350000},
+	{Key: ResCosMechOwl, Name: "炼金机械猫头鹰", Tier: "cosmetic", Description: "史诗随从 · 振翅盘旋夜视枭（可交易）", Tradable: true, InitPriceBasis: 960000},
+	{Key: ResCosAetherDrake, Name: "★S1·星界以太幼龙", Tier: "cosmetic", Description: "S1传说限定随从 · 环绕飞行吐泡幼龙（可交易）", Tradable: true, InitPriceBasis: 3500000},
 }
 
 func ResourceName(key string) string {

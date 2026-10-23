@@ -1,15 +1,28 @@
-# Drop to Empire (滴水成城 · D2E) Engineering Instructions
+# Drop to Empire (滴水成城 · D2E) engineering instructions
 
-- **Contract-First Thrift IDL**: All HTTP wire DTOs and routes live in `contracts/game/http_empire.thrift`. Run `make gen` (`./ops/codegen.sh`) whenever changing the contract to regenerate `contracts/gen/game` and `packages/api-client/src/generated.ts`.
+- Read `docs/README.md` and `docs/contracts/http-v1.md` before changing any contract, domain mechanic, economy formula, or seasonal catalog. Keep the modular game design documentation (`docs/design/{01-overall,02-macro,03-micro,04-seasons}`) in strict lockstep with the codebase.
+- React 19 / TypeScript / Vite frontend (`apps/web`); Go Hertz HTTP backend (`services/game`) with unified Thrift IDL code generation (`contracts/game/http_empire.thrift`).
+- The only deployed environment is `production`. CI or local verification may use disposable PostgreSQL containers/databases. Do not introduce dev, staging, or preview deployments.
+- `main` is the only ongoing development branch. `release/vx.x.x` branches are permanent archives. Never delete or rewrite a published release branch/tag.
+- **Contract-First Thrift IDL**: All HTTP wire DTOs and route bindings live in `contracts/game/http_empire.thrift`. Run `make gen` (`./ops/codegen.sh`) whenever changing the contract to regenerate `contracts/gen/game` and `packages/api-client/src/generated.ts`. Stage generated contract files before running `make check-arch`.
 - **4-Layer Hexagonal Clean DDD**: `services/game` is structured into `internal/{domain,app,adapter,infra}` and guarded by `internal/arch_test.go` and `make check-arch`.
-  - `domain/` must depend only on the Go standard library (zero external or framework imports).
+  - `domain/` must depend only on the Go standard library (zero external, framework, or database imports).
   - `app/` must depend only on the Go standard library and `internal/domain`.
   - `adapter/http` binds generated Hertz/HTTP routes and never imports `infra/`.
   - `infra/pg` implements `domain.TxManager` and `domain.WorldRepository` using `drop2empire/pkg/postgres` and never imports `app/` or `adapter/`.
+- **Strict Invitation-Only Registration & Physical Admin Loopback Isolation**:
+  - Public registration requires a valid single-use invitation code (`D2E-XXXX-XXXX`). `D2E_BOOTSTRAP_INVITE_CODE` defaults to `teamie-bootstrap` and can initialize the first account only when zero accounts exist.
+  - The public HTTPS edge (`:8443`) serves only player routes (`/`) and rejects `/admin*` and `/api/v1/empire/admin/*` with `HTTP 403`.
+  - The operator console (`/admin`) and `/api/v1/empire/admin/*` routes are bound exclusively to host loopback (`127.0.0.1:18480` -> `:8081` with `X-D2E-Admin-Tunnel: 1`) for SSH local port forwarding (`ssh -L 18480:127.0.0.1:18480`). Never expose admin controls, simulator buttons, or invite generators on the player UI.
 - **Authoritative Server State & Fixed-Point Accounting**:
-  - Never use floating-point accumulators for balances. Physical resources use milli-units (`1.000 = 1,000`), and currency uses basis-units (`1.0000 Gold = 10,000`).
+  - Never use floating-point accumulators for balances. Physical resources use integer milli-units (`1.000 = 1,000`), and currency uses integer basis-units (`1.0000 Gold = 10,000`).
   - Maintain the Monetary Supply Identity (`M_issued = M_player + M_escrow + M_npc + M_treasury`) across every market match, crafting fee, war stipend, and tax burn.
+  - Maintain strict economic isolation between settlement production and the 2D wasteland extraction roguelite: the roguelite consumes settlement resources (`water/wood/charcoal/stone/flint`) and outputs only non-producible tactical consumables, single-use tradable blueprints (`bp_*`), and ultra-low-drop-rate tradable seasonal cosmetics (`cos_*`). Never introduce "100% guaranteed cosmetic drop" buffs.
 - **Blueprint & Ink Design System (`apps/web`)**:
   - All colors, surfaces, radii, shadows, and typography scales live in `apps/web/src/tokens.css`.
   - Every numeric readout (resource stocks, production rates, countdowns, prices, quantities, combat power, pattern seeds) must use `.mono-num` (`var(--font-mono)` + `font-variant-numeric: tabular-nums`).
   - `apps/web/src/design-tokens.test.ts` enforces WCAG AA contrast (`>= 4.5:1`), zero unreferenced CSS classes, standard font weights, and the `ICON` size scale (`{14, 16, 18, 20, 24}`).
+  - Maintain zero-spoiler progressive disclosure: the opening stage (`Population == 0`) anchors the `[打水]` button in a fixed 3-slot grid so it never shifts or teleports, and advanced panels (`岗位`, `荒原斥候营`, `游商驿站`, `工坊/市场/战区`) unlock strictly as the player reaches each milestone.
+- **4D Modular Game Design Documentation (`docs/design/`)**:
+  - Separate all game design specs into four orthogonal layers: `01-overall/` (cross-season vision, pillars, lifecycle), `02-macro/` (monetary ledger, CLOB market, 4-profession division, chamber war), `03-micro/` (settlement coupling, 2D multi-zone portal extraction roguelite mechanics & 54 buff cards, animated Lord avatar & procedural relics), and `04-seasons/` (seasonal reset/retention rules & per-season catalogs such as `s1-obsidian-awakening.md`).
+- Never commit credentials, private keys, production `.env` files, database dumps, or local runtime artifacts.
