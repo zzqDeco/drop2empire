@@ -1,0 +1,5 @@
+version: v1
+generator: tools/thrift-go-http-codegen
+router_output: router_gen.go
+transport_interface: HTTPResponder
+middleware_interface: HTTPRouteMiddleware

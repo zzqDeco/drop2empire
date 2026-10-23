@@ -1,0 +1,184 @@
+@font-face {
+  font-family: "DM Sans Fallback";
+  src: local("Arial"), local("Helvetica Neue"), local("Helvetica");
+  size-adjust: 99.2%;
+  ascent-override: 94%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+}
+
+:root {
+  /* Blueprint & Ink (纸墨工程制图风) Text Hierarchy — all verified >= 4.5:1 WCAG AA across all light surfaces */
+  --text-strong: #141413;
+  --text: #2c2b29;
+  --text-muted: #52504c;
+  --text-subtle: #63605b;
+
+  /* Ink & Mineral Seal Accents */
+  --brand: #1c1b19;
+  --brand-muted: #383633;
+  --brand-text: #1c1b19;
+  --brand-strong: #0a0a09;
+  --on-brand: #faf8f5;
+  --seal-accent: #9e2a2b;
+
+  /* Warm Drafting Paper Surfaces & Crisp Ink Rules */
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --surface-sunken: #f3f0ea;
+  --rail: #eae6df;
+  --ink-wash: #efece6;
+  --hover-bg: #f0ede6;
+  --border: #d2cdc3;
+  --border-strong: #141413;
+
+  /* Mineral Semantic Feedback Tokens (WCAG AA >= 4.5:1 verified) */
+  --danger-text: #9e2a2b;
+  --danger-bg: #fcf1f1;
+  --danger-border: #d9a7a7;
+  --warning-text: #7a4f13;
+  --warning-bg: #fbf5ea;
+  --warning-border: #dec89e;
+  --success-text: #1f5c3a;
+  --success-bg: #eef7f2;
+  --success-border: #a8d1b8;
+
+  /* Unified Focus Ring */
+  --focus-ring: 2px solid var(--brand-strong);
+  --focus-ring-offset: 2px;
+  --focus-halo: 0 0 0 3px rgba(20, 20, 19, 0.16);
+
+  /* Typography Families & Scale */
+  --font-sans:
+    "DM Sans Variable",
+    "DM Sans",
+    "DM Sans Fallback",
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei UI",
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+    "Source Han Sans SC",
+    sans-serif;
+  --font-mono:
+    "JetBrains Mono",
+    "SFMono-Regular",
+    ui-monospace,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+  --font-xs: 11px;
+  --font-sm: 12px;
+  --font-base: 13px;
+  --font-md: 14px;
+  --font-lg: 15px;
+  --font-xl: 17px;
+  --font-2xl: 20px;
+  --font-3xl: 24px;
+  --font-4xl: 30px;
+
+  /* Global Root Typography & Rendering */
+  color-scheme: light;
+  font-family: var(--font-sans);
+  color: var(--text-strong);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: var(--font-md);
+
+  /* Sharp Architectural Border Radius Scale (2px-4px primary) */
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r-md: 4px;
+  --r-lg: 6px;
+  --r-xl: 8px;
+  --r-pill: 999px;
+
+  /* Crisp Architectural Hard-Edge Offset & Elevation Shadows */
+  --shadow-sm: 2px 2px 0 rgba(20, 20, 19, 0.08);
+  --shadow-md: 3px 3px 0 rgba(20, 20, 19, 0.14);
+  --shadow-lg: 4px 4px 0 rgba(20, 20, 19, 0.2);
+  --shadow-pop: 6px 6px 0 rgba(20, 20, 19, 0.26);
+
+  /* 4px-Base Spacing Scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Obsidian Slate Dark Mode — all verified >= 6.0:1 WCAG AA */
+  --text-strong: #f2efe9;
+  --text: #dad5cc;
+  --text-muted: #b5afa4;
+  --text-subtle: #a39d92;
+
+  /* Chalk & Ivory Accents on Dark Slate */
+  --brand: #ece8df;
+  --brand-muted: #cfc9be;
+  --brand-text: #ece8df;
+  --brand-strong: #ffffff;
+  --on-brand: #121211;
+  --seal-accent: #f08c8c;
+
+  /* Deep Charcoal Slate Surfaces */
+  --bg: #121211;
+  --surface: #1a1918;
+  --surface-sunken: #151413;
+  --rail: #1f1e1c;
+  --ink-wash: #252422;
+  --hover-bg: #262522;
+  --border: #363430;
+  --border-strong: #ece8df;
+
+  /* Semantic Feedback Tokens in Dark Mode */
+  --danger-text: #f59b9b;
+  --danger-bg: #331a1c;
+  --danger-border: #612c30;
+  --warning-text: #f2ca7e;
+  --warning-bg: #302514;
+  --warning-border: #594321;
+  --success-text: #8ad9a5;
+  --success-bg: #162b1f;
+  --success-border: #285239;
+
+  --focus-halo: 0 0 0 3px rgba(236, 232, 223, 0.25);
+  --shadow-sm: 2px 2px 0 rgba(0, 0, 0, 0.45);
+  --shadow-md: 3px 3px 0 rgba(0, 0, 0, 0.6);
+  --shadow-lg: 4px 4px 0 rgba(0, 0, 0, 0.75);
+  --shadow-pop: 6px 6px 0 rgba(0, 0, 0, 0.85);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

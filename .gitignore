@@ -1,0 +1,10 @@
+.DS_Store
+node_modules/
+dist/
+coverage/
+.runtime/
+*.log
+.env
+.env.*
+!.env.example
+services/game/bin/

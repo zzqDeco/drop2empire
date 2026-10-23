@@ -1,0 +1,408 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-strong);
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+  outline: none;
+}
+
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Buttons & Controls (shadcn-inspired structural discipline, Blueprint & Ink palette) */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: 7px 13px;
+  font-size: var(--font-base);
+  font-weight: 600;
+  background: var(--brand);
+  color: var(--on-brand);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.08s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--brand-strong);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translate(1px, 1px);
+}
+
+.btn-water-strike {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 11px 18px;
+  font-size: var(--font-md);
+  font-weight: 700;
+  background: var(--brand);
+  color: var(--on-brand);
+  border: 2px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  box-shadow: var(--shadow-md);
+  transition: transform 0.06s ease;
+}
+
+.btn-water-strike:hover:not(:disabled) {
+  background: var(--brand-strong);
+}
+
+.btn-water-strike:active:not(:disabled) {
+  transform: translate(2px, 2px);
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: 6px 11px;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--text-strong);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+
+.btn-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+}
+
+.btn-chip:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--hover-bg);
+}
+
+.btn-chip.active {
+  background: var(--brand);
+  color: var(--on-brand);
+  border-color: var(--border-strong);
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--surface);
+  color: var(--text-strong);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+}
+
+.btn-icon:hover {
+  background: var(--hover-bg);
+}
+
+.btn-link {
+  padding: 2px 6px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-xs);
+}
+
+.btn-link:hover {
+  color: var(--text-strong);
+  border-color: var(--border-strong);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-step {
+  padding: 3px 7px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--text-strong);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+}
+
+.btn-step:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+
+/* Badges & Tags */
+.tag-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  background: var(--surface-sunken);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+}
+
+.tag-warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+}
+
+.tag-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+
+.tier-pill {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: var(--font-xs);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+}
+
+.frozen-tag {
+  margin-left: var(--space-1);
+  padding: 1px 4px;
+  font-size: var(--font-xs);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--r-xs);
+}
+
+.lock-pill {
+  margin-left: 4px;
+  padding: 1px 5px;
+  font-size: var(--font-xs);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-xs);
+}
+
+/* Ink Tables */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.ink-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-base);
+}
+
+.ink-table th,
+.ink-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.ink-table th {
+  font-size: var(--font-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ink-table .num-col {
+  text-align: right;
+}
+
+.clickable-rows tbody tr {
+  cursor: pointer;
+}
+
+.clickable-rows tbody tr:hover {
+  background: var(--hover-bg);
+}
+
+.row-selected {
+  background: var(--ink-wash);
+  font-weight: 600;
+}
+
+.res-name-cell {
+  font-weight: 600;
+}
+
+.rate-pos {
+  color: var(--success-text);
+  font-weight: 600;
+}
+
+.rate-zero {
+  color: var(--text-subtle);
+}
+
+.cost-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: var(--font-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: var(--surface-sunken);
+}
+
+.cost-ok {
+  color: var(--success-text);
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+
+.cost-lack {
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+/* Side Pills & Rarity Badges */
+.side-pill {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: var(--r-xs);
+}
+
+.pill-bid {
+  color: var(--success-text);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+}
+
+.pill-ask {
+  color: var(--danger-text);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+}
+
+.rarity-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border-strong);
+}
+
+.rarity-common {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
+.rarity-rare {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+
+.rarity-epic {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+}
+
+.rarity-legendary {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+
+/* Status Banner */
+.status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 8px 16px;
+  font-size: var(--font-base);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.status-info {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.status-danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.banner-close {
+  padding: 2px 8px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--text-strong);
+  border: 1px solid currentColor;
+  border-radius: var(--r-xs);
+}
+
+.ink-divider {
+  border: 0;
+  border-top: 1px dashed var(--border-strong);
+  margin: var(--space-2) 0;
+}
+
+.muted-note {
+  color: var(--text-muted);
+  font-size: var(--font-base);
+  margin: var(--space-3) 0;
+}
