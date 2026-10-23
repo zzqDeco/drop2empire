@@ -169,6 +169,7 @@ curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/r
 curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/version.json"
 echo ""
 EOF
+curl -fsS "https://$SSH_HOST:$PUBLIC_PORT/readyz" >/dev/null
 
 echo "==> [6/6] Verifying existing Aliyun services (teamie) are 100% healthy and untouched..."
 curl -fsS "https://$SSH_HOST/" -o /dev/null
