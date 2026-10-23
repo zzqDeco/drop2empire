@@ -59,6 +59,8 @@ button:disabled {
 }
 
 .btn-water-strike {
+  position: relative;
+  overflow: visible;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -71,7 +73,11 @@ button:disabled {
   border: 2px solid var(--border-strong);
   border-radius: var(--r-xs);
   box-shadow: var(--shadow-md);
-  transition: transform 0.06s ease;
+  user-select: none;
+  transition:
+    transform 0.08s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .btn-water-strike:hover:not(:disabled) {
@@ -79,7 +85,64 @@ button:disabled {
 }
 
 .btn-water-strike:active:not(:disabled) {
-  transform: translate(2px, 2px);
+  transform: translate(2px, 2px) scale(0.98);
+}
+
+/* Tactile Floating +1 Water Particle & Concentric Ink Ripple */
+@keyframes floatUpFade {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(0.92);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -44px) scale(1.08);
+  }
+}
+
+@keyframes inkRippleExpand {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.88);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.38);
+  }
+}
+
+.water-burst-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.water-float-pop {
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--text-strong);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  padding: 1px 7px;
+  border-radius: var(--r-xs);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+  animation: floatUpFade 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.water-ripple-ring {
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  pointer-events: none;
+  animation: inkRippleExpand 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .btn-outline {

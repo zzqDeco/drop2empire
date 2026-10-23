@@ -78,9 +78,11 @@ export function App() {
   const [authPassword, setAuthPassword] = useState("");
   const [authInviteCode, setAuthInviteCode] = useState(initialInviteCode);
 
-  // Optimistic water clicks for 0ms tactile response
-  const [optimisticWaterDeltaMilli, setOptimisticWaterDeltaMilli] = useState(0);
-  const [optimisticClicksDelta, setOptimisticClicksDelta] = useState(0);
+  // In-flight water clicks & tactile burst particles (monotonic, zero flicker)
+  const [inFlightClicks, setInFlightClicks] = useState(0);
+  const [waterBursts, setWaterBursts] = useState<
+    Array<{ id: number; label: string }>
+  >([]);
 
   // Spot market form state
   const [selectedMarketItem, setSelectedMarketItem] = useState("auto_pump");
@@ -110,8 +112,6 @@ export function App() {
 
   const applyServerState = (next: DashboardStateResp) => {
     setState(next);
-    setOptimisticWaterDeltaMilli(0);
-    setOptimisticClicksDelta(0);
     setLastSyncAtMs(Date.now());
     setNowTickMs(Date.now());
   };
@@ -883,28 +883,36 @@ export function App() {
     blueprints.find((b) => b.code === "axe_blueprint")?.unlocked ?? false;
   const quarryUnlocked =
     blueprints.find((b) => b.code === "quarry_tech")?.unlocked ?? false;
+  const workshopUnlocked =
+    blueprints.find((b) => b.code === "basic_workshop")?.unlocked ?? false;
   const treasureUnlocked =
     blueprints.find((b) => b.code === "mystery_treasure")?.unlocked ?? false;
 
   const perClickWaterMilli = firstResBpUnlocked ? 2000 : 1000;
   const liveWaterMilli =
     waterRes.amountMilli +
-    optimisticWaterDeltaMilli +
+    inFlightClicks * perClickWaterMilli +
     Math.floor(waterRes.netRatePerSecMilli * interpSeconds);
-  const totalClicks = player.totalManualClicks + optimisticClicksDelta;
+  const totalClicks = player.totalManualClicks + inFlightClicks;
 
   const handleGatherWater = () => {
     setErrorBanner(null);
-    setOptimisticWaterDeltaMilli((prev) => prev + perClickWaterMilli);
-    setOptimisticClicksDelta((prev) => prev + 1);
+    const burstId = Date.now() + Math.random();
+    const label = `+${firstResBpUnlocked ? 2 : 1}`;
+    setWaterBursts((prev) => [...prev.slice(-5), { id: burstId, label }]);
+    window.setTimeout(() => {
+      setWaterBursts((prev) => prev.filter((b) => b.id !== burstId));
+    }, 660);
+
+    setInFlightClicks((prev) => prev + 1);
     api
       .gatherWater({ clicks: 1 })
       .then((next) => {
+        setInFlightClicks((prev) => Math.max(0, prev - 1));
         applyServerState(next);
       })
       .catch((err: unknown) => {
-        setOptimisticWaterDeltaMilli(0);
-        setOptimisticClicksDelta(0);
+        setInFlightClicks((prev) => Math.max(0, prev - 1));
         setErrorBanner(err instanceof Error ? err.message : "请求失败");
       });
   };
@@ -919,7 +927,7 @@ export function App() {
   };
 
   // Stage A: Opening Stage (Population == 0)
-  // At 0s: ONLY a single centered [ 打水 ] button on the canvas!
+  // Uses a fixed-anchor 3-slot grid so the [打水] button NEVER shifts or teleports!
   const isOpeningStage =
     player.populationTotal === 0 &&
     player.profession === "none" &&
@@ -931,6 +939,34 @@ export function App() {
     100,
     Math.floor((liveWaterMilli / 10000) * 100),
   );
+
+  const openingStory = !hasAnyWaterYet
+    ? {
+        key: "prologue-0",
+        kicker: "序章 · 干涸荒原",
+        line1: "干涸的荒原，万籁俱寂。",
+        line2: "唯有岩缝深处，尚存一缕微弱的水脉。",
+      }
+    : liveWaterMilli < 4000
+      ? {
+          key: "prologue-1",
+          kicker: "序章 · 微光初现",
+          line1: "清冽的水滴汇入石凹，荒原泛起生机。",
+          line2: "积满 10 滴水，便能留住路过的流民。",
+        }
+      : !canSeeFirstRecruit
+        ? {
+            key: "prologue-2",
+            kicker: "序章 · 旅人驻足",
+            line1: "远处的流民循着水汽向此聚拢……",
+            line2: "再掬起几捧清泉，即可招募第一位居民。",
+          }
+        : {
+            key: "prologue-3",
+            kicker: "序章 · 聚落起点",
+            line1: "石凹蓄满清泉，一位疲惫的旅人停下脚步。",
+            line2: "招募他留居于此，开启昼夜不息的自动汲水。",
+          };
 
   if (isOpeningStage) {
     return (
@@ -959,8 +995,20 @@ export function App() {
         </div>
 
         <main className="opening-stage" aria-label="起点">
-          {hasAnyWaterYet && (
-            <div className="opening-water-readout">
+          <div className="opening-top-slot">
+            <div className="opening-story-box" key={openingStory.key}>
+              <div className="opening-story-kicker">
+                <span className="story-beacon-dot" />
+                <span>{openingStory.kicker}</span>
+              </div>
+              <p className="story-line-primary">{openingStory.line1}</p>
+              <p className="story-line-secondary">{openingStory.line2}</p>
+            </div>
+
+            <div
+              className={`opening-water-readout ${hasAnyWaterYet ? "slot-visible" : "slot-hidden"}`}
+              aria-hidden={!hasAnyWaterYet}
+            >
               <span className="water-label">💧 水</span>
               <strong className="water-big-num mono-num">
                 {formatResource(liveWaterMilli, 0)}
@@ -972,23 +1020,37 @@ export function App() {
                 />
               </div>
             </div>
-          )}
+          </div>
 
-          <button
-            type="button"
-            className="btn-water-strike btn-opening-sole"
-            onClick={handleGatherWater}
-          >
-            <Droplets size={ICON.md} />
-            <span>{hasAnyWaterYet ? "打水 +1" : "打水"}</span>
-          </button>
+          <div className="opening-center-slot">
+            <button
+              type="button"
+              className="btn-water-strike btn-opening-sole"
+              onClick={handleGatherWater}
+            >
+              <Droplets size={ICON.md} />
+              <span>{hasAnyWaterYet ? "打水 +1" : "打水"}</span>
+              <span className="water-burst-layer" aria-hidden="true">
+                {waterBursts.map((b) => (
+                  <span key={b.id}>
+                    <span className="water-ripple-ring" />
+                    <span className="water-float-pop mono-num">{b.label}</span>
+                  </span>
+                ))}
+              </span>
+            </button>
+          </div>
 
-          {canSeeFirstRecruit && (
-            <section className="opening-recruit-card" aria-label="招募居民">
+          <div className="opening-bottom-slot">
+            <section
+              className={`opening-recruit-card ${canSeeFirstRecruit ? "slot-visible" : "slot-hidden"}`}
+              aria-label="招募居民"
+              aria-hidden={!canSeeFirstRecruit}
+            >
               <button
                 type="button"
                 className="btn-primary btn-block"
-                disabled={liveWaterMilli < 10000 || busy}
+                disabled={liveWaterMilli < 10000 || busy || !canSeeFirstRecruit}
                 onClick={() =>
                   void runAction(() => api.recruitResident({ count: 1 }))
                 }
@@ -997,7 +1059,7 @@ export function App() {
                 <span className="mono-num">招募居民 (-10 水)</span>
               </button>
             </section>
-          )}
+          </div>
         </main>
       </div>
     );
@@ -1018,6 +1080,63 @@ export function App() {
 
   const waterJob = jobs.find((j) => j.jobKey === "water");
   const waterAssignedCount = waterJob?.assigned ?? 0;
+  const woodAssignedCount = jobs.find((j) => j.jobKey === "wood")?.assigned ?? 0;
+  const stoneAssignedCount =
+    jobs.find((j) => j.jobKey === "stone")?.assigned ?? 0;
+
+  const storyChapter = !firstResBpUnlocked
+    ? {
+        key: "ch1-water",
+        tag: "第一章 · 初立营火",
+        text: "第一位居民已拎起木桶自动汲水（+2.0/秒）。继续积攒 30 滴水，在右侧解锁【最初的居所】。",
+      }
+    : !axeUnlocked
+      ? {
+          key: "ch2-axe",
+          tag: "第二章 · 居所生根",
+          text: "居所立起屋檐，手点打水翻倍（+2/次）。招募满 3 名居民，解锁【斧头蓝图】向枯木林进发。",
+        }
+      : woodAssignedCount === 0
+        ? {
+            key: "ch3-wood",
+            tag: "第三章 · 伐木开林",
+            text: "石斧已铸成！【岗位】面板已展开，点击【伐木 +1】调派居民采集木材。",
+          }
+        : !quarryUnlocked
+          ? {
+              key: "ch4-quarry",
+              tag: "第四章 · 水木并进",
+              text: "林间响起伐木声。建造【一号引水轮】提升水力，并扩充至 8 人口研发【采石技术】。",
+            }
+          : stoneAssignedCount === 0
+            ? {
+                key: "ch5-stone",
+                tag: "第五章 · 破岩采石",
+                text: "山麓岩脉已探明！在【岗位】面板点击【采石 +1】，调派居民开采筑城石料。",
+              }
+            : !workshopUnlocked
+              ? {
+                  key: "ch6-workshop",
+                  tag: "第六章 · 工坊奠基",
+                  text: "水、木、石三脉齐备。升级【石刃锯台】，集齐物资建造【基础工坊】。",
+                }
+              : !treasureUnlocked
+                ? {
+                    key: "ch7-treasure",
+                    tag: "第七章 · 远古遗物",
+                    text: "工坊炉火彻夜不息。锻造【高压铜阀】【承重横梁】【古文明石板】，开启【神秘的宝藏】。",
+                  }
+                : player.profession === "none"
+                  ? {
+                      key: "ch8-prof",
+                      tag: "第八章 · 圣坛择业",
+                      text: "远古宝藏轰然开启！择定你的终身职业，步入跨职业贸易与商会战争纪元。",
+                    }
+                  : {
+                      key: "ch9-empire",
+                      tag: "第九章 · 滴水成城",
+                      text: "聚落已蜕变为帝国重镇。在下方工坊制造专属制品、挂单贸易，率军争夺黑曜与白银城池。",
+                    };
 
   const selectedWarNode =
     state.war.nodes.find((n) => n.nodeId === selectedNodeId) ??
@@ -1128,6 +1247,15 @@ export function App() {
         </div>
       )}
 
+      {/* Animated Story Chronicle Bar */}
+      <section className="story-chronicle-bar" aria-label="纪元指引">
+        <span className="story-beacon-dot" />
+        <span className="story-chapter-tag">{storyChapter.tag}</span>
+        <span key={storyChapter.key} className="story-whisper-text">
+          {storyChapter.text}
+        </span>
+      </section>
+
       {/* Profession Selection Gate */}
       {showProfessionChoice && (
         <section className="profession-gate-banner" aria-label="选择职业">
@@ -1210,6 +1338,14 @@ export function App() {
             >
               <Droplets size={ICON.md} />
               <span>打水 +{firstResBpUnlocked ? "2" : "1"}</span>
+              <span className="water-burst-layer" aria-hidden="true">
+                {waterBursts.map((b) => (
+                  <span key={b.id}>
+                    <span className="water-ripple-ring" />
+                    <span className="water-float-pop mono-num">{b.label}</span>
+                  </span>
+                ))}
+              </span>
             </button>
           </div>
 
@@ -1232,7 +1368,7 @@ export function App() {
                         : r.amountMilli +
                           Math.floor(r.netRatePerSecMilli * interpSeconds);
                     return (
-                      <tr key={r.key}>
+                      <tr key={r.key} className="res-row-enter">
                         <td className="res-name-cell">
                           <span>{r.name}</span>
                           {r.frozenMilli > 0 && (
