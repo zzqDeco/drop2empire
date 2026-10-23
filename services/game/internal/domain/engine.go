@@ -295,8 +295,8 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 			baseMilli: 2000, // 2.00 water/s per worker (GDD 4.4)
 			effPct:    waterEff,
 			unlocked:  p.PopulationTotal > 0,
-			hint:      "招募第 1 位居民后开启",
-			inputNote: "无原料消耗 · 基础流体采集",
+			hint:      "1 人口解锁",
+			inputNote: "产出水",
 		},
 		{
 			key:       JobWood,
@@ -305,8 +305,8 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 			baseMilli: 450, // 0.45 wood/s per worker (GDD 4.4)
 			effPct:    woodEff,
 			unlocked:  p.UnlockedBlueprints[BPAxeBlueprint],
-			hint:      "需解锁【斧头蓝图】（10 人口）",
-			inputNote: "无原料消耗 · 结构木材采集",
+			hint:      "解锁斧头蓝图",
+			inputNote: "产出木材",
 		},
 		{
 			key:       JobStone,
@@ -315,28 +315,28 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 			baseMilli: 220, // 0.22 stone/s per worker (GDD 4.4)
 			effPct:    stoneEff,
 			unlocked:  p.UnlockedBlueprints[BPQuarryTech],
-			hint:      "需解锁【采石技术】（25 人口）",
-			inputNote: "无原料消耗 · 坚固石材开采",
+			hint:      "解锁采石技术",
+			inputNote: "产出石材",
 		},
 		{
 			key:       JobSmeltIron,
-			name:      "高炉炼铁",
+			name:      "炼铁",
 			outRes:    ResIronIngot,
 			baseMilli: 80, // 0.08 iron/s per worker
 			effPct:    ironEff,
 			unlocked:  p.UnlockedBlueprints[BPBasicWorkshop] && p.Profession != ProfNone,
-			hint:      "需完成职业选择并启动工坊高炉",
-			inputNote: "工坊持续熔炼精炼铁锭",
+			hint:      "选定职业解锁",
+			inputNote: "产出铁锭",
 		},
 		{
 			key:       JobPrepRation,
-			name:      "军粮制备",
+			name:      "制粮",
 			outRes:    ResRation,
 			baseMilli: 120, // 0.12 ration/s per worker
 			effPct:    rationEff,
 			unlocked:  p.UnlockedBlueprints[BPBasicWorkshop] && p.Profession != ProfNone,
-			hint:      "需完成职业选择并开启军需产线",
-			inputNote: "工坊持续封装行军口粮",
+			hint:      "选定职业解锁",
+			inputNote: "产出军粮",
 		},
 	}
 
