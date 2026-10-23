@@ -1,4 +1,4 @@
-.PHONY: gen check-arch test build dev-backend dev-web
+.PHONY: gen check-arch test build dev-backend dev-web deploy
 
 gen:
 	bash ops/codegen.sh
@@ -17,3 +17,6 @@ dev-backend:
 
 dev-web:
 	cd apps/web && npm run dev
+
+deploy:
+	bash ops/deploy-aliyun.sh
