@@ -94,6 +94,7 @@ PG_BASE=$(docker inspect teamie-postgres-1 --format '{{.Config.Image}}' 2>/dev/n
 
 cat > Dockerfile.game.runtime <<DOCKEREOF
 FROM ${ALPINE_BASE}
+USER root
 WORKDIR /app
 COPY service /app/service
 RUN chmod 0755 /app/service
