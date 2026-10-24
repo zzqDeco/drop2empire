@@ -138,6 +138,7 @@ type ResourceMeta struct {
 	Description    string
 	Tradable       bool
 	InitPriceBasis int64
+	BaseCapUnits   int64
 }
 
 type BlueprintSpec struct {
@@ -148,18 +149,27 @@ type BlueprintSpec struct {
 	PrerequisiteCode   string
 	CostsMilli         map[string]int64
 	EffectSummary      string
+	// Structured balance modifiers (decoupled from engine logic):
+	CapacityOverrideUnits map[string]int64 // ResourceKey -> new minimum capacity in whole units
+	JobEfficiencyBonusPct map[string]int64 // JobKey -> +efficiency%
+	DoublesByproductProc  bool
+	GrantsGoldBasis       int64
+	AutoEnableEdict       string
 }
 
 type ProfessionSpec struct {
-	Code             string
-	Name             string
-	Title            string
-	ArtifactName     string
-	ExclusiveOutputs []string
-	StrengthText     string
-	WeaknessText     string
-	MarketRoleText   string
-	PassiveBonusText string
+	Code                  string
+	Name                  string
+	Title                 string
+	ArtifactName          string
+	ExclusiveOutputs      []string
+	StrengthText          string
+	WeaknessText          string
+	MarketRoleText        string
+	PassiveBonusText      string
+	JobEfficiencyBonusPct map[string]int64 // JobKey -> +efficiency%
+	StarterGrantUnits     map[string]int64 // ResourceKey -> initial units granted
+	ArmamentOutputMultPct int64            // e.g. 125 for Artisan (+25% armament batch output)
 }
 
 type CraftRecipeSpec struct {
@@ -177,27 +187,36 @@ type CraftRecipeSpec struct {
 }
 
 type EquipmentSpec struct {
-	ItemKey      string
-	Name         string
-	MaxStack     int32
-	BonusSummary string
+	ItemKey               string
+	Name                  string
+	MaxStack              int32
+	BonusSummary          string
+	JobEfficiencyPerStack map[string]int64 // JobKey -> +efficiency% per installed unit
 }
 
 type EdictSpec struct {
-	Code             string
-	Name             string
-	Category         string
-	PrerequisiteCode string
-	EffectSummary    string
-	DrawbackSummary  string
+	Code                      string
+	Name                      string
+	Category                  string
+	PrerequisiteCode          string
+	EffectSummary             string
+	DrawbackSummary           string
+	MutuallyExclusiveWith     string
+	JobEfficiencyBonusPct     map[string]int64 // JobKey -> +/-efficiency%
+	PerResidentWaterDrainMod  int64            // delta milli-water/sec per resident
+	FlatResourceDrainMilliSec map[string]int64 // ResourceKey -> flat milli/sec drain when active
 }
 
 type ExpeditionRouteSpec struct {
-	RouteCode       string
-	Name            string
-	DurationSeconds int32
-	CostsMilli      map[string]int64
-	RewardSummary   string
+	RouteCode            string
+	Name                 string
+	DurationSeconds      int32
+	CostsMilli           map[string]int64
+	RewardSummary        string
+	RewardsMilli         map[string]int64
+	EvenSimSecBonusPop   int32
+	CompletionLogWithPop string
+	CompletionLogNormal  string
 }
 
 type ActiveExpeditionState struct {
@@ -208,10 +227,12 @@ type ActiveExpeditionState struct {
 }
 
 type CaravanOfferSpec struct {
-	OfferCode     string
-	Title         string
-	CostsMilli    map[string]int64
-	RewardSummary string
+	OfferCode        string
+	Title            string
+	CostsMilli       map[string]int64
+	RewardSummary    string
+	RewardsMilli     map[string]int64
+	RewardPopulation int32
 }
 
 type CosmeticSpec struct {
@@ -234,6 +255,7 @@ type RaidGearSpec struct {
 	AtkBonus       int32
 	HpBonus        int32
 	DefBonus       int32
+	BagBonus       int32
 	MoveCooldownMs int32
 	SafeSlots      int32
 	CostsMilli     map[string]int64
@@ -254,15 +276,91 @@ type RaidBuffCardSpec struct {
 	BagBonus      int32
 }
 
+type RaidLootItem struct {
+	ID       string `json:"id"`
+	Key      string `json:"key"`
+	Name     string `json:"name"`
+	Rarity   string `json:"rarity"`
+	Category string `json:"category"`
+}
+
+type RaidTileState struct {
+	X                int32  `json:"x"`
+	Y                int32  `json:"y"`
+	Kind             string `json:"kind"`
+	Explored         bool   `json:"explored"`
+	Looted           bool   `json:"looted"`
+	EnemyName        string `json:"enemyName,omitempty"`
+	EnemyHP          int32  `json:"enemyHp,omitempty"`
+	EnemyMaxHP       int32  `json:"enemyMaxHp,omitempty"`
+	EnemyAtk         int32  `json:"enemyAtk,omitempty"`
+	PortalTargetZone int32  `json:"portalTargetZone"`
+	PortalTargetX    int32  `json:"portalTargetX"`
+	PortalTargetY    int32  `json:"portalTargetY"`
+	PortalLabel      string `json:"portalLabel,omitempty"`
+}
+
+type RaidZoneState struct {
+	ID       int32           `json:"id"`
+	Name     string          `json:"name"`
+	Subtitle string          `json:"subtitle"`
+	Width    int32           `json:"width"`
+	Height   int32           `json:"height"`
+	Visited  bool            `json:"visited"`
+	Tiles    []RaidTileState `json:"tiles"`
+}
+
+type RaidSettlementReport struct {
+	Status        string         `json:"status"`
+	BackpackItems []RaidLootItem `json:"backpackItems"`
+	SafeBoxItems  []RaidLootItem `json:"safeBoxItems"`
+	LostGearNames []string       `json:"lostGearNames"`
+	ZonesVisited  int32          `json:"zonesVisited"`
+	ChestsOpened  int32          `json:"chestsOpened"`
+	BossesKilled  int32          `json:"bossesKilled"`
+}
+
+type ActiveRaidSession struct {
+	Seed                 int64           `json:"seed"`
+	StartedAt            time.Time       `json:"startedAt"`
+	ExpiresAt            time.Time       `json:"expiresAt"`
+	LastMoveAt           time.Time       `json:"lastMoveAt"`
+	CurrentZoneID        int32           `json:"currentZoneId"`
+	PlayerX              int32           `json:"playerX"`
+	PlayerY              int32           `json:"playerY"`
+	Facing               string          `json:"facing"`
+	HP                   int32           `json:"hp"`
+	MaxHP                int32           `json:"maxHp"`
+	Atk                  int32           `json:"atk"`
+	Def                  int32           `json:"def"`
+	CheatDeathActive     bool            `json:"cheatDeathActive"`
+	BaseMoveCooldownMs   int32           `json:"baseMoveCooldownMs"`
+	GaleEndsAt           time.Time       `json:"galeEndsAt"`
+	ScavEndsAt           time.Time       `json:"scavEndsAt"`
+	UsedPotionKeys       []string        `json:"usedPotionKeys"`
+	Backpack             []RaidLootItem  `json:"backpack"`
+	SafeBox              []RaidLootItem  `json:"safeBox"`
+	ActiveChestDrops     []RaidLootItem  `json:"activeChestDrops"`
+	ActiveContainerTitle string          `json:"activeContainerTitle"`
+	Logs                 []string        `json:"logs"`
+	ZonesVisitedCount    int32           `json:"zonesVisitedCount"`
+	ChestsOpenedCount    int32           `json:"chestsOpenedCount"`
+	BossesKilledCount    int32           `json:"bossesKilledCount"`
+	NextLootSeq          int32           `json:"nextLootSeq"`
+	Zones                []RaidZoneState `json:"zones"`
+}
+
 type RaidLoadoutState struct {
-	WeaponKey         string   `json:"weaponKey"`
-	ArmorKey          string   `json:"armorKey"`
-	BootsKey          string   `json:"bootsKey"`
-	SafeBoxKey        string   `json:"safeBoxKey"`
-	EquippedPotions   []string `json:"equippedPotions"`
-	EquippedBuffCards []string `json:"equippedBuffCards"`
-	DraftPoolCards    []string `json:"draftPoolCards"`
-	ActiveRaidSeed    int64    `json:"activeRaidSeed"`
+	WeaponKey            string                `json:"weaponKey"`
+	ArmorKey             string                `json:"armorKey"`
+	BootsKey             string                `json:"bootsKey"`
+	SafeBoxKey           string                `json:"safeBoxKey"`
+	EquippedPotions      []string              `json:"equippedPotions"`
+	EquippedBuffCards    []string              `json:"equippedBuffCards"`
+	DraftPoolCards       []string              `json:"draftPoolCards"`
+	ActiveRaidSeed       int64                 `json:"activeRaidSeed"`
+	ActiveSession        *ActiveRaidSession    `json:"activeSession,omitempty"`
+	LastSettlementReport *RaidSettlementReport `json:"lastSettlementReport,omitempty"`
 }
 
 type AllocationPreset struct {
@@ -342,6 +440,7 @@ type PlayerState struct {
 	DailyWarBudgetUsed      int32                  `json:"dailyWarBudgetUsed"`
 	SpeedMultiplier         int32                  `json:"speedMultiplier"`
 	TotalManualClicks       int64                  `json:"totalManualClicks"`
+	LastGatherWaterAt       time.Time              `json:"lastGatherWaterAt"`
 	SimulatedElapsedSeconds int64                  `json:"simulatedElapsedSeconds"`
 	LastSettledAt           time.Time              `json:"lastSettledAt"`
 	LastOfflineSummary      string                 `json:"lastOfflineSummary"`

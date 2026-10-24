@@ -42,8 +42,9 @@ All player endpoints authenticate via the `Authorization: Bearer <session_token>
 | `POST /api/v1/empire/raid/blueprint/learn` | `LearnRaidBlueprint` | **Consumes and destroys (`-1`)** a single-use raid blueprint item (`bp_*`) from inventory to permanently unlock crafting that T2/T3 gear or safebox for the current season. |
 | `POST /api/v1/empire/raid/gear/manage` | `ManageRaidGear` | Crafts (`action="craft"`) or equips (`action="equip"`) out-of-raid weapons, armor, boots, seasonal safeboxes (`1 -> 3 -> 5` slots), and tactical potions using settlement resources. |
 | `POST /api/v1/empire/raid/draft` | `DraftRaidBuff` | Selects (`action="pick"`) one of the 3 offered pre-departure buff cards (from the 54-card pool, max 4 carried) or spends settlement resources to reroll (`action="reroll"`). |
-| `POST /api/v1/empire/raid/start` | `StartRaid` | Pays the departure water/resource cost and generates an authoritative `activeRaidSeed` for the 4-zone portal-connected 2D extraction map. |
-| `POST /api/v1/empire/raid/finish` | `FinishRaid` | Authoritatively settles raid extraction (`EXTRACTED`) or death/timeout (`MIA`): on `MIA`, equipped weapon/armor/boots and regular backpack loot are lost, while items inside the seasonal safebox (`SafeSlotCount`) are preserved. |
+| `POST /api/v1/empire/colony/raid/start` | `StartRaid` | Generates an authoritative 4-zone 2D extraction session (`ActiveRaidSession`) on the server with fog-of-war clipping and real-time sandstorm expiration. |
+| `POST /api/v1/empire/colony/raid/action` | `RaidAction` | Executes a step-by-step authoritative in-raid intent (`move`, `open_chest`, `use_portal`, `transfer_loot`, `loot_all`, `drink_potion`, `merchant_buy`), resolving combat, fog reveal, and CSPRNG chest drops on the server. |
+| `POST /api/v1/empire/colony/raid/finish` | `FinishRaid` | Authoritatively settles raid extraction (`EXTRACTED`, verified against extraction beacon proximity and expiration) or death/timeout (`MIA`), awarding only server-recorded `SafeBox` / `Backpack` loot and destroying equipped weapon/armor/boots on `MIA`. |
 
 ---
 

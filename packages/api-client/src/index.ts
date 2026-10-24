@@ -27,6 +27,7 @@ import {
   type LearnRaidBlueprintReq,
   type ManageRaidGearReq,
   type DraftRaidBuffReq,
+  type RaidActionReq,
   type FinishRaidReq,
   type RolloverSeasonReq,
   type PublishNoticeReq,
@@ -248,6 +249,12 @@ export class EmpireClient {
     this.#request<DashboardStateResp>(IDL_ROUTES.StartRaid.clientPath, {
       method: IDL_ROUTES.StartRaid.method,
       body: JSON.stringify({}),
+    });
+
+  raidAction = (req: RaidActionReq) =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.RaidAction.clientPath, {
+      method: IDL_ROUTES.RaidAction.method,
+      body: JSON.stringify(req),
     });
 
   finishRaid = (req: FinishRaidReq) =>

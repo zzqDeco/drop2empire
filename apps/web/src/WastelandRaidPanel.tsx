@@ -3,6 +3,7 @@ import {
   api,
   type DashboardStateResp,
   type RaidGearSpecDTO,
+  type RaidLootItemDTO,
 } from "@drop2empire/api-client";
 import {
   Award,
@@ -23,6 +24,11 @@ import {
   RaidTileSpriteSVG,
   type RaidTileSpriteKind,
 } from "./RaidSpritesSVG";
+import {
+  CHEST_CHANNEL_LABELS,
+  EARLY_EXTRACT_CUTOFF_MS,
+  computeChestChannelMs,
+} from "./config/gameConfig";
 
 interface WastelandRaidPanelProps {
   state: DashboardStateResp;
@@ -35,366 +41,15 @@ interface WastelandRaidPanelProps {
 
 type TileKind = RaidTileSpriteKind;
 
-interface MapTile {
-  x: number;
-  y: number;
-  kind: TileKind;
-  searched?: boolean;
-  defeated?: boolean;
-  enemyHp?: number;
-  enemyMaxHp?: number;
-  enemyAtk?: number;
-  enemyName?: string;
-  portalTargetZone?: number;
-  portalTargetX?: number;
-  portalTargetY?: number;
-  portalLabel?: string;
-}
-
-interface RaidZone {
-  id: number;
-  name: string;
-  subtitle: string;
-  width: number;
-  height: number;
-  tiles: MapTile[];
-  explored: Set<string>;
-}
-
-export interface LootDrop {
-  id: string;
-  key: string;
-  name: string;
-  rarity: "COMMON" | "RARE" | "EPIC" | "LEGENDARY";
-}
-
-interface SettlementSummary {
-  status: "EXTRACTED" | "MIA";
-  extractedBag: LootDrop[];
-  savedSafeBox: LootDrop[];
-  zonesVisited: number;
-  chestsOpened: number;
-  bossesKilled: number;
-}
-
-const LOOT_META: Record<
-  string,
-  { name: string; rarity: "COMMON" | "RARE" | "EPIC" | "LEGENDARY" }
-> = {
-  flint: { name: "燧石结晶", rarity: "COMMON" },
-  ancient_shard: { name: "古文明残片", rarity: "RARE" },
-  meteor_ore: { name: "星陨秘银", rarity: "EPIC" },
-  bp_crossbow: { name: "★图纸：墨械连发手弩", rarity: "RARE" },
-  bp_carapace_armor: { name: "★图纸：沙虫壳胸甲", rarity: "RARE" },
-  bp_spring_boots: { name: "★图纸：墨械弹簧战靴", rarity: "RARE" },
-  bp_cipher_safe: { name: "★图纸：墨械密码保险箱", rarity: "EPIC" },
-  bp_scavenge_elixir: { name: "★图纸：速搜合剂配方", rarity: "RARE" },
-  bp_titan_hammer: { name: "★★图纸：泰坦裂地重锤", rarity: "EPIC" },
-  bp_hydro_armor: { name: "★★图纸：水压动力重甲", rarity: "EPIC" },
-  bp_hermes_boots: { name: "★★图纸：赫尔墨斯风行靴", rarity: "EPIC" },
-  bp_aether_safe: { name: "★★图纸：泰坦次元保险箱", rarity: "LEGENDARY" },
-  bp_berserk_elixir: { name: "★★图纸：狂暴圣水配方", rarity: "EPIC" },
-  cos_goggles: { name: "外观：荒原防风护目镜", rarity: "RARE" },
-  cos_sand_cloak: { name: "外观：沙行旅人斗篷", rarity: "RARE" },
-  cos_compass: { name: "外观：寻脉青铜罗盘", rarity: "RARE" },
-  cos_wood_frog: { name: "外观：汲水发条木蛙", rarity: "RARE" },
-  cos_steam_crown: { name: "外观：墨械蒸汽齿轮冠", rarity: "EPIC" },
-  cos_hydro_wings: { name: "外观：阿基米德水翼背甲", rarity: "EPIC" },
-  cos_alch_lantern: { name: "外观：赫尔墨斯荧光提灯", rarity: "EPIC" },
-  cos_mech_owl: { name: "外观：炼金机械猫头鹰", rarity: "EPIC" },
-  cos_obsidian_crown: { name: "★S1限定：曜石星辉王冠", rarity: "LEGENDARY" },
-  cos_astral_wings: { name: "★S1限定：星界流光羽翼", rarity: "LEGENDARY" },
-  cos_thunder_staff: { name: "★S1限定：泰坦雷鸣权杖", rarity: "LEGENDARY" },
-  cos_aether_drake: { name: "★S1限定：星界以太幼龙", rarity: "LEGENDARY" },
-};
-
-function mulberry32(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function rollContainerLoot(
-  rng: () => number,
-  chestKind: TileKind,
-): LootDrop[] {
-  const drops: LootDrop[] = [];
-  const makeDrop = (key: string): LootDrop => ({
-    id: `${key}_${Math.random().toString(36).slice(2, 8)}`,
-    key,
-    name: LOOT_META[key]?.name ?? key,
-    rarity: LOOT_META[key]?.rarity ?? "COMMON",
-  });
-
-  const r1 = rng();
-  if (chestKind === "chest_wood") {
-    drops.push(makeDrop("flint"));
-    if (r1 < 0.25) drops.push(makeDrop("ancient_shard"));
-  } else if (chestKind === "chest_iron") {
-    drops.push(makeDrop("flint"));
-    if (r1 < 0.35) drops.push(makeDrop("ancient_shard"));
-    const r2 = rng();
-    const t2Bps = [
-      "bp_crossbow",
-      "bp_carapace_armor",
-      "bp_spring_boots",
-      "bp_scavenge_elixir",
-    ];
-    const rareCos = [
-      "cos_goggles",
-      "cos_sand_cloak",
-      "cos_compass",
-      "cos_wood_frog",
-    ];
-    if (r2 < 0.008) {
-      drops.push(makeDrop(rareCos[Math.floor(rng() * rareCos.length)]));
-    } else if (r2 < 0.045) {
-      drops.push(makeDrop(t2Bps[Math.floor(rng() * t2Bps.length)]));
-    }
-  } else if (chestKind === "chest_coffin") {
-    drops.push(makeDrop("ancient_shard"));
-    if (r1 < 0.2) drops.push(makeDrop("meteor_ore"));
-    const r2 = rng();
-    const midBps = [
-      "bp_crossbow",
-      "bp_carapace_armor",
-      "bp_spring_boots",
-      "bp_cipher_safe",
-      "bp_scavenge_elixir",
-    ];
-    const epicCos = [
-      "cos_steam_crown",
-      "cos_hydro_wings",
-      "cos_alch_lantern",
-      "cos_mech_owl",
-    ];
-    if (r2 < 0.004) {
-      drops.push(makeDrop(epicCos[Math.floor(rng() * epicCos.length)]));
-    } else if (r2 < 0.068) {
-      drops.push(makeDrop(midBps[Math.floor(rng() * midBps.length)]));
-    }
-  } else if (chestKind === "chest_abyss") {
-    drops.push(makeDrop("ancient_shard"));
-    if (r1 < 0.42) drops.push(makeDrop("meteor_ore"));
-    const r2 = rng();
-    const highBps = [
-      "bp_titan_hammer",
-      "bp_hydro_armor",
-      "bp_hermes_boots",
-      "bp_aether_safe",
-      "bp_berserk_elixir",
-      "bp_cipher_safe",
-    ];
-    const legCos = [
-      "cos_obsidian_crown",
-      "cos_astral_wings",
-      "cos_thunder_staff",
-      "cos_aether_drake",
-    ];
-    const epicCos = [
-      "cos_steam_crown",
-      "cos_hydro_wings",
-      "cos_alch_lantern",
-      "cos_mech_owl",
-    ];
-    if (r2 < 0.0015) {
-      drops.push(makeDrop(legCos[Math.floor(rng() * legCos.length)]));
-    } else if (r2 < 0.009) {
-      drops.push(makeDrop(epicCos[Math.floor(rng() * epicCos.length)]));
-    } else if (r2 < 0.095) {
-      drops.push(makeDrop(highBps[Math.floor(rng() * highBps.length)]));
-    }
-  }
-  return drops;
-}
-
-function generateMultiZoneWorld(seed: number): RaidZone[] {
-  const rng = mulberry32(seed || 1337);
-
-  const buildZone = (
-    id: number,
-    name: string,
-    subtitle: string,
-    width: number,
-    height: number,
-  ): RaidZone => {
-    const tiles: MapTile[] = [];
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        tiles.push({ x, y, kind: "empty" });
-      }
-    }
-    return {
-      id,
-      name,
-      subtitle,
-      width,
-      height,
-      tiles,
-      explored: new Set<string>(),
-    };
-  };
-
-  const z0 = buildZone(0, "外围 · 沙暴荒原", "11×7 起始裂隙与游商营帐", 11, 7);
-  const z1 = buildZone(1, "北境 · 断崖古矿坑", "9×9 矿脉与黑市", 9, 9);
-  const z2 = buildZone(2, "南境 · 枯木迷林", "10×8 密林撤离区", 10, 8);
-  const z3 = buildZone(3, "核心 · 沉没黑曜圣殿", "8×8 高危深渊禁区", 8, 8);
-
-  const tileAt = (z: RaidZone, x: number, y: number) =>
-    z.tiles[y * z.width + x];
-
-  // Zone 0 setup (11x7) - Includes Caravan Tent right inside Zone 0 at (4,2) so players can encounter Caravan in-raid!
-  tileAt(z0, 1, 3).kind = "spawn";
-  tileAt(z0, 4, 2).kind = "merchant";
-  tileAt(z0, 10, 1).kind = "extract_early";
-  tileAt(z0, 9, 3).kind = "portal";
-  tileAt(z0, 9, 3).portalTargetZone = 1;
-  tileAt(z0, 9, 3).portalTargetX = 1;
-  tileAt(z0, 9, 3).portalTargetY = 4;
-  tileAt(z0, 9, 3).portalLabel = "传送至【断崖古矿坑】";
-
-  tileAt(z0, 5, 6).kind = "portal";
-  tileAt(z0, 5, 6).portalTargetZone = 2;
-  tileAt(z0, 5, 6).portalTargetX = 4;
-  tileAt(z0, 5, 6).portalTargetY = 1;
-  tileAt(z0, 5, 6).portalLabel = "传送至【枯木迷林】";
-
-  for (const t of z0.tiles) {
-    if (t.kind !== "empty") continue;
-    const r = rng();
-    if (r < 0.13 && !(t.x === 2 && t.y === 3)) t.kind = "wall";
-    else if (r < 0.25) t.kind = "chest_wood";
-    else if (r < 0.31) t.kind = "chest_iron";
-    else if (r < 0.39) {
-      t.kind = "enemy_raider";
-      t.enemyName = "荒原劫掠者";
-      t.enemyHp = 38;
-      t.enemyMaxHp = 38;
-      t.enemyAtk = 9;
-    }
-  }
-
-  // Zone 1 setup (9x9)
-  tileAt(z1, 1, 4).kind = "portal";
-  tileAt(z1, 1, 4).portalTargetZone = 0;
-  tileAt(z1, 1, 4).portalTargetX = 9;
-  tileAt(z1, 1, 4).portalTargetY = 3;
-  tileAt(z1, 1, 4).portalLabel = "返回【沙暴荒原】";
-
-  tileAt(z1, 7, 7).kind = "portal";
-  tileAt(z1, 7, 7).portalTargetZone = 3;
-  tileAt(z1, 7, 7).portalTargetX = 1;
-  tileAt(z1, 7, 7).portalTargetY = 3;
-  tileAt(z1, 7, 7).portalLabel = "深潜【沉没黑曜圣殿】";
-
-  tileAt(z1, 4, 2).kind = "merchant";
-
-  for (const t of z1.tiles) {
-    if (t.kind !== "empty") continue;
-    const r = rng();
-    if (r < 0.15) t.kind = "wall";
-    else if (r < 0.24) t.kind = "chest_iron";
-    else if (r < 0.31) t.kind = "chest_coffin";
-    else if (r < 0.41) {
-      t.kind = "enemy_worm";
-      t.enemyName = "岩甲沙虫";
-      t.enemyHp = 65;
-      t.enemyMaxHp = 65;
-      t.enemyAtk = 14;
-    }
-  }
-
-  // Zone 2 setup (10x8)
-  tileAt(z2, 4, 1).kind = "portal";
-  tileAt(z2, 4, 1).portalTargetZone = 0;
-  tileAt(z2, 4, 1).portalTargetX = 5;
-  tileAt(z2, 4, 1).portalTargetY = 6;
-  tileAt(z2, 4, 1).portalLabel = "返回【沙暴荒原】";
-
-  tileAt(z2, 8, 6).kind = "extract_deep";
-  tileAt(z2, 2, 5).kind = "oasis";
-  tileAt(z2, 8, 2).kind = "portal";
-  tileAt(z2, 8, 2).portalTargetZone = 3;
-  tileAt(z2, 8, 2).portalTargetX = 6;
-  tileAt(z2, 8, 2).portalTargetY = 6;
-  tileAt(z2, 8, 2).portalLabel = "深潜【沉没黑曜圣殿】";
-
-  for (const t of z2.tiles) {
-    if (t.kind !== "empty") continue;
-    const r = rng();
-    if (r < 0.14) t.kind = "wall";
-    else if (r < 0.24) t.kind = "chest_wood";
-    else if (r < 0.32) t.kind = "chest_iron";
-    else if (r < 0.36) t.kind = "chest_coffin";
-    else if (r < 0.44) {
-      t.kind = "enemy_raider";
-      t.enemyName = "迷林猎手";
-      t.enemyHp = 52;
-      t.enemyMaxHp = 52;
-      t.enemyAtk = 12;
-    }
-  }
-
-  // Zone 3 setup (8x8)
-  tileAt(z3, 1, 3).kind = "portal";
-  tileAt(z3, 1, 3).portalTargetZone = 1;
-  tileAt(z3, 1, 3).portalTargetX = 7;
-  tileAt(z3, 1, 3).portalTargetY = 7;
-  tileAt(z3, 1, 3).portalLabel = "返回【断崖古矿坑】";
-
-  tileAt(z3, 6, 6).kind = "portal";
-  tileAt(z3, 6, 6).portalTargetZone = 2;
-  tileAt(z3, 6, 6).portalTargetX = 8;
-  tileAt(z3, 6, 6).portalTargetY = 2;
-  tileAt(z3, 6, 6).portalLabel = "返回【枯木迷林】";
-
-  tileAt(z3, 4, 3).kind = "enemy_boss";
-  tileAt(z3, 4, 3).enemyName = "★墨械圣殿重装巨像";
-  tileAt(z3, 4, 3).enemyHp = 135;
-  tileAt(z3, 4, 3).enemyMaxHp = 135;
-  tileAt(z3, 4, 3).enemyAtk = 22;
-
-  tileAt(z3, 4, 1).kind = "chest_abyss";
-  tileAt(z3, 6, 2).kind = "chest_abyss";
-  tileAt(z3, 2, 6).kind = "chest_coffin";
-  tileAt(z3, 7, 1).kind = "extract_deep";
-
-  for (const t of z3.tiles) {
-    if (t.kind !== "empty") continue;
-    const r = rng();
-    if (r < 0.12) t.kind = "wall";
-    else if (r < 0.24) t.kind = "chest_coffin";
-    else if (r < 0.34) {
-      t.kind = "enemy_worm";
-      t.enemyName = "黑曜巡逻傀儡";
-      t.enemyHp = 78;
-      t.enemyMaxHp = 78;
-      t.enemyAtk = 16;
-    }
-  }
-
-  return [z0, z1, z2, z3];
-}
-
-function getChestChannelMs(kind: TileKind, speedBuffActive: boolean): number {
-  let base = 1100;
-  if (kind === "chest_iron") base = 2200;
-  else if (kind === "chest_coffin") base = 3600;
-  else if (kind === "chest_abyss") base = 5400;
-  else if (kind === "extract_early" || kind === "extract_deep") base = 2800;
-  return speedBuffActive ? Math.floor(base * 0.5) : base;
-}
+export type LootDrop = RaidLootItemDTO;
 
 export function WastelandRaidPanel({
   state,
   runAction,
 }: WastelandRaidPanelProps) {
   const { raidLoadout, raidGears, equippedCosmetics } = state;
-  const inRaid = raidLoadout.activeRaidSeed > 0;
+  const activeSession = raidLoadout.activeSession ?? null;
+  const inRaid = raidLoadout.activeRaidSeed > 0 && activeSession !== null;
 
   // 2-Stage Pre-Raid Progression: "armory" (Act 1) -> "draft" (Act 2)
   const [preStage, setPreStage] = useState<"armory" | "draft">("armory");
@@ -404,39 +59,16 @@ export function WastelandRaidPanel({
   >("all");
   const [replaceSlotIdx, setReplaceSlotIdx] = useState<number>(0);
 
-  // Ceremonial Post-Raid Settlement Overlay State
-  const [settlementReport, setSettlementReport] =
-    useState<SettlementSummary | null>(null);
+  // Ceremonial Post-Raid Settlement Overlay State (driven by server's lastSettlementReport)
+  const [dismissedSettlementSeed, setDismissedSettlementSeed] =
+    useState<string>("");
 
-  // In-raid live 2D state
-  const [zones, setZones] = useState<RaidZone[]>([]);
-  const [curZoneId, setCurZoneId] = useState(0);
-  const [pos, setPos] = useState({ x: 1, y: 3 });
-  const [facing, setFacing] = useState<FacingDirection>("down");
-  const [hp, setHp] = useState(100);
-  const [maxHp, setMaxHp] = useState(100);
-  const [atk, setAtk] = useState(12);
-  const [def, setDef] = useState(2);
-  const [cheatDeath, setCheatDeath] = useState(false);
+  const [facing, setFacing] = useState<FacingDirection>("right");
   const [timeLeftMs, setTimeLeftMs] = useState(180000);
   const [lastMoveAtMs, setLastMoveAtMs] = useState(0);
-  const [galeRemMs, setGaleRemMs] = useState(0);
-  const [scavRemMs, setScavRemMs] = useState(0);
-  const [usedPotions, setUsedPotions] = useState<string[]>([]);
-  const [backpack, setBackpack] = useState<LootDrop[]>([]);
-  const [safeBox, setSafeBox] = useState<LootDrop[]>([]);
-  const [raidLog, setRaidLog] = useState<string[]>([]);
-  const [zonesVisitedSet, setZonesVisitedSet] = useState<Set<number>>(
-    () => new Set([0]),
-  );
-  const [chestsOpenedCount, setChestsOpenedCount] = useState(0);
-  const [bossesKilledCount, setBossesKilledCount] = useState(0);
 
   // Hidden Backpack by default; opens on [B]/[Tab], button click, or when opening a chest / Caravan
   const [showLootModal, setShowLootModal] = useState(false);
-  const [activeChestDrops, setActiveChestDrops] = useState<LootDrop[]>([]);
-  const [activeContainerTitle, setActiveContainerTitle] =
-    useState<string>("未开启容器");
   const [draggedItem, setDraggedItem] = useState<{
     item: LootDrop;
     source: "chest" | "backpack" | "safebox";
@@ -452,76 +84,32 @@ export function WastelandRaidPanel({
     progressPct: number;
   } | null>(null);
 
-  const rngRef = useRef<() => number>(() => Math.random());
   const settlingRef = useRef(false);
 
-  const revealAround = useCallback(
-    (zList: RaidZone[], zId: number, cx: number, cy: number) => {
-      const target = zList[zId];
-      if (!target) return zList;
-      const radius = 2;
-      const nextExplored = new Set(target.explored);
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
-          const nx = cx + dx;
-          const ny = cy + dy;
-          if (nx >= 0 && nx < target.width && ny >= 0 && ny < target.height) {
-            nextExplored.add(`${nx},${ny}`);
-          }
-        }
-      }
-      const next = [...zList];
-      next[zId] = { ...target, explored: nextExplored };
-      return next;
-    },
-    [],
-  );
-
-  // Initialize 2D multi-zone map when activeRaidSeed turns positive
+  // Sync local countdown & facing from authoritative server session
   useEffect(() => {
-    if (!inRaid) {
-      setZones([]);
+    if (!inRaid || !activeSession) {
       setChanneling(null);
       setShowLootModal(false);
-      setActiveChestDrops([]);
       settlingRef.current = false;
       return;
     }
-    rngRef.current = mulberry32(raidLoadout.activeRaidSeed);
-    const built = generateMultiZoneWorld(raidLoadout.activeRaidSeed);
-    const revealed = revealAround(built, 0, 1, 3);
-    setZones(revealed);
-    setCurZoneId(0);
-    setPos({ x: 1, y: 3 });
-    setFacing("right");
-    setHp(raidLoadout.totalMaxHp);
-    setMaxHp(raidLoadout.totalMaxHp);
-    setAtk(raidLoadout.totalAtk);
-    setDef(raidLoadout.totalDef);
-    setCheatDeath(false);
-    setTimeLeftMs(raidLoadout.raidDurationSeconds * 1000);
-    setGaleRemMs(0);
-    setScavRemMs(0);
-    setUsedPotions([]);
-    setBackpack([]);
-    setSafeBox([]);
-    setActiveChestDrops([]);
-    setShowLootModal(false);
-    setZonesVisitedSet(new Set([0]));
-    setChestsOpenedCount(0);
-    setBossesKilledCount(0);
-    setRaidLog([
-      "已踏入【外围 · 沙暴荒原】全屏视野！按 WASD 或点击相邻格移动，平时背囊隐藏，搜索宝箱或按 [B] 键可呼出三栏摸金界面。",
-    ]);
+    setTimeLeftMs(activeSession.timeRemainingMs);
+    if (
+      activeSession.facing === "up" ||
+      activeSession.facing === "down" ||
+      activeSession.facing === "left" ||
+      activeSession.facing === "right"
+    ) {
+      setFacing(activeSession.facing);
+    }
     settlingRef.current = false;
   }, [
     inRaid,
-    raidLoadout.activeRaidSeed,
-    raidLoadout.totalMaxHp,
-    raidLoadout.totalAtk,
-    raidLoadout.totalDef,
-    raidLoadout.raidDurationSeconds,
-    revealAround,
+    activeSession?.seed,
+    activeSession?.timeRemainingMs,
+    activeSession?.facing,
+    activeSession,
   ]);
 
   const triggerFinishRaid = useCallback(
@@ -530,48 +118,21 @@ export function WastelandRaidPanel({
       settlingRef.current = true;
       setChanneling(null);
       setShowLootModal(false);
-
-      const summarySnapshot: SettlementSummary = {
-        status,
-        extractedBag: status === "EXTRACTED" ? [...backpack] : [],
-        savedSafeBox: [...safeBox],
-        zonesVisited: zonesVisitedSet.size,
-        chestsOpened: chestsOpenedCount,
-        bossesKilled: bossesKilledCount,
-      };
-      setSettlementReport(summarySnapshot);
       setPreStage("armory");
 
       void runAction(
-        () =>
-          api.finishRaid({
-            status,
-            backpackLootKeys: backpack.map((d) => d.key),
-            safeBoxLootKeys: safeBox.map((d) => d.key),
-            usedPotionKeys: usedPotions,
-            zonesVisited: zonesVisitedSet.size,
-            chestsOpened: chestsOpenedCount,
-            bossesKilled: bossesKilledCount,
-          }),
+        () => api.finishRaid({ status }),
         status === "EXTRACTED"
           ? "凯旋归城！背囊与安全箱全部战利品已入库。"
           : "荒原迷失 (MIA)！仅安全保险箱内物资成功带回。",
       );
     },
-    [
-      backpack,
-      safeBox,
-      usedPotions,
-      zonesVisitedSet,
-      chestsOpenedCount,
-      bossesKilledCount,
-      runAction,
-    ],
+    [runAction],
   );
 
   // Real-time countdown & channeling ticker (100ms)
   useEffect(() => {
-    if (!inRaid || zones.length === 0) return;
+    if (!inRaid || !activeSession) return;
     const id = window.setInterval(() => {
       const now = Date.now();
       setTimeLeftMs((prev) => {
@@ -582,8 +143,6 @@ export function WastelandRaidPanel({
         }
         return next;
       });
-      setGaleRemMs((prev) => (prev > 0 ? Math.max(0, prev - 100) : 0));
-      setScavRemMs((prev) => (prev > 0 ? Math.max(0, prev - 100) : 0));
 
       setChanneling((cur) => {
         if (!cur) return null;
@@ -601,9 +160,9 @@ export function WastelandRaidPanel({
       });
     }, 100);
     return () => window.clearInterval(id);
-  }, [inRaid, zones.length, triggerFinishRaid]);
+  }, [inRaid, activeSession, triggerFinishRaid]);
 
-  // Complete channeling when progressPct reaches 100 -> Open 3-Column Looting Modal!
+  // Complete channeling when progressPct reaches 100 -> Request Server Chest Roll or Extraction!
   useEffect(() => {
     if (!channeling || channeling.progressPct < 100) return;
     const done = channeling;
@@ -614,45 +173,35 @@ export function WastelandRaidPanel({
       return;
     }
 
-    const rolled = rollContainerLoot(rngRef.current, done.kind);
-    setZones((prev) => {
-      const z = prev[curZoneId];
-      if (!z) return prev;
-      const nextTiles = z.tiles.map((t) =>
-        t.x === done.x && t.y === done.y ? { ...t, searched: true } : t,
-      );
-      const next = [...prev];
-      next[curZoneId] = { ...z, tiles: nextTiles };
-      return next;
-    });
-    setChestsOpenedCount((c) => c + 1);
-
-    setActiveContainerTitle(done.label.replace("正在", ""));
-    setActiveChestDrops(rolled);
     setShowLootModal(true);
+    void runAction(() => api.raidAction({ action: "open_chest" }));
+  }, [channeling, triggerFinishRaid, runAction]);
 
-    if (rolled.length === 0) {
-      setRaidLog((prev) => [
-        "开启了容器，内部空无一物。",
-        ...prev.slice(0, 7),
-      ]);
-    } else {
-      setRaidLog((l) => [
-        `开启容器发现：${rolled.map((r) => r.name).join("、")}！拖拽或点击可收入背囊/保险箱。`,
-        ...l.slice(0, 7),
-      ]);
-    }
-  }, [channeling, curZoneId, triggerFinishRaid]);
-
-  const effectiveMoveCooldownMs = useMemo(() => {
-    const base = raidLoadout.moveCooldownMs || 360;
-    if (galeRemMs > 0) {
-      return Math.max(95, Math.floor(base * 0.65));
-    }
-    return base;
-  }, [raidLoadout.moveCooldownMs, galeRemMs]);
-
+  const zones = activeSession?.zones ?? [];
+  const curZoneId = activeSession?.currentZoneId ?? 0;
   const currentZone = zones[curZoneId];
+  const pos = useMemo(
+    () => ({
+      x: activeSession?.playerX ?? 1,
+      y: activeSession?.playerY ?? 3,
+    }),
+    [activeSession?.playerX, activeSession?.playerY],
+  );
+  const hp = activeSession?.hp ?? raidLoadout.totalMaxHp;
+  const maxHp = activeSession?.maxHp ?? raidLoadout.totalMaxHp;
+  const atk = activeSession?.atk ?? raidLoadout.totalAtk;
+  const def = activeSession?.def ?? raidLoadout.totalDef;
+  const effectiveMoveCooldownMs =
+    activeSession?.effectiveMoveCooldownMs ?? raidLoadout.moveCooldownMs ?? 360;
+  const scavRemMs = activeSession?.scavRemainingMs ?? 0;
+  const usedPotions = activeSession?.usedPotionKeys ?? [];
+  const backpack = activeSession?.backpack ?? [];
+  const safeBox = activeSession?.safeBox ?? [];
+  const activeChestDrops = activeSession?.activeChestDrops ?? [];
+  const activeContainerTitle =
+    activeSession?.activeContainerTitle ?? "未开启容器";
+  const raidLog = activeSession?.logs ?? [];
+
   const currentTile = useMemo(() => {
     if (!currentZone) return null;
     return currentZone.tiles[pos.y * currentZone.width + pos.x] ?? null;
@@ -661,7 +210,6 @@ export function WastelandRaidPanel({
   const handleStep = useCallback(
     (dx: number, dy: number) => {
       if (!inRaid || !currentZone || settlingRef.current) return;
-      // Update 2.5D Minecraft Voxel character facing immediately even if rate-limited
       if (dx < 0) setFacing("left");
       else if (dx > 0) setFacing("right");
       else if (dy < 0) setFacing("up");
@@ -688,115 +236,38 @@ export function WastelandRaidPanel({
 
       setLastMoveAtMs(now);
       setChanneling(null);
-      setActiveChestDrops([]);
-      setPos({ x: nx, y: ny });
-      setZones((prev) => revealAround(prev, curZoneId, nx, ny));
 
-      if (
-        (dest.kind === "enemy_raider" ||
-          dest.kind === "enemy_worm" ||
-          dest.kind === "enemy_boss") &&
-        !dest.defeated
-      ) {
-        const eHp = dest.enemyHp ?? 50;
-        const eAtk = dest.enemyAtk ?? 12;
-        const playerDmg = Math.max(6, atk);
-        const rounds = Math.ceil(eHp / playerDmg);
-        const dmgPerRound = Math.max(2, eAtk - def);
-        const totalTaken = Math.max(0, (rounds - 1) * dmgPerRound);
-
-        const nextHp = hp - totalTaken;
-        if (nextHp <= 0 && !cheatDeath) {
-          setHp(0);
-          triggerFinishRaid("MIA");
-          return;
-        }
-        if (nextHp <= 0 && cheatDeath) {
-          setCheatDeath(false);
-          setHp(35);
-          setRaidLog((l) => [
-            `免死圣水触发！抵挡了【${dest.enemyName}】致命一击并反杀对手！`,
-            ...l.slice(0, 7),
-          ]);
-        } else {
-          setHp(nextHp);
-        }
-
-        setZones((prev) => {
-          const z = prev[curZoneId];
-          if (!z) return prev;
-          const nextTiles = z.tiles.map((t) =>
-            t.x === nx && t.y === ny ? { ...t, defeated: true } : t,
-          );
-          const next = [...prev];
-          next[curZoneId] = { ...z, tiles: nextTiles };
-          return next;
-        });
-
-        if (dest.kind === "enemy_boss") {
-          setBossesKilledCount((c) => c + 1);
-          const bossDrops = rollContainerLoot(rngRef.current, "chest_abyss");
-          setActiveContainerTitle(`${dest.enemyName} · 首领战利品箱`);
-          setActiveChestDrops(bossDrops);
-          setShowLootModal(true);
-          setRaidLog((l) => [
-            `讨伐首领【${dest.enemyName}】（受创 -${totalTaken} HP），掉落战利品箱已展开！`,
-            ...l.slice(0, 7),
-          ]);
-        } else {
-          setRaidLog((l) => [
-            `击溃【${dest.enemyName}】（受创 -${totalTaken} HP）。`,
-            ...l.slice(0, 7),
-          ]);
-        }
-      } else if (dest.kind === "oasis" && !dest.searched) {
-        setHp((h) => Math.min(maxHp, h + 40));
-        setTimeLeftMs((t) => t + 25000);
-        setZones((prev) => {
-          const z = prev[curZoneId];
-          if (!z) return prev;
-          const nextTiles = z.tiles.map((t) =>
-            t.x === nx && t.y === ny ? { ...t, searched: true } : t,
-          );
-          const next = [...prev];
-          next[curZoneId] = { ...z, tiles: nextTiles };
-          return next;
-        });
-        setRaidLog((l) => [
-          "饮用绿洲甘泉：生命 +40，沙暴倒计时延长 +25 秒！",
-          ...l.slice(0, 7),
-        ]);
-      } else if (dest.kind === "merchant") {
-        setActiveContainerTitle("荒原游商营帐 · 局内易物驿站");
-        setShowLootModal(true);
-        setRaidLog((l) => [
-          "抵达【荒原游商营帐】！已展开游商货架与随身背囊。",
-          ...l.slice(0, 7),
-        ]);
-      } else if (
+      const isBossAlive = dest.kind === "enemy_boss" && !dest.looted;
+      const isMerchant = dest.kind === "merchant";
+      const isUnsearchedChest =
         (dest.kind === "chest_wood" ||
           dest.kind === "chest_iron" ||
           dest.kind === "chest_coffin" ||
           dest.kind === "chest_abyss") &&
-        !dest.searched
-      ) {
-        const dur = getChestChannelMs(dest.kind, scavRemMs > 0);
-        const labelMap: Record<string, string> = {
-          chest_wood: "正在搜索破旧木箱",
-          chest_iron: "正在撬开铁皮军需箱",
-          chest_coffin: "正在破译远古机关石棺",
-          chest_abyss: "正在开启深渊黑曜秘宝库",
-        };
-        setChanneling({
-          label: labelMap[dest.kind] ?? "正在搜索容器",
-          kind: dest.kind,
-          x: nx,
-          y: ny,
-          startedAt: Date.now(),
-          durationMs: dur,
-          progressPct: 0,
-        });
-      }
+        !dest.looted;
+
+      void runAction(async () => {
+        const resp = await api.raidAction({ action: "move", dx, dy });
+        if (isBossAlive || isMerchant) {
+          setShowLootModal(true);
+        } else if (isUnsearchedChest) {
+          const dur = computeChestChannelMs(
+            dest.kind,
+            scavRemMs > 0,
+            dest.channelMs,
+          );
+          setChanneling({
+            label: CHEST_CHANNEL_LABELS[dest.kind] ?? "正在搜索容器",
+            kind: dest.kind as TileKind,
+            x: nx,
+            y: ny,
+            startedAt: Date.now(),
+            durationMs: dur,
+            progressPct: 0,
+          });
+        }
+        return resp;
+      });
     },
     [
       inRaid,
@@ -804,15 +275,8 @@ export function WastelandRaidPanel({
       lastMoveAtMs,
       effectiveMoveCooldownMs,
       pos,
-      revealAround,
-      curZoneId,
-      atk,
-      def,
-      hp,
-      cheatDeath,
-      triggerFinishRaid,
-      maxHp,
       scavRemMs,
+      runAction,
     ],
   );
 
@@ -855,59 +319,19 @@ export function WastelandRaidPanel({
   }, [inRaid, handleStep, showLootModal]);
 
   const handleUsePortal = () => {
-    if (
-      !currentTile ||
-      currentTile.kind !== "portal" ||
-      currentTile.portalTargetZone === undefined
-    ) {
+    if (!currentTile || currentTile.kind !== "portal") {
       return;
     }
-    const tz = currentTile.portalTargetZone;
-    const tx = currentTile.portalTargetX ?? 1;
-    const ty = currentTile.portalTargetY ?? 1;
     setChanneling(null);
     setShowLootModal(false);
-    setCurZoneId(tz);
-    setPos({ x: tx, y: ty });
-    setZonesVisitedSet((prev) => new Set([...prev, tz]));
-    setZones((prev) => revealAround(prev, tz, tx, ty));
-    setRaidLog((l) => [
-      `穿越星盘传送门，抵达【${zones[tz]?.name ?? "未知区块"}】！`,
-      ...l.slice(0, 7),
-    ]);
+    void runAction(() => api.raidAction({ action: "use_portal" }));
   };
 
   const handleDrinkPotion = (potKey: string) => {
     if (usedPotions.includes(potKey)) return;
-    setUsedPotions((prev) => [...prev, potKey]);
-    if (potKey === "pot_heal_spring") {
-      setHp((h) => Math.min(maxHp, h + 55));
-      setTimeLeftMs((t) => t + 15000);
-      setRaidLog((l) => [
-        "饮用【清泉止血露】：生命 +55，时间 +15s！",
-        ...l.slice(0, 7),
-      ]);
-    } else if (potKey === "pot_gale_stride") {
-      setGaleRemMs(25000);
-      setRaidLog((l) => [
-        "饮用【轻身疾行散】：25秒内移动冷却缩短 35%！",
-        ...l.slice(0, 7),
-      ]);
-    } else if (potKey === "pot_scavenge_elixir") {
-      setScavRemMs(35000);
-      setRaidLog((l) => [
-        "饮用【巧手速搜合剂】：35秒内搜索宝箱读条缩短 50%！",
-        ...l.slice(0, 7),
-      ]);
-    } else if (potKey === "pot_berserk_elixir") {
-      setAtk((a) => a + 25);
-      setDef((d) => d + 12);
-      setCheatDeath(true);
-      setRaidLog((l) => [
-        "饮用【泰坦狂暴圣水】：攻击+25、护甲+12，并激活 1 次致命免死护盾！",
-        ...l.slice(0, 7),
-      ]);
-    }
+    void runAction(() =>
+      api.raidAction({ action: "drink_potion", itemKey: potKey }),
+    );
   };
 
   // Drag-and-Drop & Click Item Transfer Handlers between Chest <-> Backpack <-> SafeBox
@@ -920,85 +344,35 @@ export function WastelandRaidPanel({
     if (to === "safebox" && safeBox.length >= raidLoadout.safeSlotCount) return;
     if (to === "backpack" && backpack.length >= raidLoadout.backpackCapacity)
       return;
-
-    if (from === "chest") {
-      setActiveChestDrops((prev) => prev.filter((x) => x.id !== item.id));
-    } else if (from === "backpack") {
-      setBackpack((prev) => prev.filter((x) => x.id !== item.id));
-    } else if (from === "safebox") {
-      setSafeBox((prev) => prev.filter((x) => x.id !== item.id));
-    }
-
-    if (to === "safebox") {
-      setSafeBox((prev) => [...prev, item]);
-    } else {
-      setBackpack((prev) => [...prev, item]);
-    }
+    void runAction(() =>
+      api.raidAction({
+        action: "transfer_loot",
+        itemId: item.id,
+        fromContainer: from,
+        toContainer: to,
+      }),
+    );
   };
 
   const lootAllFromChest = () => {
     if (activeChestDrops.length === 0) return;
-    const remaining: LootDrop[] = [];
-    const nextSafe = [...safeBox];
-    const nextBag = [...backpack];
-
-    for (const d of activeChestDrops) {
-      if (
-        (d.rarity === "LEGENDARY" || d.rarity === "EPIC") &&
-        nextSafe.length < raidLoadout.safeSlotCount
-      ) {
-        nextSafe.push(d);
-      } else if (nextBag.length < raidLoadout.backpackCapacity) {
-        nextBag.push(d);
-      } else if (nextSafe.length < raidLoadout.safeSlotCount) {
-        nextSafe.push(d);
-      } else {
-        remaining.push(d);
-      }
-    }
-    setSafeBox(nextSafe);
-    setBackpack(nextBag);
-    setActiveChestDrops(remaining);
+    void runAction(() => api.raidAction({ action: "loot_all" }));
   };
 
   const handleMerchantBuy = (offer: "heal" | "mystery_bp") => {
-    if (offer === "heal") {
-      const flintIdx = backpack.findIndex((i) => i.key === "flint");
-      if (flintIdx < 0) return;
-      setBackpack((b) => b.filter((_, idx) => idx !== flintIdx));
-      setHp((h) => Math.min(maxHp, h + 65));
-      setTimeLeftMs((t) => t + 30000);
-      setRaidLog((l) => [
-        "向荒原游商交付 1 枚燧石：恢复 +65 生命、延长 +30 秒时间！",
-        ...l.slice(0, 7),
-      ]);
-    } else {
-      const shardIdx = backpack.findIndex((i) => i.key === "ancient_shard");
-      if (shardIdx < 0) return;
-      setBackpack((b) => b.filter((_, idx) => idx !== shardIdx));
-      const pool = [
-        "bp_crossbow",
-        "bp_carapace_armor",
-        "bp_spring_boots",
-        "bp_cipher_safe",
-        "bp_titan_hammer",
-        "cos_goggles",
-        "cos_steam_crown",
-      ];
-      const pick = pool[Math.floor(rngRef.current() * pool.length)];
-      const drop: LootDrop = {
-        id: `${pick}_${Date.now()}`,
-        key: pick,
-        name: LOOT_META[pick]?.name ?? pick,
-        rarity: LOOT_META[pick]?.rarity ?? "RARE",
-      };
-      setBackpack((b) => [...b.filter((_, idx) => idx !== shardIdx), drop]);
-      setRaidLog((l) => [
-        `游商盲盒开启：获得【${drop.name}】！`,
-        ...l.slice(0, 7),
-      ]);
-    }
+    void runAction(() =>
+      api.raidAction({ action: "merchant_buy", itemKey: offer }),
+    );
   };
+
+  const serverReport = raidLoadout.lastSettlementReport ?? null;
+  const reportKey = serverReport
+    ? `${serverReport.status}_${serverReport.zonesVisited}_${serverReport.chestsOpened}_${serverReport.bossesKilled}_${serverReport.backpackItems.length}_${serverReport.safeBoxItems.length}`
+    : "";
+  const settlementReport =
+    !inRaid && serverReport && dismissedSettlementSeed !== reportKey
+      ? serverReport
+      : null;
 
   // ============================================================================
   // ACT 4: CEREMONIAL POST-RAID SETTLEMENT OVERLAY (仪式感结算卷轴画面)
@@ -1080,14 +454,14 @@ export function WastelandRaidPanel({
               </div>
               <div className="tab-body">
                 <h4>
-                  安全保险箱带回 ({settlementReport.savedSafeBox.length} 件 ·
+                  安全保险箱带回 ({settlementReport.safeBoxItems.length} 件 ·
                   绝不掉落)
                 </h4>
                 <div className="loot-slot-grid">
-                  {settlementReport.savedSafeBox.length === 0 ? (
+                  {settlementReport.safeBoxItems.length === 0 ? (
                     <span className="muted-note">安全保险箱未存放物品</span>
                   ) : (
-                    settlementReport.savedSafeBox.map((item) => (
+                    settlementReport.safeBoxItems.map((item) => (
                       <div key={item.id} className="loot-item-tile">
                         <RaidItemIconSVG itemKey={item.key} size={ICON.xl} />
                         <div>
@@ -1106,17 +480,17 @@ export function WastelandRaidPanel({
                 <hr className="ink-divider" />
 
                 <h4>
-                  随身背囊带出 ({settlementReport.extractedBag.length} 件)
+                  随身背囊带出 ({settlementReport.backpackItems.length} 件)
                 </h4>
                 <div className="loot-slot-grid">
-                  {settlementReport.extractedBag.length === 0 ? (
+                  {settlementReport.backpackItems.length === 0 ? (
                     <span className="muted-note">
                       {isExtracted
                         ? "随身背囊未携带额外战利品"
                         : "随身背囊物资已在荒原迷失中损毁"}
                     </span>
                   ) : (
-                    settlementReport.extractedBag.map((item) => (
+                    settlementReport.backpackItems.map((item) => (
                       <div key={item.id} className="loot-item-tile">
                         <RaidItemIconSVG itemKey={item.key} size={ICON.xl} />
                         <div>
@@ -1136,7 +510,7 @@ export function WastelandRaidPanel({
                   <button
                     type="button"
                     className="btn-primary btn-block"
-                    onClick={() => setSettlementReport(null)}
+                    onClick={() => setDismissedSettlementSeed(reportKey)}
                   >
                     收拢战利品 · 返回斥候大本营
                   </button>
@@ -1153,7 +527,7 @@ export function WastelandRaidPanel({
   // ACT 3: FULL-SCREEN 2D MULTI-ZONE MAP + HIDDEN BACKPACK + 3-COLUMN LOOTING
   // ============================================================================
   if (inRaid && currentZone) {
-    const earlyExtractOpen = timeLeftMs >= 80000;
+    const earlyExtractOpen = timeLeftMs >= EARLY_EXTRACT_CUTOFF_MS;
     const canExtractHere =
       currentTile?.kind === "extract_deep" ||
       (currentTile?.kind === "extract_early" && earlyExtractOpen);
@@ -1253,9 +627,7 @@ export function WastelandRaidPanel({
                   const isPlayer = tile.x === pos.x && tile.y === pos.y;
                   const isAdjacent =
                     Math.abs(tile.x - pos.x) + Math.abs(tile.y - pos.y) === 1;
-                  const isExplored = currentZone.explored.has(
-                    `${tile.x},${tile.y}`,
-                  );
+                  const isExplored = tile.explored && tile.kind !== "fog";
 
                   let tileTitle = "荒原空地";
                   let tileBadge = "";
@@ -1266,7 +638,7 @@ export function WastelandRaidPanel({
                     tileTitle = "裂隙起点";
                     tileBadge = "起点";
                   } else if (tile.kind === "portal") {
-                    tileTitle = tile.portalLabel ?? "区块星盘传送门";
+                    tileTitle = tile.portalLabel || "区块星盘传送门";
                     tileBadge = "星门";
                   } else if (tile.kind === "extract_early") {
                     tileTitle = earlyExtractOpen
@@ -1281,26 +653,26 @@ export function WastelandRaidPanel({
                     tileBadge = "游商";
                   } else if (tile.kind === "oasis") {
                     tileTitle = "甘泉绿洲";
-                    tileBadge = tile.searched ? "" : "绿洲";
+                    tileBadge = tile.looted ? "" : "绿洲";
                   } else if (tile.kind === "chest_wood") {
                     tileTitle = "破旧木箱 (1.1s)";
-                    tileBadge = tile.searched ? "" : "木箱";
+                    tileBadge = tile.looted ? "" : "木箱";
                   } else if (tile.kind === "chest_iron") {
                     tileTitle = "铁皮军需箱 (2.2s)";
-                    tileBadge = tile.searched ? "" : "军需";
+                    tileBadge = tile.looted ? "" : "军需";
                   } else if (tile.kind === "chest_coffin") {
                     tileTitle = "远古机关石棺 (3.6s)";
-                    tileBadge = tile.searched ? "" : "石棺";
+                    tileBadge = tile.looted ? "" : "石棺";
                   } else if (tile.kind === "chest_abyss") {
                     tileTitle = "深渊黑曜秘宝库 (5.4s)";
-                    tileBadge = tile.searched ? "" : "秘宝";
+                    tileBadge = tile.looted ? "" : "秘宝";
                   } else if (
                     tile.kind === "enemy_raider" ||
                     tile.kind === "enemy_worm" ||
                     tile.kind === "enemy_boss"
                   ) {
-                    tileTitle = `${tile.enemyName ?? "荒原敌军"} (HP ${tile.enemyHp} / 攻 ${tile.enemyAtk})`;
-                    tileBadge = tile.defeated ? "" : `HP${tile.enemyHp}`;
+                    tileTitle = `${tile.enemyName || "荒原敌军"} (HP ${tile.enemyHp} / 攻 ${tile.enemyAtk})`;
+                    tileBadge = tile.looted ? "" : `HP${tile.enemyHp}`;
                   }
 
                   return (
@@ -1335,9 +707,9 @@ export function WastelandRaidPanel({
                       ) : (
                         <>
                           <RaidTileSpriteSVG
-                            kind={tile.kind}
-                            searched={tile.searched}
-                            defeated={tile.defeated}
+                            kind={tile.kind as TileKind}
+                            searched={tile.looted}
+                            defeated={tile.looted}
                             extractOpen={earlyExtractOpen}
                           />
                           {tileBadge && (
@@ -1391,7 +763,7 @@ export function WastelandRaidPanel({
                       onClick={handleUsePortal}
                     >
                       <Compass size={ICON.xs} />
-                      <span>{currentTile.portalLabel ?? "踏入星盘传送门"}</span>
+                      <span>{currentTile.portalLabel || "踏入星盘传送门"}</span>
                     </button>
                   )}
 
@@ -1402,13 +774,14 @@ export function WastelandRaidPanel({
                       onClick={() =>
                         setChanneling({
                           label: "正在呼叫信标撤离 (2.8s)",
-                          kind: currentTile.kind,
+                          kind: currentTile.kind as TileKind,
                           x: pos.x,
                           y: pos.y,
                           startedAt: Date.now(),
-                          durationMs: getChestChannelMs(
+                          durationMs: computeChestChannelMs(
                             currentTile.kind,
                             scavRemMs > 0,
+                            currentTile.channelMs,
                           ),
                           progressPct: 0,
                         })
@@ -1423,10 +796,7 @@ export function WastelandRaidPanel({
                     <button
                       type="button"
                       className="btn-primary"
-                      onClick={() => {
-                        setActiveContainerTitle("荒原游商营帐 · 局内易物驿站");
-                        setShowLootModal(true);
-                      }}
+                      onClick={() => setShowLootModal(true)}
                     >
                       <span>与荒原游商交易</span>
                     </button>
@@ -1452,7 +822,7 @@ export function WastelandRaidPanel({
               <div className="minimap-zone-topology">
                 {zones.map((z) => {
                   const isCur = z.id === curZoneId;
-                  const isVis = zonesVisitedSet.has(z.id);
+                  const isVis = z.visited;
                   return (
                     <div
                       key={z.id}
@@ -1475,7 +845,7 @@ export function WastelandRaidPanel({
                 >
                   {currentZone.tiles.map((t) => {
                     const isP = t.x === pos.x && t.y === pos.y;
-                    const isExp = currentZone.explored.has(`${t.x},${t.y}`);
+                    const isExp = t.explored && t.kind !== "fog";
                     let cellCls = "minimap-floor";
                     if (isP) cellCls = "minimap-player";
                     else if (!isExp) cellCls = "minimap-fog";
@@ -1493,14 +863,14 @@ export function WastelandRaidPanel({
                         t.kind === "chest_iron" ||
                         t.kind === "chest_coffin" ||
                         t.kind === "chest_abyss") &&
-                      !t.searched
+                      !t.looted
                     )
                       cellCls = "minimap-chest";
                     else if (
                       (t.kind === "enemy_raider" ||
                         t.kind === "enemy_worm" ||
                         t.kind === "enemy_boss") &&
-                      !t.defeated
+                      !t.looted
                     )
                       cellCls = "minimap-enemy";
 
@@ -1519,7 +889,7 @@ export function WastelandRaidPanel({
                   <span>
                     已探明{" "}
                     {Math.round(
-                      (currentZone.explored.size / currentZone.tiles.length) *
+                      (currentZone.exploredCount / currentZone.tiles.length) *
                         100,
                     )}
                     %

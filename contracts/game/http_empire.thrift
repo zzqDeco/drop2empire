@@ -147,6 +147,77 @@ struct RaidBuffCardDTO {
   7: required bool canBuy (api.body="canBuy")
 }
 
+struct RaidLootItemDTO {
+  1: required string id (api.body="id")
+  2: required string key (api.body="key")
+  3: required string name (api.body="name")
+  4: required string rarity (api.body="rarity")
+  5: required string category (api.body="category")
+}
+
+struct RaidTileViewDTO {
+  1: required i32 x (api.body="x")
+  2: required i32 y (api.body="y")
+  3: required string kind (api.body="kind")
+  4: required bool explored (api.body="explored")
+  5: required bool looted (api.body="looted")
+  6: required string enemyName (api.body="enemyName")
+  7: required i32 enemyHp (api.body="enemyHp")
+  8: required i32 enemyMaxHp (api.body="enemyMaxHp")
+  9: required i32 enemyAtk (api.body="enemyAtk")
+  10: required i32 portalTargetZone (api.body="portalTargetZone")
+  11: required string portalLabel (api.body="portalLabel")
+  12: required i32 channelMs (api.body="channelMs")
+}
+
+struct RaidZoneViewDTO {
+  1: required i32 id (api.body="id")
+  2: required string name (api.body="name")
+  3: required string subtitle (api.body="subtitle")
+  4: required i32 width (api.body="width")
+  5: required i32 height (api.body="height")
+  6: required bool visited (api.body="visited")
+  7: required i32 exploredCount (api.body="exploredCount")
+  8: required list<RaidTileViewDTO> tiles (api.body="tiles")
+}
+
+struct RaidSettlementReportDTO {
+  1: required string status (api.body="status")
+  2: required list<RaidLootItemDTO> backpackItems (api.body="backpackItems")
+  3: required list<RaidLootItemDTO> safeBoxItems (api.body="safeBoxItems")
+  4: required list<string> lostGearNames (api.body="lostGearNames")
+  5: required i32 zonesVisited (api.body="zonesVisited")
+  6: required i32 chestsOpened (api.body="chestsOpened")
+  7: required i32 bossesKilled (api.body="bossesKilled")
+}
+
+struct RaidSessionDTO {
+  1: required i64 seed (api.body="seed")
+  2: required i32 currentZoneId (api.body="currentZoneId")
+  3: required i32 playerX (api.body="playerX")
+  4: required i32 playerY (api.body="playerY")
+  5: required string facing (api.body="facing")
+  6: required i32 hp (api.body="hp")
+  7: required i32 maxHp (api.body="maxHp")
+  8: required i32 atk (api.body="atk")
+  9: required i32 def (api.body="def")
+  10: required bool cheatDeathActive (api.body="cheatDeathActive")
+  11: required i64 timeRemainingMs (api.body="timeRemainingMs")
+  12: required i32 effectiveMoveCooldownMs (api.body="effectiveMoveCooldownMs")
+  13: required i64 galeRemainingMs (api.body="galeRemainingMs")
+  14: required i64 scavRemainingMs (api.body="scavRemainingMs")
+  15: required list<string> usedPotionKeys (api.body="usedPotionKeys")
+  16: required list<RaidLootItemDTO> backpack (api.body="backpack")
+  17: required list<RaidLootItemDTO> safeBox (api.body="safeBox")
+  18: required list<RaidLootItemDTO> activeChestDrops (api.body="activeChestDrops")
+  19: required string activeContainerTitle (api.body="activeContainerTitle")
+  20: required list<string> logs (api.body="logs")
+  21: required i32 zonesVisitedCount (api.body="zonesVisitedCount")
+  22: required i32 chestsOpenedCount (api.body="chestsOpenedCount")
+  23: required i32 bossesKilledCount (api.body="bossesKilledCount")
+  24: required list<RaidZoneViewDTO> zones (api.body="zones")
+}
+
 struct RaidLoadoutStateDTO {
   1: required string weaponKey (api.body="weaponKey")
   2: required string armorKey (api.body="armorKey")
@@ -165,6 +236,8 @@ struct RaidLoadoutStateDTO {
   15: required i32 raidDurationSeconds (api.body="raidDurationSeconds")
   16: required i32 backpackCapacity (api.body="backpackCapacity")
   17: required i64 activeRaidSeed (api.body="activeRaidSeed")
+  18: optional RaidSessionDTO activeSession (api.body="activeSession")
+  19: optional RaidSettlementReportDTO lastSettlementReport (api.body="lastSettlementReport")
 }
 
 struct ProfessionSpecDTO {
@@ -568,14 +641,18 @@ struct PublishNoticeReq {
   4: optional list<string> demandShifts (api.body="demandShifts")
 }
 
+struct RaidActionReq {
+  1: required string action (api.body="action")
+  2: optional i32 dx (api.body="dx")
+  3: optional i32 dy (api.body="dy")
+  4: optional string itemId (api.body="itemId")
+  5: optional string fromContainer (api.body="fromContainer")
+  6: optional string toContainer (api.body="toContainer")
+  7: optional string itemKey (api.body="itemKey")
+}
+
 struct FinishRaidReq {
   1: required string status (api.body="status")
-  2: optional list<string> backpackLootKeys (api.body="backpackLootKeys")
-  3: optional list<string> safeBoxLootKeys (api.body="safeBoxLootKeys")
-  4: optional list<string> usedPotionKeys (api.body="usedPotionKeys")
-  5: optional i32 zonesVisited (api.body="zonesVisited")
-  6: optional i32 chestsOpened (api.body="chestsOpened")
-  7: optional i32 bossesKilled (api.body="bossesKilled")
 }
 
 struct ChooseProfessionReq {
@@ -686,8 +763,8 @@ service EmpireService {
   DashboardStateResp TriggerWarSettlement(1: TriggerWarSettlementReq req) (api.post="/api/v1/empire/war/settle")
   DashboardStateResp RedeemSeasonChest(1: RedeemSeasonChestReq req) (api.post="/api/v1/empire/season/redeem-chest")
   DashboardStateResp OpenSeasonChest(1: OpenSeasonChestReq req) (api.post="/api/v1/empire/season/open-chest")
-  DashboardStateResp ControlSimulation(1: ControlSimulationReq req) (api.post="/api/v1/empire/debug/sim")
-  Benchmark30mResp RunBenchmark30m(1: RunBenchmark30mReq req) (api.post="/api/v1/empire/debug/benchmark-30m")
+  DashboardStateResp ControlSimulation(1: ControlSimulationReq req) (api.post="/api/v1/empire/admin/sim")
+  Benchmark30mResp RunBenchmark30m(1: RunBenchmark30mReq req) (api.post="/api/v1/empire/admin/benchmark-30m")
   DashboardStateResp CreateInvite(1: CreateInviteReq req) (api.post="/api/v1/empire/admin/invites")
   DashboardStateResp RevokeInvite(1: RevokeInviteReq req) (api.post="/api/v1/empire/admin/invites/:id/revoke")
   DashboardStateResp ToggleEdict(1: ToggleEdictReq req) (api.post="/api/v1/empire/colony/toggle-edict")
@@ -699,6 +776,7 @@ service EmpireService {
   DashboardStateResp ManageRaidGear(1: ManageRaidGearReq req) (api.post="/api/v1/empire/colony/raid/gear")
   DashboardStateResp DraftRaidBuff(1: DraftRaidBuffReq req) (api.post="/api/v1/empire/colony/raid/buff")
   DashboardStateResp StartRaid(1: StartRaidReq req) (api.post="/api/v1/empire/colony/raid/start")
+  DashboardStateResp RaidAction(1: RaidActionReq req) (api.post="/api/v1/empire/colony/raid/action")
   DashboardStateResp FinishRaid(1: FinishRaidReq req) (api.post="/api/v1/empire/colony/raid/finish")
   DashboardStateResp RolloverSeason(1: RolloverSeasonReq req) (api.post="/api/v1/empire/admin/season/rollover")
   DashboardStateResp PublishNotice(1: PublishNoticeReq req) (api.post="/api/v1/empire/admin/notices")
