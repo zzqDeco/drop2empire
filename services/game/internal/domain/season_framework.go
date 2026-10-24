@@ -21,6 +21,31 @@ var SeasonRetentionRules = []string{
 	"已开启铸造的唯一序列号程序化纹理藏品（Collectibles）永久保留",
 }
 
+func DefaultSeasonAnnouncements() []SeasonNotice {
+	return []SeasonNotice{
+		{
+			SeasonID:    "S1-CURRENT",
+			Title:       "第一赛季 · 墨械纪元皇室敕令",
+			EffectiveIn: "本季生效中",
+			Summary:     "要塞驻防战力 +25%，铁锭、抽水机与步兵军备需求旺盛；荒原裂隙已发现游商营帐与高危黑曜圣殿。",
+			DemandShifts: []string{
+				"自动抽水机（科学家）",
+				"泰坦精锻工具组 & 重步兵军备（工匠）",
+			},
+		},
+		{
+			SeasonID:    "S2-PREVIEW-T7D",
+			Title:       "第二赛季前瞻 · 秘法狂潮",
+			EffectiveIn: "7 天后轮换",
+			Summary:     "新增酸雾沼泽与以太裂隙，催化剂与附魔卷轴需求上升。所有 S1 赛季限定动态外观与唯一纹理藏品将跨赛季永久保留。",
+			DemandShifts: []string{
+				"赫尔墨斯催化剂（炼金术士）",
+				"星界附魔卷轴（魔法师）",
+			},
+		},
+	}
+}
+
 func EnsureSeasonState(w *WorldState, now time.Time) {
 	if w.SeasonNumber <= 0 {
 		w.SeasonNumber = 1
@@ -34,6 +59,45 @@ func EnsureSeasonState(w *WorldState, now time.Time) {
 	if w.SeasonStartedAt == "" {
 		w.SeasonStartedAt = now.UTC().Format("2006-01-02 15:04:05")
 	}
+	if len(w.Announcements) == 0 {
+		w.Announcements = DefaultSeasonAnnouncements()
+	}
+}
+
+func PublishNotice(w *WorldState, title, effectiveIn, summary string, demandShifts []string, now time.Time) error {
+	EnsureSeasonState(w, now)
+	cleanTitle := strings.TrimSpace(title)
+	cleanEff := strings.TrimSpace(effectiveIn)
+	cleanSum := strings.TrimSpace(summary)
+	if cleanTitle == "" || cleanSum == "" {
+		return ErrInvalidInput("公告标题与正文摘要不能为空")
+	}
+	if cleanEff == "" {
+		cleanEff = "即时生效"
+	}
+	shifts := make([]string, 0, len(demandShifts))
+	for _, s := range demandShifts {
+		if trimmed := strings.TrimSpace(s); trimmed != "" {
+			shifts = append(shifts, trimmed)
+		}
+	}
+	notice := SeasonNotice{
+		SeasonID:     fmt.Sprintf("S%d-NOTICE-%d", w.SeasonNumber, now.Unix()),
+		Title:        cleanTitle,
+		EffectiveIn:  cleanEff,
+		Summary:      cleanSum,
+		DemandShifts: shifts,
+	}
+	w.Announcements = append([]SeasonNotice{notice}, w.Announcements...)
+	if len(w.Announcements) > 8 {
+		w.Announcements = w.Announcements[:8]
+	}
+	for _, p := range w.Players {
+		if p != nil {
+			AppendLog(p, now, "EMPIRE", fmt.Sprintf("【帝国皇室公告】%s（%s）：%s", cleanTitle, cleanEff, cleanSum))
+		}
+	}
+	return nil
 }
 
 // isCosmeticKey checks if a resource key is a permanent season cosmetic (cos_*).

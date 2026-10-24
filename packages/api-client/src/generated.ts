@@ -561,6 +561,13 @@ export interface RolloverSeasonReq {
   nextTitle?: string;
 }
 
+export interface PublishNoticeReq {
+  title: string;
+  effectiveIn: string;
+  summary: string;
+  demandShifts?: string[];
+}
+
 export interface FinishRaidReq {
   status: string;
   backpackLootKeys?: string[];
@@ -984,6 +991,15 @@ export const IDL_ROUTES = {
     path: "/api/v1/empire/admin/season/rollover",
     clientPath: "/empire/admin/season/rollover",
     requestType: "RolloverSeasonReq",
+    responseType: "DashboardStateResp",
+  },
+  PublishNotice: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/admin/notices",
+    clientPath: "/empire/admin/notices",
+    requestType: "PublishNoticeReq",
     responseType: "DashboardStateResp",
   },
 } as const;

@@ -196,11 +196,11 @@ func TestColonyDepthSystemsConversionEdictsExpeditionsAndCaravan(t *testing.T) {
 	if len(p.RaidLoadout.DraftPoolCards) != 3 {
 		t.Fatalf("expected 3 draft pool cards, got %d", len(p.RaidLoadout.DraftPoolCards))
 	}
-	p.ResourcesMilli[ResWater] = 2000 * ResourceScale
-	p.ResourcesMilli[ResWood] = 1000 * ResourceScale
-	p.ResourcesMilli[ResCharcoal] = 500 * ResourceScale
-	p.ResourcesMilli[ResStone] = 1000 * ResourceScale
-	p.ResourcesMilli[ResFlint] = 50 * ResourceScale
+	p.ResourcesMilli[ResWater] = 15000 * ResourceScale
+	p.ResourcesMilli[ResWood] = 15000 * ResourceScale
+	p.ResourcesMilli[ResCharcoal] = 5000 * ResourceScale
+	p.ResourcesMilli[ResStone] = 15000 * ResourceScale
+	p.ResourcesMilli[ResFlint] = 500 * ResourceScale
 
 	for i := 0; i < 5; i++ {
 		pick := p.RaidLoadout.DraftPoolCards[0]

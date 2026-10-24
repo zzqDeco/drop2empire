@@ -3106,6 +3106,52 @@ func (p *RolloverSeasonReq) String() string {
 	return fmt.Sprintf("RolloverSeasonReq(%+v)", *p)
 }
 
+type PublishNoticeReq struct {
+	Title        string   `thrift:"title,1,required" json:"title"`
+	EffectiveIn  string   `thrift:"effectiveIn,2,required" json:"effectiveIn"`
+	Summary      string   `thrift:"summary,3,required" json:"summary"`
+	DemandShifts []string `thrift:"demandShifts,4,optional,list<string>" json:"demandShifts,omitempty"`
+}
+
+func NewPublishNoticeReq() *PublishNoticeReq {
+	return &PublishNoticeReq{}
+}
+
+func (p *PublishNoticeReq) InitDefault() {
+}
+
+func (p *PublishNoticeReq) GetTitle() (v string) {
+	return p.Title
+}
+
+func (p *PublishNoticeReq) GetEffectiveIn() (v string) {
+	return p.EffectiveIn
+}
+
+func (p *PublishNoticeReq) GetSummary() (v string) {
+	return p.Summary
+}
+
+var PublishNoticeReq_DemandShifts_DEFAULT []string
+
+func (p *PublishNoticeReq) GetDemandShifts() (v []string) {
+	if !p.IsSetDemandShifts() {
+		return PublishNoticeReq_DemandShifts_DEFAULT
+	}
+	return p.DemandShifts
+}
+
+func (p *PublishNoticeReq) IsSetDemandShifts() bool {
+	return p.DemandShifts != nil
+}
+
+func (p *PublishNoticeReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PublishNoticeReq(%+v)", *p)
+}
+
 type FinishRaidReq struct {
 	Status           string   `thrift:"status,1,required" json:"status"`
 	BackpackLootKeys []string `thrift:"backpackLootKeys,2,optional,list<string>" json:"backpackLootKeys,omitempty"`
@@ -3837,4 +3883,6 @@ type EmpireService interface {
 	FinishRaid(ctx context.Context, req *FinishRaidReq) (r *DashboardStateResp, err error)
 
 	RolloverSeason(ctx context.Context, req *RolloverSeasonReq) (r *DashboardStateResp, err error)
+
+	PublishNotice(ctx context.Context, req *PublishNoticeReq) (r *DashboardStateResp, err error)
 }

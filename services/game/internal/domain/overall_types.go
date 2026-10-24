@@ -455,6 +455,14 @@ type WarDaySettlement struct {
 	NodeReports           []WarBattleNodeReport `json:"nodeReports"`
 }
 
+type SeasonNotice struct {
+	SeasonID     string   `json:"seasonId"`
+	Title        string   `json:"title"`
+	EffectiveIn  string   `json:"effectiveIn"`
+	Summary      string   `json:"summary"`
+	DemandShifts []string `json:"demandShifts"`
+}
+
 type WorldState struct {
 	ActiveHandle           string                  `json:"activeHandle"`
 	AdminMode              bool                    `json:"-"`
@@ -475,6 +483,7 @@ type WorldState struct {
 	SeasonName             string                  `json:"seasonName"`
 	SeasonSubtitle         string                  `json:"seasonSubtitle"`
 	SeasonStartedAt        string                  `json:"seasonStartedAt"`
+	Announcements          []SeasonNotice          `json:"announcements"`
 	WarDay                 int32                   `json:"warDay"`
 	ObsidianScore          int32                   `json:"obsidianScore"`
 	ArgentScore            int32                   `json:"argentScore"`

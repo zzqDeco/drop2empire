@@ -34,6 +34,18 @@ func (s *Service) RolloverSeason(ctx context.Context, nextSeasonTitle string) (*
 	})
 }
 
+func (s *Service) PublishNotice(ctx context.Context, title, effectiveIn, summary string, demandShifts []string) (*domain.WorldState, error) {
+	if IsPublicSurface(ctx) {
+		return nil, domain.ErrForbidden("管理后台未在公网开放，请通过 SSH 本地隧道访问")
+	}
+	return s.mutate(ctx, func(w *domain.WorldState, _ *domain.PlayerState, now time.Time) error {
+		if !w.AdminMode {
+			return domain.ErrForbidden("仅平台管理员可发布帝国公告")
+		}
+		return domain.PublishNotice(w, title, effectiveIn, summary, demandShifts, now)
+	})
+}
+
 func (s *Service) ControlSimulation(ctx context.Context, action string, speedMultiplier int32, advanceSeconds int64, targetHandle string) (*domain.WorldState, error) {
 	return s.mutate(ctx, func(w *domain.WorldState, p *domain.PlayerState, now time.Time) error {
 		if !w.AdminMode {

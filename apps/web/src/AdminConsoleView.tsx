@@ -54,6 +54,10 @@ export function AdminConsoleView({
   const [authPassword, setAuthPassword] = useState("");
   const [customHandleInput, setCustomHandleInput] = useState("pioneer");
   const [nextSeasonTitle, setNextSeasonTitle] = useState("");
+  const [noticeTitle, setNoticeTitle] = useState("");
+  const [noticeEffectiveIn, setNoticeEffectiveIn] = useState("即时生效");
+  const [noticeSummary, setNoticeSummary] = useState("");
+  const [noticeShiftsText, setNoticeShiftsText] = useState("");
   const [benchmarkData, setBenchmarkData] = useState<Benchmark30mResp | null>(
     null,
   );
@@ -543,6 +547,103 @@ export function AdminConsoleView({
             </div>
           </section>
         </div>
+
+        <section className="subpanel" aria-label="帝国公告发布">
+          <div className="subpanel-head">
+            <h3>
+              <Sparkles size={ICON.sm} />
+              <span>帝国公告与赛季动向发布（控制全服公告节奏）</span>
+            </h3>
+            <span className="tag-badge mono-num">
+              已发布 {state.seasonNotices.length} 条
+            </span>
+          </div>
+
+          <div className="split-2col">
+            <form
+              className="order-ticket"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!noticeTitle.trim() || !noticeSummary.trim()) return;
+                const shifts = noticeShiftsText
+                  .split("\n")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                void runAction(
+                  () =>
+                    api.publishNotice({
+                      title: noticeTitle.trim(),
+                      effectiveIn: noticeEffectiveIn.trim() || "即时生效",
+                      summary: noticeSummary.trim(),
+                      demandShifts: shifts,
+                    }),
+                  "已向全服发布新帝国公告",
+                );
+                setNoticeTitle("");
+                setNoticeSummary("");
+                setNoticeShiftsText("");
+              }}
+            >
+              <div className="form-row-2">
+                <label>
+                  <span>公告标题</span>
+                  <input
+                    type="text"
+                    placeholder="如：S1 中期战备动员令..."
+                    value={noticeTitle}
+                    onChange={(e) => setNoticeTitle(e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>生效周期标签</span>
+                  <input
+                    type="text"
+                    placeholder="如：即时生效 / D4 开启"
+                    value={noticeEffectiveIn}
+                    onChange={(e) => setNoticeEffectiveIn(e.target.value)}
+                  />
+                </label>
+              </div>
+              <label>
+                <span>公告正文摘要</span>
+                <input
+                  type="text"
+                  placeholder="阐述当前赛季演进节奏、宏观经济或战区动向..."
+                  value={noticeSummary}
+                  onChange={(e) => setNoticeSummary(e.target.value)}
+                />
+              </label>
+              <label>
+                <span>物价与需求变动条目（每行一条，选填）</span>
+                <input
+                  type="text"
+                  placeholder="如：骑兵军备箱需求上升 +25%"
+                  value={noticeShiftsText}
+                  onChange={(e) => setNoticeShiftsText(e.target.value)}
+                />
+              </label>
+              <button
+                type="submit"
+                className="btn-primary btn-block"
+                disabled={busy || !noticeTitle.trim() || !noticeSummary.trim()}
+              >
+                发布全服帝国公告
+              </button>
+            </form>
+
+            <div className="notice-stack">
+              {state.seasonNotices.map((sn) => (
+                <article key={sn.seasonId} className="season-notice-card">
+                  <div className="bp-top">
+                    <strong>{sn.title}</strong>
+                    <span className="tag-badge">{sn.effectiveIn}</span>
+                  </div>
+                  <p>{sn.summary}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
 
       {showBenchmarkModal && benchmarkData && (

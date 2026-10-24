@@ -76,4 +76,5 @@ Protected by Caddy loopback port isolation and `X-D2E-Admin-Tunnel: 1`:
 | `POST /api/v1/empire/admin/reset` | `ResetWorld` | Resets the active test player state. |
 | `POST /api/v1/empire/admin/war/settle` | `TriggerWarSettlement` | Manually triggers the daily 20:00 chamber war resolution and stipend distribution. |
 | `POST /api/v1/empire/admin/season/rollover` | `RolloverSeason` | Executes cross-season settlement (`S1 -> S2`): resets settlement population/resources/blueprints, profession, gold, and learned raid blueprints (`bp_*`), while permanently retaining `cos_*` seasonal animated cosmetics and minted `Collectibles`. |
+| `POST /api/v1/empire/admin/notices` | `PublishNotice` | Publishes an official Imperial Announcement (`title`, `effectiveIn`, `summary`, `demandShifts`) to all players' `seasonNotices` feed. |
 | `GET /api/v1/empire/admin/benchmark-30m` | `RunBenchmark30m` | Runs the deterministic 30-minute Phase 1 progression simulator across 3 reference strategies. |

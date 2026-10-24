@@ -5,38 +5,35 @@ import {
   type DashboardStateResp,
 } from "@drop2empire/api-client";
 import {
-  Award,
   Compass,
-  Cpu,
   Droplets,
   Hammer,
-  LogOut,
   Moon,
   Plus,
   Scale,
   Sun,
-  Swords,
-  TrendingUp,
   UserCheck,
 } from "lucide-react";
 import { ICON } from "./icons";
 import { applyTheme, getInitialTheme, type ThemeMode } from "./theme";
 import { formatETA, formatGold, formatRate, formatResource } from "./format";
-import { LordAvatarSVG } from "./LordAvatarSVG";
+import { CivilizationSilhouetteSVG } from "./RaidSpritesSVG";
 import {
   LordProfileWardrobeBar,
   WastelandRaidPanel,
 } from "./WastelandRaidPanel";
 import { AdminConsoleView } from "./AdminConsoleView";
 import {
+  ImperialAnnouncementModal,
   MarketSceneView,
   SeasonRelicVaultPanel,
   SettingsChronicleModal,
   WarGuildSceneView,
+  WorldMapCompassModal,
+  type WorldZoneKey,
 } from "./MacroEmpireWorkspace";
 
 type AuthMode = "login" | "register";
-type GameScene = "settlement" | "scout" | "market" | "war" | "lord";
 
 export function App() {
   const isAdminRoute = useMemo(
@@ -54,8 +51,14 @@ export function App() {
   const [noticeBanner, setNoticeBanner] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme());
   const [presetInput, setPresetInput] = useState("");
-  const [activeScene, setActiveScene] = useState<GameScene>("settlement");
+  const [activeScene, setActiveScene] = useState<WorldZoneKey>("settlement");
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [showWorldMapModal, setShowWorldMapModal] = useState(false);
+  const [dismissedChapterKey, setDismissedChapterKey] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem("d2e_ack_chapter") ?? "";
+  });
 
   // Authentication form state
   const initialInviteCode = useMemo(() => {
@@ -145,6 +148,20 @@ export function App() {
     }, 150);
     return () => window.clearInterval(id);
   }, [state, hasActivePopulation]);
+
+  useEffect(() => {
+    if (!state || !hasActivePopulation || isAdminRoute) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        setShowWorldMapModal((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [state, hasActivePopulation, isAdminRoute]);
 
   const runAction = async (
     fn: () => Promise<DashboardStateResp>,
@@ -650,45 +667,63 @@ export function App() {
                   ? {
                       key: "ch8-prof",
                       tag: "第八章 · 圣坛择业",
-                      text: "远古宝藏轰然开启！择定你的终身职业，解锁【工坊与市场】与【公会与战区】场景。",
+                      text: "远古宝藏轰然开启！择定你的终身职业，即可在右下角【世界舆图】中解锁皇家工坊市场与公会战区。",
                     }
                   : {
                       key: "ch9-empire",
                       tag: "第九章 · 滴水成城",
-                      text: "聚落已蜕变为帝国重镇。在上方切换【聚落生产】【荒原斥候】【工坊与市场】【公会与战区】【领主与藏品】五大场景。",
+                      text: "聚落已蜕变为帝国重镇！主界面融合领主个人档案与主城生产，点击右下角【世界舆图 (M)】即可前往荒原裂隙、工坊交易所、公会战区与秘宝馆。",
                     };
+
+  const civEra: "stone" | "colony" | "workshop" | "empire" = !quarryUnlocked
+    ? "stone"
+    : !workshopUnlocked
+      ? "colony"
+      : player.profession === "none"
+        ? "workshop"
+        : "empire";
+
+  const currentAckChapterKey = `${player.handle}:${storyChapter.key}`;
+  const showCivChapterPopup = dismissedChapterKey !== currentAckChapterKey;
+
+  const zoneTitleMap: Record<WorldZoneKey, string> = {
+    settlement: "◆ 帝国主城 · 领主与聚落总览 ◆",
+    scout: "◆ 西北裂隙 · 荒原斥候大营 ◆",
+    market: "◆ 东南商埠 · 皇家工坊与交易所 ◆",
+    war: "◆ 东北前线 · 公会驻地与八城战区 ◆",
+    lord: "◆ 西南秘苑 · 墨械唯一秘宝馆 ◆",
+  };
 
   return (
     <div className="app-shell" onClickCapture={handleGlobalButtonPop}>
-      <header className="topbar">
-        <div className="brand-cluster">
-          <div className="brand-emblem">D2E</div>
-          <LordAvatarSVG
-            cosmetics={state.equippedCosmetics}
-            weaponKey={state.raidLoadout?.weaponKey}
-            armorKey={state.raidLoadout?.armorKey}
-            bootsKey={state.raidLoadout?.bootsKey}
-            size="mini"
-          />
-          <div className="brand-titles">
-            <div className="brand-main">
-              <span>滴水成城</span>
-            </div>
-            <div className="brand-meta">
-              <span>{player.handle}</span>
-              {player.profession !== "none" && (
-                <>
-                  <span>·</span>
-                  <span>{player.professionName}</span>
-                </>
-              )}
-            </div>
-          </div>
+      {/* ========================================================================
+          GRAND IMPERIAL CREST HEADER (无冗余左上角品牌/小人，强化人口/金币/积分纹章边框)
+          ======================================================================== */}
+      <header className="topbar imperial-crest-header">
+        <div className="imperial-header-wing">
+          {activeScene !== "settlement" ? (
+            <button
+              type="button"
+              className="btn-primary btn-sm"
+              data-pop="返回主城"
+              onClick={() => setActiveScene("settlement")}
+            >
+              <Compass size={ICON.xs} />
+              <span>返回领主主城</span>
+            </button>
+          ) : (
+            <span className="imperial-zone-plaque mono-num">
+              {zoneTitleMap[activeScene]}
+            </span>
+          )}
         </div>
 
-        <div className="telemetry-strip">
-          <div className="metric-cell">
-            <span className="metric-label">人口</span>
+        <div className="telemetry-strip imperial-telemetry-crest">
+          <span className="crest-corner-ornament" aria-hidden="true">
+            ◆
+          </span>
+          <div className="metric-cell imperial-plaque">
+            <span className="metric-label">帝国人口</span>
             <span className="metric-value mono-num">
               {player.populationTotal}
             </span>
@@ -697,8 +732,8 @@ export function App() {
           {(treasureUnlocked ||
             player.profession !== "none" ||
             player.goldBasis > 0) && (
-            <div className="metric-cell">
-              <span className="metric-label">金币</span>
+            <div className="metric-cell imperial-plaque">
+              <span className="metric-label">皇家金币</span>
               <span className="metric-value mono-num">
                 {formatGold(player.goldBasis)}
                 {player.goldFrozenBasis > 0 && (
@@ -712,43 +747,34 @@ export function App() {
           )}
 
           {(player.profession !== "none" || player.activityPoints > 0) && (
-            <div className="metric-cell">
-              <span className="metric-label">积分</span>
+            <div className="metric-cell imperial-plaque">
+              <span className="metric-label">战功积分</span>
               <span className="metric-value mono-num">
                 {player.activityPoints}
               </span>
             </div>
           )}
+          <span className="crest-corner-ornament" aria-hidden="true">
+            ◆
+          </span>
         </div>
 
-        <div className="toolbar-actions">
+        <div className="toolbar-actions imperial-header-wing">
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={() => setShowAnnouncementModal(true)}
+          >
+            <Scale size={ICON.xs} />
+            <span>帝国公告 ({state.seasonNotices.length})</span>
+          </button>
           <button
             type="button"
             className="btn-outline"
             onClick={() => setShowSettingsModal(true)}
           >
-            <Scale size={ICON.xs} />
-            <span>设置 · 纪事 ({state.eventLogs.length})</span>
-          </button>
-          <button
-            type="button"
-            className="btn-icon"
-            aria-label="切换主题"
-            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-          >
-            {theme === "light" ? (
-              <Moon size={ICON.sm} />
-            ) : (
-              <Sun size={ICON.sm} />
-            )}
-          </button>
-          <button
-            type="button"
-            className="btn-outline"
-            onClick={() => void handleLogout()}
-          >
-            <LogOut size={ICON.xs} />
-            <span>退出</span>
+            <Hammer size={ICON.xs} />
+            <span>设置 ({state.eventLogs.length})</span>
           </button>
         </div>
       </header>
@@ -774,96 +800,16 @@ export function App() {
         </div>
       )}
 
-      {/* Animated Story Chronicle Bar */}
-      <section className="story-chronicle-bar" aria-label="纪元指引">
-        <span className="story-beacon-dot" />
-        <span className="story-chapter-tag">{storyChapter.tag}</span>
-        <span key={storyChapter.key} className="story-whisper-text">
-          {storyChapter.text}
-        </span>
-      </section>
-
-      {/* Multi-Scene Switcher Bar (Progressive Disclosure) */}
-      {(showScoutScene || showAdvancedWorld || showLordScene) && (
-        <nav
-          className="lower-workspace"
-          style={{ marginTop: "var(--space-3)", marginBottom: 0 }}
-          aria-label="玩法场景切换"
-        >
-          <div className="tabs-header">
-            <div className="tab-buttons" role="tablist">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeScene === "settlement"}
-                className={`tab-btn ${activeScene === "settlement" ? "active" : ""}`}
-                onClick={() => setActiveScene("settlement")}
-              >
-                <Droplets size={ICON.sm} />
-                <span>聚落生产</span>
-              </button>
-
-              {showScoutScene && (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeScene === "scout"}
-                  className={`tab-btn ${activeScene === "scout" ? "active" : ""}`}
-                  onClick={() => setActiveScene("scout")}
-                >
-                  <Compass size={ICON.sm} />
-                  <span>荒原斥候与游商</span>
-                </button>
-              )}
-
-              {showAdvancedWorld && (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeScene === "market"}
-                  className={`tab-btn ${activeScene === "market" ? "active" : ""}`}
-                  onClick={() => setActiveScene("market")}
-                >
-                  <Cpu size={ICON.sm} />
-                  <span>工坊与市场</span>
-                </button>
-              )}
-
-              {showAdvancedWorld && (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeScene === "war"}
-                  className={`tab-btn ${activeScene === "war" ? "active" : ""}`}
-                  onClick={() => setActiveScene("war")}
-                >
-                  <Swords size={ICON.sm} />
-                  <span>公会与战区 (D{state.war.currentDay})</span>
-                </button>
-              )}
-
-              {showLordScene && (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeScene === "lord"}
-                  className={`tab-btn ${activeScene === "lord" ? "active" : ""}`}
-                  onClick={() => setActiveScene("lord")}
-                >
-                  <Award size={ICON.sm} />
-                  <span>领主与藏品</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </nav>
-      )}
-
       {/* ========================================================================
-          SCENE 1: 聚落生产 (Settlement Production, Edicts, Blueprints & Profession Gate)
+          SCENE 1: 完整个人视角 · 领主主城 (Personal Lord Profile + Settlement Production)
           ======================================================================== */}
       {activeScene === "settlement" && (
         <div key="scene-settlement">
+          {/* Integrated Personal Lord Profile & 2.5D Voxel Wardrobe */}
+          <div className="settlement-lord-hero-wrap">
+            <LordProfileWardrobeBar state={state} runAction={runAction} />
+          </div>
+
           {showProfessionChoice && (
             <section className="profession-gate-banner" aria-label="选择职业">
               <div className="section-head">
@@ -1467,68 +1413,15 @@ export function App() {
       )}
 
       {/* ========================================================================
-          SCENE 2: 荒原斥候与游商 (2D Portal Extraction Roguelite + Caravan Barter)
+          SCENE 2: 荒原裂隙斥候营 (Act 1 整备 → Act 2 3D 蚀刻增益卡抽取 → Act 3 全屏 2D 搜打撤与局内游商)
           ======================================================================== */}
       {activeScene === "scout" && showScoutScene && (
         <section
           key="scene-scout"
-          className="dashboard-grid dashboard-grid-2col"
-          aria-label="荒原探索与游商驿站"
+          className="raid-scene-shell"
+          aria-label="荒原裂隙斥候营"
         >
           <WastelandRaidPanel state={state} runAction={runAction} />
-
-          <section className="panel" aria-label="游商驿站">
-            <div className="panel-header">
-              <div className="panel-title">
-                <TrendingUp size={ICON.sm} />
-                <h2>游商驿站</h2>
-              </div>
-              <span className="tag-badge">以物易物</span>
-            </div>
-
-            <div className="blueprint-list">
-              {(state.caravanOffers ?? []).map((cf) => (
-                <article
-                  key={cf.offerCode}
-                  className={`bp-card ${cf.canTrade ? "bp-ready" : ""}`}
-                >
-                  <div className="bp-top">
-                    <strong>{cf.title}</strong>
-                    <span className="tag-badge">{cf.rewardSummary}</span>
-                  </div>
-                  <div className="bp-footer">
-                    <div className="bp-costs">
-                      {cf.costs.map((c) => {
-                        const ok = c.currentMilli >= c.requiredMilli;
-                        return (
-                          <span
-                            key={c.resourceKey}
-                            className={`cost-chip mono-num ${ok ? "cost-ok" : "cost-lack"}`}
-                          >
-                            {c.resourceName} {formatResource(c.currentMilli, 0)}
-                            /{formatResource(c.requiredMilli, 0)}
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn-primary btn-sm"
-                      data-pop={`+${cf.rewardSummary}`}
-                      disabled={!cf.canTrade}
-                      onClick={() =>
-                        void runAction(() =>
-                          api.tradeCaravan({ offerCode: cf.offerCode }),
-                        )
-                      }
-                    >
-                      易物
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
         </section>
       )}
 
@@ -1551,24 +1444,112 @@ export function App() {
       )}
 
       {/* ========================================================================
-          SCENE 5: 领主与藏品 (Blueprint & Ink Lord Wardrobe + Procedural Relics)
+          SCENE 5: 墨械秘宝陈列馆 (Season Chest & Procedural UV-Etched Collectibles)
           ======================================================================== */}
       {activeScene === "lord" && showLordScene && (
         <div key="scene-lord" style={{ marginTop: "var(--space-3)" }}>
-          <div style={{ margin: "0 18px var(--space-3)" }}>
-            <LordProfileWardrobeBar state={state} runAction={runAction} />
-          </div>
           <SeasonRelicVaultPanel state={state} runAction={runAction} />
         </div>
       )}
 
       {/* ========================================================================
-          SETTINGS & CHRONICLE MODAL (设置 · 赛季动向与聚落编年纪事)
+          FLOATING WORLD MAP COMPASS BUTTON (右下角世界舆图按钮，前往各大功能区)
+          ======================================================================== */}
+      <button
+        type="button"
+        className="world-map-fab"
+        aria-label="打开世界舆图 (快捷键 M)"
+        data-pop="展开世界舆图"
+        onClick={() => setShowWorldMapModal(true)}
+      >
+        <span className="world-map-fab-ring" aria-hidden="true" />
+        <Compass size={ICON.lg} />
+        <div className="world-map-fab-text">
+          <strong>世界舆图</strong>
+          <span className="mono-num">
+            {activeScene === "settlement" ? "前往疆域 [M]" : "切换疆域 [M]"}
+          </span>
+        </div>
+      </button>
+
+      {/* ========================================================================
+          CIVILIZATION CHAPTER PROGRESSION POPUP (章节推进时浮出文明剪影，常驻收敛于设置)
+          ======================================================================== */}
+      {showCivChapterPopup && (
+        <div
+          className="modal-backdrop civ-popup-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="文明纪元推进昭告"
+        >
+          <div className="civ-popup-card">
+            <div className="civ-popup-kicker">
+              <span className="story-beacon-dot" />
+              <span className="story-chapter-tag">{storyChapter.tag}</span>
+            </div>
+            <div className="civ-popup-silhouette-wrap">
+              <CivilizationSilhouetteSVG era={civEra} />
+            </div>
+            <p className="story-whisper-text">{storyChapter.text}</p>
+            <div className="civ-popup-footer">
+              <span className="muted-note">
+                （此章节指引随后将收纳于右上角【设置】面板中，不占用主界面视野）
+              </span>
+              <button
+                type="button"
+                className="btn-water-strike"
+                data-pop="★ 纪元推进"
+                onClick={() => {
+                  setDismissedChapterKey(currentAckChapterKey);
+                  if (typeof window !== "undefined") {
+                    window.localStorage.setItem(
+                      "d2e_ack_chapter",
+                      currentAckChapterKey,
+                    );
+                  }
+                }}
+              >
+                <span>铭记史册 · 继续开拓</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================
+          WORLD MAP COMPASS MODAL (世界舆图疆域导航)
+          ======================================================================== */}
+      {showWorldMapModal && (
+        <WorldMapCompassModal
+          state={state}
+          activeScene={activeScene}
+          showScoutScene={showScoutScene}
+          showAdvancedWorld={showAdvancedWorld}
+          showLordScene={showLordScene}
+          onSelectZone={(z) => setActiveScene(z)}
+          onClose={() => setShowWorldMapModal(false)}
+        />
+      )}
+
+      {/* ========================================================================
+          IMPERIAL ANNOUNCEMENT MODAL (帝国公告 · 赛季动向与宏观账本)
+          ======================================================================== */}
+      {showAnnouncementModal && (
+        <ImperialAnnouncementModal
+          state={state}
+          onClose={() => setShowAnnouncementModal(false)}
+        />
+      )}
+
+      {/* ========================================================================
+          SETTINGS & CHRONICLE MODAL (设置 · 主题切换、退出、文明章节与聚落编年纪事)
           ======================================================================== */}
       {showSettingsModal && (
         <SettingsChronicleModal
           state={state}
           theme={theme}
+          storyChapter={storyChapter}
+          civEra={civEra}
           onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
           onLogout={() => void handleLogout()}
           onClose={() => setShowSettingsModal(false)}
