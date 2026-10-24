@@ -5,200 +5,6 @@ import (
 	"time"
 )
 
-var ProfessionCatalog = []ProfessionSpec{
-	{
-		Code:             ProfScientist,
-		Name:             "科学家",
-		Title:            "工业自动化",
-		ArtifactName:     "阿基米德水力核",
-		ExclusiveOutputs: []string{"自动抽水机"},
-		StrengthText:     "基础资源高产",
-		WeaknessText:     "耗铁量高",
-		MarketRoleText:   "自动化设备供应",
-		PassiveBonusText: "水/木/石效率 +15%",
-	},
-	{
-		Code:             ProfAlchemist,
-		Name:             "炼金术士",
-		Title:            "高能催化",
-		ArtifactName:     "赫尔墨斯蒸馏釜",
-		ExclusiveOutputs: []string{"赫尔墨斯催化剂"},
-		StrengthText:     "全工坊通用增产",
-		WeaknessText:     "基础采集较慢",
-		MarketRoleText:   "催化剂供应",
-		PassiveBonusText: "军粮 +20% / 水 +10%",
-	},
-	{
-		Code:             ProfMage,
-		Name:             "魔法师",
-		Title:            "以太铭文",
-		ArtifactName:     "星界刻印棱镜",
-		ExclusiveOutputs: []string{"星界附魔卷轴"},
-		StrengthText:     "矿石与远程强化",
-		WeaknessText:     "耗木量高",
-		MarketRoleText:   "附魔卷轴供应",
-		PassiveBonusText: "采石 +20% / 军粮 +15%",
-	},
-	{
-		Code:             ProfArtisan,
-		Name:             "工匠",
-		Title:            "重装锻造",
-		ArtifactName:     "泰坦锻造矩尺",
-		ExclusiveOutputs: []string{"泰坦精锻工具组"},
-		StrengthText:     "冶金与军械制造",
-		WeaknessText:     "依赖外部矿源",
-		MarketRoleText:   "工具与军备供应",
-		PassiveBonusText: "炼铁 +25% / 伐木 +15%",
-	},
-}
-
-var CraftRecipeCatalog = []CraftRecipeSpec{
-	{
-		RecipeCode:        "craft_iron_batch",
-		Name:              "急炼铁锭",
-		Category:          "intermediate",
-		ProfessionReq:     "all",
-		ProfessionReqName: "通用",
-		OutputKey:         ResIronIngot,
-		OutputName:        "铁锭",
-		OutputAmountMilli: 5 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWater: 180 * ResourceScale, ResWood: 120 * ResourceScale, ResStone: 90 * ResourceScale},
-		GoldCostBasis:     0,
-		EffectSummary:     "产出 5 铁锭",
-	},
-	{
-		RecipeCode:        "craft_ration_batch",
-		Name:              "干粮封装",
-		Category:          "intermediate",
-		ProfessionReq:     "all",
-		ProfessionReqName: "通用",
-		OutputKey:         ResRation,
-		OutputName:        "军粮",
-		OutputAmountMilli: 8 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWater: 240 * ResourceScale, ResWood: 100 * ResourceScale},
-		GoldCostBasis:     0,
-		EffectSummary:     "产出 8 军粮",
-	},
-	{
-		RecipeCode:        "craft_auto_pump",
-		Name:              "自动抽水机",
-		Category:          "profession",
-		ProfessionReq:     ProfScientist,
-		ProfessionReqName: "科学家",
-		OutputKey:         ResAutoPump,
-		OutputName:        "自动抽水机",
-		OutputAmountMilli: 1 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWater: 600 * ResourceScale, ResWood: 300 * ResourceScale, ResIronIngot: 4 * ResourceScale},
-		GoldCostBasis:     5 * GoldScale,
-		EffectSummary:     "装槽：打水/伐木 +15%",
-	},
-	{
-		RecipeCode:        "craft_alch_catalyst",
-		Name:              "赫尔墨斯催化剂",
-		Category:          "profession",
-		ProfessionReq:     ProfAlchemist,
-		ProfessionReqName: "炼金术士",
-		OutputKey:         ResAlchCatalyst,
-		OutputName:        "赫尔墨斯催化剂",
-		OutputAmountMilli: 1 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWater: 800 * ResourceScale, ResStone: 220 * ResourceScale, ResRation: 4 * ResourceScale},
-		GoldCostBasis:     5 * GoldScale,
-		EffectSummary:     "装槽：全岗位 +12%",
-	},
-	{
-		RecipeCode:        "craft_enchant_scroll",
-		Name:              "星界附魔卷轴",
-		Category:          "profession",
-		ProfessionReq:     ProfMage,
-		ProfessionReqName: "魔法师",
-		OutputKey:         ResEnchantScroll,
-		OutputName:        "星界附魔卷轴",
-		OutputAmountMilli: 1 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWater: 500 * ResourceScale, ResWood: 380 * ResourceScale, ResStone: 200 * ResourceScale},
-		GoldCostBasis:     5 * GoldScale,
-		EffectSummary:     "装槽：采石/军粮 +15%",
-	},
-	{
-		RecipeCode:        "craft_heavy_toolset",
-		Name:              "泰坦精锻工具组",
-		Category:          "profession",
-		ProfessionReq:     ProfArtisan,
-		ProfessionReqName: "工匠",
-		OutputKey:         ResHeavyToolset,
-		OutputName:        "泰坦精锻工具组",
-		OutputAmountMilli: 1 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWood: 280 * ResourceScale, ResStone: 240 * ResourceScale, ResIronIngot: 4 * ResourceScale},
-		GoldCostBasis:     5 * GoldScale,
-		EffectSummary:     "装槽：伐木/炼铁 +15%",
-	},
-	{
-		RecipeCode:        "craft_infantry_kit",
-		Name:              "重步兵军备",
-		Category:          "armament",
-		ProfessionReq:     "all",
-		ProfessionReqName: "通用",
-		OutputKey:         ResInfantryKit,
-		OutputName:        "重步兵军备",
-		OutputAmountMilli: 2 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWood: 220 * ResourceScale, ResIronIngot: 3 * ResourceScale, ResRation: 4 * ResourceScale},
-		GoldCostBasis:     2 * GoldScale,
-		EffectSummary:     "克弓兵 1.15x",
-	},
-	{
-		RecipeCode:        "craft_archer_kit",
-		Name:              "长弓兵军备",
-		Category:          "armament",
-		ProfessionReq:     "all",
-		ProfessionReqName: "通用",
-		OutputKey:         ResArcherKit,
-		OutputName:        "长弓兵军备",
-		OutputAmountMilli: 2 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWood: 360 * ResourceScale, ResStone: 140 * ResourceScale, ResRation: 4 * ResourceScale},
-		GoldCostBasis:     2 * GoldScale,
-		EffectSummary:     "克骑兵 1.15x",
-	},
-	{
-		RecipeCode:        "craft_cavalry_kit",
-		Name:              "铁骑兵军备",
-		Category:          "armament",
-		ProfessionReq:     "all",
-		ProfessionReqName: "通用",
-		OutputKey:         ResCavalryKit,
-		OutputName:        "铁骑兵军备",
-		OutputAmountMilli: 2 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWater: 300 * ResourceScale, ResIronIngot: 4 * ResourceScale, ResRation: 6 * ResourceScale},
-		GoldCostBasis:     3 * GoldScale,
-		EffectSummary:     "克步兵 1.15x",
-	},
-}
-
-var EquipmentCatalog = []EquipmentSpec{
-	{
-		ItemKey:      ResAutoPump,
-		Name:         "自动抽水机",
-		MaxStack:     5,
-		BonusSummary: "打水/伐木 +15%/台",
-	},
-	{
-		ItemKey:      ResAlchCatalyst,
-		Name:         "赫尔墨斯催化剂",
-		MaxStack:     5,
-		BonusSummary: "全岗位 +12%/瓶",
-	},
-	{
-		ItemKey:      ResEnchantScroll,
-		Name:         "星界附魔卷轴",
-		MaxStack:     5,
-		BonusSummary: "采石/军粮 +15%/卷",
-	},
-	{
-		ItemKey:      ResHeavyToolset,
-		Name:         "泰坦精锻工具组",
-		MaxStack:     5,
-		BonusSummary: "伐木/炼铁 +15%/套",
-	},
-}
-
 func ChooseProfession(p *PlayerState, prof string, now time.Time) error {
 	if !p.UnlockedBlueprints[BPMysteryTreasure] {
 		return ErrPrecondition("treasure_locked", "必须先开启【神秘的宝藏】才能选择职业")
@@ -220,23 +26,14 @@ func ChooseProfession(p *PlayerState, prof string, now time.Time) error {
 	p.ArtifactName = spec.ArtifactName
 	p.Phase = 3
 
-	// Grant starter batch of profession goods & basic war kits so player can immediately trade or deploy
-	switch spec.Code {
-	case ProfScientist:
-		p.ResourcesMilli[ResAutoPump] += 2 * ResourceScale
-	case ProfAlchemist:
-		p.ResourcesMilli[ResAlchCatalyst] += 2 * ResourceScale
-	case ProfMage:
-		p.ResourcesMilli[ResEnchantScroll] += 2 * ResourceScale
-	case ProfArtisan:
-		p.ResourcesMilli[ResHeavyToolset] += 2 * ResourceScale
+	// Grant starter batch of profession goods & basic war kits from declarative table
+	for resKey, units := range spec.StarterGrantUnits {
+		p.ResourcesMilli[resKey] += units * ResourceScale
 	}
-	p.ResourcesMilli[ResIronIngot] += 10 * ResourceScale
-	p.ResourcesMilli[ResRation] += 12 * ResourceScale
-	p.ResourcesMilli[ResInfantryKit] += 6 * ResourceScale
-	p.ResourcesMilli[ResArcherKit] += 6 * ResourceScale
-	p.ResourcesMilli[ResCavalryKit] += 6 * ResourceScale
-	p.ActivityPoints += 120
+	for resKey, milli := range MacroBalance.StarterUniversalGrants {
+		p.ResourcesMilli[resKey] += milli
+	}
+	p.ActivityPoints += MacroBalance.StarterActivityPoints
 
 	AppendLog(p, now, "PROFESSION", fmt.Sprintf("已执掌神器【%s】并就职为【%s】！全球现货交易所、跨职业工坊与七日商会战争已全面开放。", spec.ArtifactName, spec.Name))
 	return nil
@@ -249,8 +46,8 @@ func CraftItem(w *WorldState, p *PlayerState, recipeCode string, batches int32, 
 	if batches <= 0 {
 		batches = 1
 	}
-	if batches > 20 {
-		batches = 20
+	if batches > MacroBalance.MaxCraftBatchesPerReq {
+		batches = MacroBalance.MaxCraftBatchesPerReq
 	}
 	var spec *CraftRecipeSpec
 	for i := range CraftRecipeCatalog {
@@ -293,8 +90,13 @@ func CraftItem(w *WorldState, p *PlayerState, recipeCode string, batches int32, 
 	}
 
 	outMilli := spec.OutputAmountMilli * b64
-	if p.Profession == ProfArtisan && spec.Category == "armament" {
-		outMilli = (outMilli * 125) / 100
+	if spec.Category == "armament" {
+		for _, profSpec := range ProfessionCatalog {
+			if profSpec.Code == p.Profession && profSpec.ArmamentOutputMultPct > 100 {
+				outMilli = (outMilli * profSpec.ArmamentOutputMultPct) / 100
+				break
+			}
+		}
 	}
 	p.ResourcesMilli[spec.OutputKey] += outMilli
 	AppendLog(p, now, "PRODUCTION", fmt.Sprintf("工坊制造完成：产出 %.1f 单位【%s】。", float64(outMilli)/1000.0, spec.OutputName))

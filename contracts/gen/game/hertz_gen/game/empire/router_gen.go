@@ -53,8 +53,8 @@ const (
 	PatternTriggerWarSettlement = "POST /api/v1/empire/war/settle"
 	PatternRedeemSeasonChest = "POST /api/v1/empire/season/redeem-chest"
 	PatternOpenSeasonChest = "POST /api/v1/empire/season/open-chest"
-	PatternControlSimulation = "POST /api/v1/empire/debug/sim"
-	PatternRunBenchmark30m = "POST /api/v1/empire/debug/benchmark-30m"
+	PatternControlSimulation = "POST /api/v1/empire/admin/sim"
+	PatternRunBenchmark30m = "POST /api/v1/empire/admin/benchmark-30m"
 	PatternCreateInvite = "POST /api/v1/empire/admin/invites"
 	PatternRevokeInvite = "POST /api/v1/empire/admin/invites/{id}/revoke"
 	PatternToggleEdict = "POST /api/v1/empire/colony/toggle-edict"
@@ -66,12 +66,13 @@ const (
 	PatternManageRaidGear = "POST /api/v1/empire/colony/raid/gear"
 	PatternDraftRaidBuff = "POST /api/v1/empire/colony/raid/buff"
 	PatternStartRaid = "POST /api/v1/empire/colony/raid/start"
+	PatternRaidAction = "POST /api/v1/empire/colony/raid/action"
 	PatternFinishRaid = "POST /api/v1/empire/colony/raid/finish"
 	PatternRolloverSeason = "POST /api/v1/empire/admin/season/rollover"
 	PatternPublishNotice = "POST /api/v1/empire/admin/notices"
 )
 
-// EmpireServiceRoutes lists all 37 route specifications declared on EmpireService.
+// EmpireServiceRoutes lists all 38 route specifications declared on EmpireService.
 var EmpireServiceRoutes = []RouteSpec{
 	{Name: "GetDashboard", Method: "GET", Path: "/api/v1/empire/state", MuxPattern: PatternGetDashboard, RequestType: "GetDashboardReq", ResponseType: "DashboardStateResp"},
 	{Name: "RegisterAccount", Method: "POST", Path: "/api/v1/empire/auth/register", MuxPattern: PatternRegisterAccount, RequestType: "RegisterAccountReq", ResponseType: "DashboardStateResp"},
@@ -94,8 +95,8 @@ var EmpireServiceRoutes = []RouteSpec{
 	{Name: "TriggerWarSettlement", Method: "POST", Path: "/api/v1/empire/war/settle", MuxPattern: PatternTriggerWarSettlement, RequestType: "TriggerWarSettlementReq", ResponseType: "DashboardStateResp"},
 	{Name: "RedeemSeasonChest", Method: "POST", Path: "/api/v1/empire/season/redeem-chest", MuxPattern: PatternRedeemSeasonChest, RequestType: "RedeemSeasonChestReq", ResponseType: "DashboardStateResp"},
 	{Name: "OpenSeasonChest", Method: "POST", Path: "/api/v1/empire/season/open-chest", MuxPattern: PatternOpenSeasonChest, RequestType: "OpenSeasonChestReq", ResponseType: "DashboardStateResp"},
-	{Name: "ControlSimulation", Method: "POST", Path: "/api/v1/empire/debug/sim", MuxPattern: PatternControlSimulation, RequestType: "ControlSimulationReq", ResponseType: "DashboardStateResp"},
-	{Name: "RunBenchmark30m", Method: "POST", Path: "/api/v1/empire/debug/benchmark-30m", MuxPattern: PatternRunBenchmark30m, RequestType: "RunBenchmark30mReq", ResponseType: "Benchmark30mResp"},
+	{Name: "ControlSimulation", Method: "POST", Path: "/api/v1/empire/admin/sim", MuxPattern: PatternControlSimulation, RequestType: "ControlSimulationReq", ResponseType: "DashboardStateResp"},
+	{Name: "RunBenchmark30m", Method: "POST", Path: "/api/v1/empire/admin/benchmark-30m", MuxPattern: PatternRunBenchmark30m, RequestType: "RunBenchmark30mReq", ResponseType: "Benchmark30mResp"},
 	{Name: "CreateInvite", Method: "POST", Path: "/api/v1/empire/admin/invites", MuxPattern: PatternCreateInvite, RequestType: "CreateInviteReq", ResponseType: "DashboardStateResp"},
 	{Name: "RevokeInvite", Method: "POST", Path: "/api/v1/empire/admin/invites/:id/revoke", MuxPattern: PatternRevokeInvite, RequestType: "RevokeInviteReq", ResponseType: "DashboardStateResp"},
 	{Name: "ToggleEdict", Method: "POST", Path: "/api/v1/empire/colony/toggle-edict", MuxPattern: PatternToggleEdict, RequestType: "ToggleEdictReq", ResponseType: "DashboardStateResp"},
@@ -107,6 +108,7 @@ var EmpireServiceRoutes = []RouteSpec{
 	{Name: "ManageRaidGear", Method: "POST", Path: "/api/v1/empire/colony/raid/gear", MuxPattern: PatternManageRaidGear, RequestType: "ManageRaidGearReq", ResponseType: "DashboardStateResp"},
 	{Name: "DraftRaidBuff", Method: "POST", Path: "/api/v1/empire/colony/raid/buff", MuxPattern: PatternDraftRaidBuff, RequestType: "DraftRaidBuffReq", ResponseType: "DashboardStateResp"},
 	{Name: "StartRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/start", MuxPattern: PatternStartRaid, RequestType: "StartRaidReq", ResponseType: "DashboardStateResp"},
+	{Name: "RaidAction", Method: "POST", Path: "/api/v1/empire/colony/raid/action", MuxPattern: PatternRaidAction, RequestType: "RaidActionReq", ResponseType: "DashboardStateResp"},
 	{Name: "FinishRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/finish", MuxPattern: PatternFinishRaid, RequestType: "FinishRaidReq", ResponseType: "DashboardStateResp"},
 	{Name: "RolloverSeason", Method: "POST", Path: "/api/v1/empire/admin/season/rollover", MuxPattern: PatternRolloverSeason, RequestType: "RolloverSeasonReq", ResponseType: "DashboardStateResp"},
 	{Name: "PublishNotice", Method: "POST", Path: "/api/v1/empire/admin/notices", MuxPattern: PatternPublishNotice, RequestType: "PublishNoticeReq", ResponseType: "DashboardStateResp"},
@@ -148,6 +150,7 @@ type EmpireServiceRouteHandlers struct {
 	ManageRaidGear http.HandlerFunc
 	DraftRaidBuff http.HandlerFunc
 	StartRaid http.HandlerFunc
+	RaidAction http.HandlerFunc
 	FinishRaid http.HandlerFunc
 	RolloverSeason http.HandlerFunc
 	PublishNotice http.HandlerFunc
@@ -291,6 +294,10 @@ func RegisterEmpireServiceRoutes(mux *http.ServeMux, h EmpireServiceRouteHandler
 		panic("EmpireServiceRouteHandlers.StartRaid (" + PatternStartRaid + ") is nil")
 	}
 	mux.HandleFunc(PatternStartRaid, h.StartRaid)
+	if h.RaidAction == nil {
+		panic("EmpireServiceRouteHandlers.RaidAction (" + PatternRaidAction + ") is nil")
+	}
+	mux.HandleFunc(PatternRaidAction, h.RaidAction)
 	if h.FinishRaid == nil {
 		panic("EmpireServiceRouteHandlers.FinishRaid (" + PatternFinishRaid + ") is nil")
 	}
@@ -711,7 +718,7 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			m.WriteOKHTTP(w, r, http.StatusOK, resp)
 		})
 		if hasMW {
-			fn = mw.WrapRoute(RouteSpec{Name: "ControlSimulation", Method: "POST", Path: "/api/v1/empire/debug/sim", MuxPattern: PatternControlSimulation, RequestType: "ControlSimulationReq", ResponseType: "DashboardStateResp"}, fn)
+			fn = mw.WrapRoute(RouteSpec{Name: "ControlSimulation", Method: "POST", Path: "/api/v1/empire/admin/sim", MuxPattern: PatternControlSimulation, RequestType: "ControlSimulationReq", ResponseType: "DashboardStateResp"}, fn)
 		}
 		h.ControlSimulation = fn
 	}
@@ -726,7 +733,7 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			m.WriteOKHTTP(w, r, http.StatusOK, resp)
 		})
 		if hasMW {
-			fn = mw.WrapRoute(RouteSpec{Name: "RunBenchmark30m", Method: "POST", Path: "/api/v1/empire/debug/benchmark-30m", MuxPattern: PatternRunBenchmark30m, RequestType: "RunBenchmark30mReq", ResponseType: "Benchmark30mResp"}, fn)
+			fn = mw.WrapRoute(RouteSpec{Name: "RunBenchmark30m", Method: "POST", Path: "/api/v1/empire/admin/benchmark-30m", MuxPattern: PatternRunBenchmark30m, RequestType: "RunBenchmark30mReq", ResponseType: "Benchmark30mResp"}, fn)
 		}
 		h.RunBenchmark30m = fn
 	}
@@ -923,6 +930,25 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			fn = mw.WrapRoute(RouteSpec{Name: "StartRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/start", MuxPattern: PatternStartRaid, RequestType: "StartRaidReq", ResponseType: "DashboardStateResp"}, fn)
 		}
 		h.StartRaid = fn
+	}
+	if h.RaidAction == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req RaidActionReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.RaidAction(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "RaidAction", Method: "POST", Path: "/api/v1/empire/colony/raid/action", MuxPattern: PatternRaidAction, RequestType: "RaidActionReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.RaidAction = fn
 	}
 	if h.FinishRaid == nil {
 		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

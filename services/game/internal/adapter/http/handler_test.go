@@ -144,7 +144,7 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 	}
 
 	// 9. Normal player cannot call admin-only benchmark-30m (403 Forbidden)
-	req4 := httptest.NewRequest(http.MethodPost, "/api/v1/empire/debug/benchmark-30m", strings.NewReader(`{}`))
+	req4 := httptest.NewRequest(http.MethodPost, "/api/v1/empire/admin/benchmark-30m", strings.NewReader(`{}`))
 	req4.Header.Set("X-Session-Token", playerToken)
 	rec4 := httptest.NewRecorder()
 	h.ServeHTTP(rec4, req4)
@@ -169,7 +169,7 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 		t.Fatalf("expected admin inspecting newbie_lord with isAdmin=true, got %+v", swState.Player)
 	}
 
-	req5 := httptest.NewRequest(http.MethodPost, "/api/v1/empire/debug/benchmark-30m", strings.NewReader(`{}`))
+	req5 := httptest.NewRequest(http.MethodPost, "/api/v1/empire/admin/benchmark-30m", strings.NewReader(`{}`))
 	req5.Header.Set("X-Session-Token", adminToken)
 	req5.Header.Set("X-Admin-Tunnel", "1")
 	rec5 := httptest.NewRecorder()

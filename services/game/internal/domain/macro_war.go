@@ -188,9 +188,9 @@ func PerformGuildAction(w *WorldState, p *PlayerState, action, guildID, name, ta
 		if cleanFaction != GuildObsidian && cleanFaction != GuildArgent {
 			cleanFaction = GuildObsidian
 		}
-		waterCost := int64(100) * ResourceScale
-		woodCost := int64(60) * ResourceScale
-		stoneCost := int64(30) * ResourceScale
+		waterCost := MacroBalance.GuildCreateWaterCostMilli
+		woodCost := MacroBalance.GuildCreateWoodCostMilli
+		stoneCost := MacroBalance.GuildCreateStoneCostMilli
 		if p.ResourcesMilli[ResWater] < waterCost || p.ResourcesMilli[ResWood] < woodCost || p.ResourcesMilli[ResStone] < stoneCost {
 			return ErrPrecondition("insufficient_resources", "创建新公会需要建造驻地物资：清水 100、木材 60、石料 30")
 		}

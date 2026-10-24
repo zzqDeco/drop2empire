@@ -37,8 +37,14 @@ func (s *Service) StartRaid(ctx context.Context) (*domain.WorldState, error) {
 	})
 }
 
-func (s *Service) FinishRaid(ctx context.Context, status string, backpackLootKeys, safeBoxLootKeys, usedPotionKeys []string, zonesVisited, chestsOpened, bossesKilled int32) (*domain.WorldState, error) {
+func (s *Service) RaidAction(ctx context.Context, action string, dx, dy int32, itemID, fromContainer, toContainer, itemKey string) (*domain.WorldState, error) {
 	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
-		return domain.FinishRaid(p, status, backpackLootKeys, safeBoxLootKeys, usedPotionKeys, zonesVisited, chestsOpened, bossesKilled, now)
+		return domain.PerformRaidAction(p, action, dx, dy, itemID, fromContainer, toContainer, itemKey, now)
+	})
+}
+
+func (s *Service) FinishRaid(ctx context.Context, status string) (*domain.WorldState, error) {
+	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+		return domain.FinishRaid(p, status, now)
 	})
 }

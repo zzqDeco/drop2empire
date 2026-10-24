@@ -147,6 +147,77 @@ export interface RaidBuffCardDTO {
   canBuy: boolean;
 }
 
+export interface RaidLootItemDTO {
+  id: string;
+  key: string;
+  name: string;
+  rarity: string;
+  category: string;
+}
+
+export interface RaidTileViewDTO {
+  x: number;
+  y: number;
+  kind: string;
+  explored: boolean;
+  looted: boolean;
+  enemyName: string;
+  enemyHp: number;
+  enemyMaxHp: number;
+  enemyAtk: number;
+  portalTargetZone: number;
+  portalLabel: string;
+  channelMs: number;
+}
+
+export interface RaidZoneViewDTO {
+  id: number;
+  name: string;
+  subtitle: string;
+  width: number;
+  height: number;
+  visited: boolean;
+  exploredCount: number;
+  tiles: RaidTileViewDTO[];
+}
+
+export interface RaidSettlementReportDTO {
+  status: string;
+  backpackItems: RaidLootItemDTO[];
+  safeBoxItems: RaidLootItemDTO[];
+  lostGearNames: string[];
+  zonesVisited: number;
+  chestsOpened: number;
+  bossesKilled: number;
+}
+
+export interface RaidSessionDTO {
+  seed: number;
+  currentZoneId: number;
+  playerX: number;
+  playerY: number;
+  facing: string;
+  hp: number;
+  maxHp: number;
+  atk: number;
+  def: number;
+  cheatDeathActive: boolean;
+  timeRemainingMs: number;
+  effectiveMoveCooldownMs: number;
+  galeRemainingMs: number;
+  scavRemainingMs: number;
+  usedPotionKeys: string[];
+  backpack: RaidLootItemDTO[];
+  safeBox: RaidLootItemDTO[];
+  activeChestDrops: RaidLootItemDTO[];
+  activeContainerTitle: string;
+  logs: string[];
+  zonesVisitedCount: number;
+  chestsOpenedCount: number;
+  bossesKilledCount: number;
+  zones: RaidZoneViewDTO[];
+}
+
 export interface RaidLoadoutStateDTO {
   weaponKey: string;
   armorKey: string;
@@ -165,6 +236,8 @@ export interface RaidLoadoutStateDTO {
   raidDurationSeconds: number;
   backpackCapacity: number;
   activeRaidSeed: number;
+  activeSession?: RaidSessionDTO;
+  lastSettlementReport?: RaidSettlementReportDTO;
 }
 
 export interface ProfessionSpecDTO {
@@ -568,14 +641,18 @@ export interface PublishNoticeReq {
   demandShifts?: string[];
 }
 
+export interface RaidActionReq {
+  action: string;
+  dx?: number;
+  dy?: number;
+  itemId?: string;
+  fromContainer?: string;
+  toContainer?: string;
+  itemKey?: string;
+}
+
 export interface FinishRaidReq {
   status: string;
-  backpackLootKeys?: string[];
-  safeBoxLootKeys?: string[];
-  usedPotionKeys?: string[];
-  zonesVisited?: number;
-  chestsOpened?: number;
-  bossesKilled?: number;
 }
 
 export interface ChooseProfessionReq {
@@ -862,8 +939,8 @@ export const IDL_ROUTES = {
     service: "EmpireService",
     namespace: "game.empire",
     method: "POST",
-    path: "/api/v1/empire/debug/sim",
-    clientPath: "/empire/debug/sim",
+    path: "/api/v1/empire/admin/sim",
+    clientPath: "/empire/admin/sim",
     requestType: "ControlSimulationReq",
     responseType: "DashboardStateResp",
   },
@@ -871,8 +948,8 @@ export const IDL_ROUTES = {
     service: "EmpireService",
     namespace: "game.empire",
     method: "POST",
-    path: "/api/v1/empire/debug/benchmark-30m",
-    clientPath: "/empire/debug/benchmark-30m",
+    path: "/api/v1/empire/admin/benchmark-30m",
+    clientPath: "/empire/admin/benchmark-30m",
     requestType: "RunBenchmark30mReq",
     responseType: "Benchmark30mResp",
   },
@@ -973,6 +1050,15 @@ export const IDL_ROUTES = {
     path: "/api/v1/empire/colony/raid/start",
     clientPath: "/empire/colony/raid/start",
     requestType: "StartRaidReq",
+    responseType: "DashboardStateResp",
+  },
+  RaidAction: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/colony/raid/action",
+    clientPath: "/empire/colony/raid/action",
+    requestType: "RaidActionReq",
     responseType: "DashboardStateResp",
   },
   FinishRaid: {

@@ -3,7 +3,16 @@
 > **层级定位**：`03-micro`（微观设计层 · 单局 2D 搜打撤肉鸽核心规则与行前增益卡库）  
 > **职责边界**：定义 2D 多区块传送门互联地图、实时沙暴倒计时、移动最大频率冷却、五档宝箱读条交互、安全保险箱死亡保底机制、一次性可交易蓝图研习/销毁规则，以及 54 种行前增益卡轮抽机制。  
 > **注**：当季专属的高阶装备目录 (`16 Raid Gear Specs`)、10 种一次性蓝图 (`bp_*`) 与 12 款限定动态外观 (`cos_*`) 掉率归属 [`04-seasons/s1-obsidian-awakening.md`](../04-seasons/s1-obsidian-awakening.md)。  
-> **代码映射**：[`services/game/internal/domain/raid_catalog.go`](../../../services/game/internal/domain/raid_catalog.go)、[`services/game/internal/domain/raid_engine.go`](../../../services/game/internal/domain/raid_engine.go)、[`apps/web/src/WastelandRaidPanel.tsx`](../../../apps/web/src/WastelandRaidPanel.tsx)
+> **代码映射**：[`services/game/internal/domain/balance_raid_s1.go`](../../../services/game/internal/domain/balance_raid_s1.go)、[`services/game/internal/domain/micro_raid.go`](../../../services/game/internal/domain/micro_raid.go)、[`apps/web/src/WastelandRaidPanel.tsx`](../../../apps/web/src/WastelandRaidPanel.tsx)
+
+---
+
+## 0. 零信任服务端权威状态机与反作弊架构 (`Zero-Trust Server-Authoritative Raid Engine`)
+
+为杜绝客户端伪造战利品或透视战争迷雾，单局荒原 2D 搜打撤采用**纯服务端权威状态机 (`ActiveRaidSession`)**：
+- **服务端地图生成与迷雾裁剪 (`Fog-of-War Server Clipping`)**：`StartRaid` 时由服务端生成 4 区块 `9×9` 地图网格 (`RaidZoneState`)；在序列化响应 DTO (`RaidZoneViewDTO`) 时，所有 `Explored == false` 的格子统一被服务端脱敏裁剪为 `kind: "fog"`，客户端无法通过抓包获知未探明区域的宝箱或游商坐标。
+- **步进式意图校验 (`POST /api/v1/empire/colony/raid/action`)**：前端仅发送玩家动作意图（`MOVE` / `LOOT_TILE` / `TAKE_CHEST_ITEM` / `MOVE_TO_SAFEBOX` / `USE_POTION` / `BUY_MERCHANT`），由服务端逐格校验曼哈顿距离 (`|Δx| + |Δy| == 1`)、墙体阻挡、实时沙暴倒计时 (`ExpiresAtUnixMs`)、CSPRNG 宝箱掉落以及安全保险箱/随身背囊容量。
+- **权威撤离判定 (`POST /api/v1/empire/colony/raid/finish`)**：`FinishRaidReq` 不接受任何客户端战利品数组；当 `status == "EXTRACTED"` 时，服务端强制校验玩家当前坐标是否处于撤离信标 (`extract`) 格或相邻 1 格内，并仅结算服务端 `ActiveRaidSession` 中真实获取的背囊与安全箱战利品。
 
 ---
 

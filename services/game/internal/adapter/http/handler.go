@@ -925,24 +925,158 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		}
 	}
 
+	mapLootSlice := func(items []domain.RaidLootItem) []*empire.RaidLootItemDTO {
+		out := make([]*empire.RaidLootItemDTO, 0, len(items))
+		for _, it := range items {
+			out = append(out, &empire.RaidLootItemDTO{
+				ID:       it.ID,
+				Key:      it.Key,
+				Name:     it.Name,
+				Rarity:   it.Rarity,
+				Category: it.Category,
+			})
+		}
+		return out
+	}
+
+	var activeSessionDTO *empire.RaidSessionDTO
+	if sess := p.RaidLoadout.ActiveSession; sess != nil {
+		nowUTC := time.Now().UTC()
+		remMs := sess.ExpiresAt.Sub(nowUTC).Milliseconds()
+		if remMs < 0 {
+			remMs = 0
+		}
+		galeRemMs := sess.GaleEndsAt.Sub(nowUTC).Milliseconds()
+		if galeRemMs < 0 {
+			galeRemMs = 0
+		}
+		scavRemMs := sess.ScavEndsAt.Sub(nowUTC).Milliseconds()
+		if scavRemMs < 0 {
+			scavRemMs = 0
+		}
+		effMoveCD := sess.BaseMoveCooldownMs
+		if galeRemMs > 0 {
+			effMoveCD = (effMoveCD * 65) / 100
+			if effMoveCD < domain.RaidBalance.MinMoveCooldownMs {
+				effMoveCD = domain.RaidBalance.MinMoveCooldownMs
+			}
+		}
+
+		zonesDTO := make([]*empire.RaidZoneViewDTO, 0, len(sess.Zones))
+		for _, zn := range sess.Zones {
+			tilesDTO := make([]*empire.RaidTileViewDTO, 0, len(zn.Tiles))
+			var exploredCount int32
+			for _, t := range zn.Tiles {
+				if !t.Explored {
+					// Zero-Trust Fog-of-War clipping: hide unexplored tile contents from wire DTO
+					tilesDTO = append(tilesDTO, &empire.RaidTileViewDTO{
+						X:                t.X,
+						Y:                t.Y,
+						Kind:             "fog",
+						Explored:         false,
+						Looted:           false,
+						EnemyName:        "",
+						EnemyHp:          0,
+						EnemyMaxHp:       0,
+						EnemyAtk:         0,
+						PortalTargetZone: -1,
+						PortalLabel:      "",
+						ChannelMs:        0,
+					})
+				} else {
+					exploredCount++
+					chMs := domain.RaidChannelDurationMs[t.Kind]
+					if scavRemMs > 0 && chMs > 0 {
+						chMs = chMs / 2
+					}
+					tilesDTO = append(tilesDTO, &empire.RaidTileViewDTO{
+						X:                t.X,
+						Y:                t.Y,
+						Kind:             t.Kind,
+						Explored:         true,
+						Looted:           t.Looted,
+						EnemyName:        t.EnemyName,
+						EnemyHp:          t.EnemyHP,
+						EnemyMaxHp:       t.EnemyMaxHP,
+						EnemyAtk:         t.EnemyAtk,
+						PortalTargetZone: t.PortalTargetZone,
+						PortalLabel:      t.PortalLabel,
+						ChannelMs:        chMs,
+					})
+				}
+			}
+			zonesDTO = append(zonesDTO, &empire.RaidZoneViewDTO{
+				ID:            zn.ID,
+				Name:          zn.Name,
+				Subtitle:      zn.Subtitle,
+				Width:         zn.Width,
+				Height:        zn.Height,
+				Visited:       zn.Visited,
+				ExploredCount: exploredCount,
+				Tiles:         tilesDTO,
+			})
+		}
+		activeSessionDTO = &empire.RaidSessionDTO{
+			Seed:                    sess.Seed,
+			CurrentZoneId:           sess.CurrentZoneID,
+			PlayerX:                 sess.PlayerX,
+			PlayerY:                 sess.PlayerY,
+			Facing:                  sess.Facing,
+			Hp:                      sess.HP,
+			MaxHp:                   sess.MaxHP,
+			Atk:                     sess.Atk,
+			Def:                     sess.Def,
+			CheatDeathActive:        sess.CheatDeathActive,
+			TimeRemainingMs:         remMs,
+			EffectiveMoveCooldownMs: effMoveCD,
+			GaleRemainingMs:         galeRemMs,
+			ScavRemainingMs:         scavRemMs,
+			UsedPotionKeys:          append([]string{}, sess.UsedPotionKeys...),
+			Backpack:                mapLootSlice(sess.Backpack),
+			SafeBox:                 mapLootSlice(sess.SafeBox),
+			ActiveChestDrops:        mapLootSlice(sess.ActiveChestDrops),
+			ActiveContainerTitle:    sess.ActiveContainerTitle,
+			Logs:                    append([]string{}, sess.Logs...),
+			ZonesVisitedCount:       sess.ZonesVisitedCount,
+			ChestsOpenedCount:       sess.ChestsOpenedCount,
+			BossesKilledCount:       sess.BossesKilledCount,
+			Zones:                   zonesDTO,
+		}
+	}
+
+	var lastSettlementDTO *empire.RaidSettlementReportDTO
+	if rep := p.RaidLoadout.LastSettlementReport; rep != nil {
+		lastSettlementDTO = &empire.RaidSettlementReportDTO{
+			Status:        rep.Status,
+			BackpackItems: mapLootSlice(rep.BackpackItems),
+			SafeBoxItems:  mapLootSlice(rep.SafeBoxItems),
+			LostGearNames: append([]string{}, rep.LostGearNames...),
+			ZonesVisited:  rep.ZonesVisited,
+			ChestsOpened:  rep.ChestsOpened,
+			BossesKilled:  rep.BossesKilled,
+		}
+	}
+
 	raidLoadoutDTO := &empire.RaidLoadoutStateDTO{
-		WeaponKey:           p.RaidLoadout.WeaponKey,
-		ArmorKey:            p.RaidLoadout.ArmorKey,
-		BootsKey:            p.RaidLoadout.BootsKey,
-		SafeBoxKey:          p.RaidLoadout.SafeBoxKey,
-		SafeSlotCount:       safeSlots,
-		EquippedPotions:     eqPotions,
-		EquippedBuffCards:   equippedBuffsDTO,
-		DraftPoolCards:      draftPoolDTO,
-		RerollCosts:         rerollCostsDTO,
-		CanReroll:           canReroll,
-		TotalMaxHp:          maxHP,
-		TotalAtk:            atk,
-		TotalDef:            def,
-		MoveCooldownMs:      moveCD,
-		RaidDurationSeconds: durSec,
-		BackpackCapacity:    bagCap,
-		ActiveRaidSeed:      p.RaidLoadout.ActiveRaidSeed,
+		WeaponKey:            p.RaidLoadout.WeaponKey,
+		ArmorKey:             p.RaidLoadout.ArmorKey,
+		BootsKey:             p.RaidLoadout.BootsKey,
+		SafeBoxKey:           p.RaidLoadout.SafeBoxKey,
+		SafeSlotCount:        safeSlots,
+		EquippedPotions:      eqPotions,
+		EquippedBuffCards:    equippedBuffsDTO,
+		DraftPoolCards:       draftPoolDTO,
+		RerollCosts:          rerollCostsDTO,
+		CanReroll:            canReroll,
+		TotalMaxHp:           maxHP,
+		TotalAtk:             atk,
+		TotalDef:             def,
+		MoveCooldownMs:       moveCD,
+		RaidDurationSeconds:  durSec,
+		BackpackCapacity:     bagCap,
+		ActiveRaidSeed:       p.RaidLoadout.ActiveRaidSeed,
+		ActiveSession:        activeSessionDTO,
+		LastSettlementReport: lastSettlementDTO,
 	}
 
 	return &empire.DashboardStateResp{
@@ -1205,18 +1339,36 @@ func (s *Server) StartRaid(ctx context.Context, _ *empire.StartRaidReq) (*empire
 	return mapDashboardResp(w), nil
 }
 
+func (s *Server) RaidAction(ctx context.Context, req *empire.RaidActionReq) (*empire.DashboardStateResp, error) {
+	var dx, dy int32
+	if req.Dx != nil {
+		dx = *req.Dx
+	}
+	if req.Dy != nil {
+		dy = *req.Dy
+	}
+	var itemID, fromContainer, toContainer, itemKey string
+	if req.ItemId != nil {
+		itemID = *req.ItemId
+	}
+	if req.FromContainer != nil {
+		fromContainer = *req.FromContainer
+	}
+	if req.ToContainer != nil {
+		toContainer = *req.ToContainer
+	}
+	if req.ItemKey != nil {
+		itemKey = *req.ItemKey
+	}
+	w, err := s.svc.RaidAction(ctx, req.Action, dx, dy, itemID, fromContainer, toContainer, itemKey)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
 func (s *Server) FinishRaid(ctx context.Context, req *empire.FinishRaidReq) (*empire.DashboardStateResp, error) {
-	var zv, co, bk int32
-	if req.ZonesVisited != nil {
-		zv = *req.ZonesVisited
-	}
-	if req.ChestsOpened != nil {
-		co = *req.ChestsOpened
-	}
-	if req.BossesKilled != nil {
-		bk = *req.BossesKilled
-	}
-	w, err := s.svc.FinishRaid(ctx, req.Status, req.BackpackLootKeys, req.SafeBoxLootKeys, req.UsedPotionKeys, zv, co, bk)
+	w, err := s.svc.FinishRaid(ctx, req.Status)
 	if err != nil {
 		return nil, err
 	}

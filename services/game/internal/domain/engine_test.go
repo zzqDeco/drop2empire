@@ -230,11 +230,35 @@ func TestColonyDepthSystemsConversionEdictsExpeditionsAndCaravan(t *testing.T) {
 		t.Fatalf("expected crafting crossbow after learning blueprint to succeed, got %v", err)
 	}
 
-	// Test StartRaid & FinishRaid (EXTRACTED vs MIA hardcore penalty)
+	// Test StartRaid & Server-Authoritative Raid Session (EXTRACTED vs MIA hardcore penalty)
 	if err := StartRaid(p, now); err != nil {
 		t.Fatal(err)
 	}
-	if err := FinishRaid(p, "EXTRACTED", []string{ResCosObsidianCrown, ResMeteorOre}, []string{ResAncientShard}, nil, 3, 5, 1, now); err != nil {
+	if p.RaidLoadout.ActiveSession == nil {
+		t.Fatal("expected ActiveSession to be initialized on server")
+	}
+	// Step right 1 tile using PerformRaidAction
+	if err := PerformRaidAction(p, "move", 1, 0, "", "", "", "", now); err != nil {
+		t.Fatal(err)
+	}
+	if p.RaidLoadout.ActiveSession.PlayerX != 2 || p.RaidLoadout.ActiveSession.PlayerY != 3 {
+		t.Fatalf("expected player at (2,3), got (%d,%d)", p.RaidLoadout.ActiveSession.PlayerX, p.RaidLoadout.ActiveSession.PlayerY)
+	}
+	// Simulate finding loot in a chest on the server and transferring to backpack & safebox
+	p.RaidLoadout.ActiveSession.ActiveChestDrops = []RaidLootItem{
+		{ID: "test_loot_1", Key: ResCosObsidianCrown, Name: "★S1·曜石星辉王冠", Rarity: "LEGENDARY", Category: "cosmetic"},
+		{ID: "test_loot_2", Key: ResAncientShard, Name: "古遗物残片", Rarity: "RARE", Category: "material"},
+	}
+	if err := PerformRaidAction(p, "loot_transfer", 0, 0, "test_loot_1", "chest", "backpack", "", now); err != nil {
+		t.Fatal(err)
+	}
+	if err := PerformRaidAction(p, "loot_transfer", 0, 0, "test_loot_2", "chest", "safebox", "", now); err != nil {
+		t.Fatal(err)
+	}
+	// Move player to extraction beacon at (10, 1) in Zone 0 before extracting
+	p.RaidLoadout.ActiveSession.PlayerX = 10
+	p.RaidLoadout.ActiveSession.PlayerY = 1
+	if err := FinishRaid(p, "EXTRACTED", now); err != nil {
 		t.Fatal(err)
 	}
 	if p.ResourcesMilli[ResCosObsidianCrown] < ResourceScale {
@@ -244,22 +268,41 @@ func TestColonyDepthSystemsConversionEdictsExpeditionsAndCaravan(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Start another raid and suffer MIA: equipped weapon is lost, backpack is lost, only Safe Box (1 slot) survives!
+	// Start another raid and suffer MIA (or attempt to fake EXTRACTED away from extraction tile):
+	// equipped weapon is lost, backpack is lost, only Safe Box (1 slot) survives!
 	if err := StartRaid(p, now); err != nil {
 		t.Fatal(err)
 	}
+	p.RaidLoadout.ActiveSession.Backpack = []RaidLootItem{
+		{ID: "mia_bag_1", Key: ResCosAstralWings, Name: "★S1·星界流光羽翼", Rarity: "LEGENDARY", Category: "cosmetic"},
+	}
+	p.RaidLoadout.ActiveSession.SafeBox = []RaidLootItem{
+		{ID: "mia_safe_1", Key: ResMeteorOre, Name: "星陨铁矿", Rarity: "EPIC", Category: "material"},
+	}
 	prevMeteor := p.ResourcesMilli[ResMeteorOre]
-	if err := FinishRaid(p, "MIA", []string{ResCosAstralWings}, []string{ResMeteorOre}, nil, 2, 3, 0, now); err != nil {
+	// Player is at spawn (1,3), not at extraction tile -> even if client sends "EXTRACTED", server enforces MIA!
+	if err := FinishRaid(p, "EXTRACTED", now); err != nil {
 		t.Fatal(err)
 	}
 	if p.ResourcesMilli[ResCosAstralWings] != 0 {
-		t.Fatal("expected backpack loot to be lost on MIA")
+		t.Fatal("expected backpack loot to be lost when not at extraction tile (MIA enforced)")
 	}
 	if p.ResourcesMilli[ResMeteorOre] != prevMeteor+ResourceScale {
 		t.Fatal("expected safe box item to be preserved on MIA")
 	}
 	if p.RaidLoadout.WeaponKey != "" {
 		t.Fatalf("expected equipped weapon to be destroyed on MIA, got %s", p.RaidLoadout.WeaponKey)
+	}
+
+	// Verify anti-macro GatherWater rate limit & batch cap
+	if err := GatherWater(p, 50, now.Add(1*time.Second)); err == nil {
+		t.Fatal("expected GatherWater with clicks > 10 to be rejected")
+	}
+	if err := GatherWater(p, 1, now.Add(2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := GatherWater(p, 1, now.Add(2*time.Second+10*time.Millisecond)); err == nil {
+		t.Fatal("expected GatherWater within 10ms (< 45ms human interval) to be rate-limited")
 	}
 }
 
