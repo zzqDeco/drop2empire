@@ -972,7 +972,7 @@ export function SeasonRelicVaultPanel({ state, runAction }: SceneProps) {
               </span>
             </h3>
             <p>
-              消耗 100 战争活动积分可兑换 1 个赛季宝箱。开启后铸造具有全服唯一递增序列号与随机 UV 采样坐标的纸墨蚀刻藏品（跨赛季永久保留）。
+              消耗 100 战争活动积分可兑换 1 个赛季宝箱。开启后铸造具有全服唯一递增序列号与传世墨金蚀刻纹样的秘宝藏品（跨赛季永久保留）。
             </p>
           </div>
           <div className="chest-console-actions">
@@ -1331,7 +1331,7 @@ export function WorldMapCompassModal({
       key: "settlement",
       title: "领主主城 · 聚落与个人档案",
       subtitle:
-        "完整个人视角：领主立体形象衣橱、汲水与资源总账、居民调配与文明蓝图研发。",
+        "完整个人视角：领主披挂形象衣橱、汲水与资源总账、居民调配与文明蓝图研发。",
       coord: "N 00° · E 00° (中央主城)",
       unlocked: true,
       lockHint: "",
@@ -1341,7 +1341,7 @@ export function WorldMapCompassModal({
       key: "scout",
       title: "荒原裂隙斥候营",
       subtitle:
-        "三幕式探索撤离：行前整备与保险箱 → 3D 蚀刻增益卡抽取 → 全屏 2D 裂隙搜打撤与局内游商帐篷。",
+        "三幕式探索撤离：行前整备与保险箱 → 敕令增益卡抽取 → 全屏裂隙搜打撤与局内游商营帐。",
       coord: "N 18° · W 42° (西北裂隙)",
       unlocked: showScoutScene,
       lockHint: "需在主城达到 5 人口并解锁【荒原斥候营】蓝图",
@@ -1351,7 +1351,7 @@ export function WorldMapCompassModal({
       key: "market",
       title: "皇家工坊与全球交易所",
       subtitle:
-        "跨职业增产设备装槽、四大职业独占配方制造，以及全服中央限价订单簿 (CLOB) 现货与外观交易。",
+        "跨职业增产设备装槽、四大职业独占配方制造，以及帝国中央交易所现货、蓝图与外观买卖。",
       coord: "S 12° · E 28° (东南商埠)",
       unlocked: showAdvancedWorld,
       lockHint: "需开启【神秘的宝藏】并择定终身职业后开放",
@@ -1361,7 +1361,7 @@ export function WorldMapCompassModal({
       key: "war",
       title: "公会驻地与八城战区",
       subtitle:
-        "创立或加入全服公会、捐献军需集结目标，并在 8 节点战略沙盘上派兵参与每晚 20:00 城池会战。",
+        "创立或加入全服公会、捐献军需集结目标，并在八城战略沙盘上派兵参与每晚 20:00 城池会战。",
       coord: "N 34° · E 36° (东北前线)",
       unlocked: showAdvancedWorld,
       lockHint: "需开启【神秘的宝藏】并择定终身职业后开放",
@@ -1371,7 +1371,7 @@ export function WorldMapCompassModal({
       key: "lord",
       title: "墨械唯一秘宝陈列馆",
       subtitle:
-        "消耗战争活动积分兑换并开启赛季典藏宝箱，铸造全服唯一编号与随机 UV 纹样的永久秘宝。",
+        "消耗战争活动积分兑换并开启赛季典藏宝箱，铸造全服唯一编号与传世墨金纹样的永久秘宝。",
       coord: "S 24° · W 19° (西南秘苑)",
       unlocked: showLordScene,
       lockHint: "需解锁荒原斥候营或获得首件藏品后开放",
@@ -1424,14 +1424,45 @@ export function WorldMapCompassModal({
               </pattern>
             </defs>
             <rect width="760" height="220" fill="url(#wm-grid)" />
+            {/* Topographic Contours & Imperial River */}
+            <path
+              d="M 0 148 Q 180 120 340 150 T 760 95"
+              fill="none"
+              stroke="#4AA3DF"
+              strokeWidth="3.5"
+              opacity="0.22"
+            />
+            <path
+              d="M 0 148 Q 180 120 340 150 T 760 95"
+              fill="none"
+              stroke="#4AA3DF"
+              strokeWidth="1"
+              strokeDasharray="6 4"
+              opacity="0.55"
+            />
+            <path
+              d="M 40 34 Q 145 14 250 42 M 480 28 Q 590 12 700 44 M 70 196 Q 190 175 290 202"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1"
+              strokeDasharray="3 3"
+              opacity="0.22"
+            />
             {/* Compass rose */}
-            <g transform="translate(695, 48)" opacity="0.55">
+            <g transform="translate(704, 46)" opacity="0.65">
               <circle
                 r="26"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1"
                 strokeDasharray="3 2"
+              />
+              <circle
+                r="18"
+                fill="none"
+                stroke="#C89B3C"
+                strokeWidth="0.8"
+                opacity="0.6"
               />
               <polygon points="0,-24 5,-5 0,-10 -5,-5" fill="#C89B3C" />
               <polygon
@@ -1453,7 +1484,7 @@ export function WorldMapCompassModal({
               stroke="#C89B3C"
               strokeWidth="1.8"
               strokeDasharray="5 4"
-              opacity="0.75"
+              opacity="0.8"
             >
               <line x1="380" y1="112" x2="145" y2="56" />
               <line x1="380" y1="112" x2="595" y2="56" />
@@ -1482,7 +1513,7 @@ export function WorldMapCompassModal({
                 fill={activeScene === "scout" ? "#162436" : "#F3EFE6"}
               />
               <text
-                y="35"
+                y="36"
                 textAnchor="middle"
                 fill="currentColor"
                 fontSize="12"
@@ -1508,15 +1539,12 @@ export function WorldMapCompassModal({
                 stroke="#C89B3C"
                 strokeWidth="2"
               />
-              <rect
-                x="-8"
-                y="-8"
-                width="16"
-                height="16"
+              <path
+                d="M-8,-8 L-8,8 L8,8 L8,-8 L4,-3 L0,-9 L-4,-3 Z"
                 fill={activeScene === "war" ? "#162436" : "#F3EFE6"}
               />
               <text
-                y="35"
+                y="36"
                 textAnchor="middle"
                 fill="currentColor"
                 fontSize="12"
@@ -1535,17 +1563,24 @@ export function WorldMapCompassModal({
               }}
             >
               <circle
-                r="28"
+                r="32"
+                fill="none"
+                stroke="#C89B3C"
+                strokeWidth="1.2"
+                strokeDasharray="4 2"
+              />
+              <circle
+                r="26"
                 fill={activeScene === "settlement" ? "#C89B3C" : "#1D4E89"}
                 stroke="#F3EFE6"
                 strokeWidth="2.5"
               />
               <polygon
-                points="0,-14 12,-2 8,-2 8,11 -8,11 -8,-2 -12,-2"
+                points="0,-13 11,-2 7,-2 7,10 -7,10 -7,-2 -11,-2"
                 fill="#F3EFE6"
               />
               <text
-                y="43"
+                y="45"
                 textAnchor="middle"
                 fill="currentColor"
                 fontSize="13"
@@ -1576,7 +1611,7 @@ export function WorldMapCompassModal({
                 fill={activeScene === "lord" ? "#162436" : "#F3EFE6"}
               />
               <text
-                y="33"
+                y="34"
                 textAnchor="middle"
                 fill="currentColor"
                 fontSize="12"
@@ -1607,7 +1642,7 @@ export function WorldMapCompassModal({
                 fill={activeScene === "market" ? "#162436" : "#F3EFE6"}
               />
               <text
-                y="35"
+                y="36"
                 textAnchor="middle"
                 fill="currentColor"
                 fontSize="12"
@@ -1622,10 +1657,11 @@ export function WorldMapCompassModal({
         <div className="world-map-zone-grid">
           {zones.map((z) => {
             const isCurrent = activeScene === z.key;
+            const isCitadel = z.key === "settlement";
             return (
               <article
                 key={z.key}
-                className={`world-map-zone-card ${isCurrent ? "zone-active" : ""} ${!z.unlocked ? "zone-locked" : ""}`}
+                className={`world-map-zone-card ${isCitadel ? "world-map-zone-card-citadel" : ""} ${isCurrent ? "zone-active" : ""} ${!z.unlocked ? "zone-locked" : ""}`}
               >
                 <div className="bp-top">
                   <div>

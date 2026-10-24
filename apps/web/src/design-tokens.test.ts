@@ -203,6 +203,32 @@ describe("Blueprint & Ink design tokens & WCAG AA contrast", () => {
       );
       expect(unreferenced, `${cssFile} unreferenced classes`).toEqual([]);
     }
+
+    // Reverse check: every static className used in .tsx must be defined in styles.css or layout.css
+    const fullCss =
+      readFileSync(join(srcDir, "styles.css"), "utf8") +
+      "\n" +
+      readFileSync(join(srcDir, "layout.css"), "utf8");
+    const definedClasses = new Set<string>();
+    for (const m of fullCss.matchAll(/\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g)) {
+      definedClasses.add(m[1]);
+    }
+    const tsxFiles = allFiles.filter((f) => f.endsWith(".tsx"));
+    const undefinedInCss: string[] = [];
+    for (const f of tsxFiles) {
+      const content = readFileSync(join(srcDir, f), "utf8");
+      for (const m of content.matchAll(
+        /className=(?:"([^"]+)"|\{`([^`]+)`\})/g,
+      )) {
+        const raw = (m[1] || m[2] || "").replace(/\$\{[^}]+\}/g, " ");
+        for (const cls of raw.split(/\s+/).filter(Boolean)) {
+          if (!cls.endsWith("-") && !definedClasses.has(cls)) {
+            undefinedInCss.push(`${f}:${cls}`);
+          }
+        }
+      }
+    }
+    expect(undefinedInCss, "TSX classes missing from CSS").toEqual([]);
   });
 
   it("standardizes Lucide icon sizes onto ICON scale {14, 16, 18, 20, 24}", () => {

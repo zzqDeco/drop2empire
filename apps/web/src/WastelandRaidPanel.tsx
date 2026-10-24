@@ -1239,179 +1239,329 @@ export function WastelandRaidPanel({
           </div>
         )}
 
-        {/* Main Full-Screen 2D Map Stage */}
+        {/* Main Full-Screen 2D Map Stage + Live Tactical Minimap Radar */}
         <div className="raid-fullscreen-stage">
-          <div className="raid-map-board-wrap">
-            <div
-              className="raid-map-grid"
-              style={{
-                gridTemplateColumns: `repeat(${currentZone.width}, minmax(54px, 68px))`,
-              }}
-            >
-              {currentZone.tiles.map((tile) => {
-                const isPlayer = tile.x === pos.x && tile.y === pos.y;
-                const isAdjacent =
-                  Math.abs(tile.x - pos.x) + Math.abs(tile.y - pos.y) === 1;
-                const isExplored = currentZone.explored.has(
-                  `${tile.x},${tile.y}`,
-                );
+          <div className="raid-battlefield-layout">
+            <div className="raid-map-board-wrap">
+              <div
+                className="raid-map-grid"
+                style={{
+                  gridTemplateColumns: `repeat(${currentZone.width}, 64px)`,
+                }}
+              >
+                {currentZone.tiles.map((tile) => {
+                  const isPlayer = tile.x === pos.x && tile.y === pos.y;
+                  const isAdjacent =
+                    Math.abs(tile.x - pos.x) + Math.abs(tile.y - pos.y) === 1;
+                  const isExplored = currentZone.explored.has(
+                    `${tile.x},${tile.y}`,
+                  );
 
-                let tileTitle = "荒原空地";
-                if (!isExplored) tileTitle = "未探明战争迷雾";
-                else if (tile.kind === "wall") tileTitle = "断崖岩壁（不可通行）";
-                else if (tile.kind === "spawn") tileTitle = "裂隙起点";
-                else if (tile.kind === "portal")
-                  tileTitle = tile.portalLabel ?? "区块星盘传送门";
-                else if (tile.kind === "extract_early")
-                  tileTitle = earlyExtractOpen
-                    ? "外围限时撤离信标（开放中）"
-                    : "外围限时撤离信标（已关闭）";
-                else if (tile.kind === "extract_deep")
-                  tileTitle = "深处常驻撤离信标";
-                else if (tile.kind === "merchant")
-                  tileTitle = "荒原游商营帐（踩上开启易物）";
-                else if (tile.kind === "oasis") tileTitle = "甘泉绿洲";
-                else if (tile.kind === "chest_wood")
-                  tileTitle = "破旧木箱 (1.1s)";
-                else if (tile.kind === "chest_iron")
-                  tileTitle = "铁皮军需箱 (2.2s)";
-                else if (tile.kind === "chest_coffin")
-                  tileTitle = "远古机关石棺 (3.6s)";
-                else if (tile.kind === "chest_abyss")
-                  tileTitle = "深渊黑曜秘宝库 (5.4s)";
-                else if (
-                  tile.kind === "enemy_raider" ||
-                  tile.kind === "enemy_worm" ||
-                  tile.kind === "enemy_boss"
-                ) {
-                  tileTitle = `${tile.enemyName ?? "荒原敌军"} (HP ${tile.enemyHp} / 攻 ${tile.enemyAtk})`;
-                }
+                  let tileTitle = "荒原空地";
+                  let tileBadge = "";
+                  if (!isExplored) tileTitle = "未探明战争迷雾";
+                  else if (tile.kind === "wall")
+                    tileTitle = "断崖岩壁（不可通行）";
+                  else if (tile.kind === "spawn") {
+                    tileTitle = "裂隙起点";
+                    tileBadge = "起点";
+                  } else if (tile.kind === "portal") {
+                    tileTitle = tile.portalLabel ?? "区块星盘传送门";
+                    tileBadge = "星门";
+                  } else if (tile.kind === "extract_early") {
+                    tileTitle = earlyExtractOpen
+                      ? "外围限时撤离信标（开放中）"
+                      : "外围限时撤离信标（已关闭）";
+                    tileBadge = earlyExtractOpen ? "撤离" : "关闭";
+                  } else if (tile.kind === "extract_deep") {
+                    tileTitle = "深处常驻撤离信标";
+                    tileBadge = "撤离";
+                  } else if (tile.kind === "merchant") {
+                    tileTitle = "荒原游商营帐（踩上开启易物）";
+                    tileBadge = "游商";
+                  } else if (tile.kind === "oasis") {
+                    tileTitle = "甘泉绿洲";
+                    tileBadge = tile.searched ? "" : "绿洲";
+                  } else if (tile.kind === "chest_wood") {
+                    tileTitle = "破旧木箱 (1.1s)";
+                    tileBadge = tile.searched ? "" : "木箱";
+                  } else if (tile.kind === "chest_iron") {
+                    tileTitle = "铁皮军需箱 (2.2s)";
+                    tileBadge = tile.searched ? "" : "军需";
+                  } else if (tile.kind === "chest_coffin") {
+                    tileTitle = "远古机关石棺 (3.6s)";
+                    tileBadge = tile.searched ? "" : "石棺";
+                  } else if (tile.kind === "chest_abyss") {
+                    tileTitle = "深渊黑曜秘宝库 (5.4s)";
+                    tileBadge = tile.searched ? "" : "秘宝";
+                  } else if (
+                    tile.kind === "enemy_raider" ||
+                    tile.kind === "enemy_worm" ||
+                    tile.kind === "enemy_boss"
+                  ) {
+                    tileTitle = `${tile.enemyName ?? "荒原敌军"} (HP ${tile.enemyHp} / 攻 ${tile.enemyAtk})`;
+                    tileBadge = tile.defeated ? "" : `HP${tile.enemyHp}`;
+                  }
 
-                return (
+                  return (
+                    <button
+                      key={`${tile.x}_${tile.y}`}
+                      type="button"
+                      title={tileTitle}
+                      disabled={!isAdjacent || tile.kind === "wall"}
+                      className={`raid-tile-cell ${isPlayer ? "tile-player" : ""} ${
+                        isAdjacent && tile.kind !== "wall"
+                          ? "tile-adjacent"
+                          : ""
+                      } ${!isExplored ? "tile-fog" : ""} ${
+                        tile.kind === "wall" ? "tile-wall" : ""
+                      }`}
+                      onClick={() =>
+                        handleStep(tile.x - pos.x, tile.y - pos.y)
+                      }
+                    >
+                      {isPlayer ? (
+                        <LordAvatarSVG
+                          cosmetics={equippedCosmetics}
+                          weaponKey={raidLoadout.weaponKey}
+                          armorKey={raidLoadout.armorKey}
+                          bootsKey={raidLoadout.bootsKey}
+                          size="token"
+                          facing={facing}
+                          isMoving
+                        />
+                      ) : !isExplored ? (
+                        <span className="tile-fog-pattern mono-num">?</span>
+                      ) : (
+                        <>
+                          <RaidTileSpriteSVG
+                            kind={tile.kind}
+                            searched={tile.searched}
+                            defeated={tile.defeated}
+                            extractOpen={earlyExtractOpen}
+                          />
+                          {tileBadge && (
+                            <span className="tile-micro-badge mono-num">
+                              {tileBadge}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Bottom Floating Action Bar on Map */}
+              <div className="raid-map-action-dock">
+                <div className="quick-alloc-bar">
                   <button
-                    key={`${tile.x}_${tile.y}`}
                     type="button"
-                    title={tileTitle}
-                    disabled={!isAdjacent || tile.kind === "wall"}
-                    className={`raid-tile-cell ${isPlayer ? "tile-player" : ""} ${
-                      isAdjacent && tile.kind !== "wall" ? "tile-adjacent" : ""
-                    } ${!isExplored ? "tile-fog" : ""} ${
-                      tile.kind === "wall" ? "tile-wall" : ""
-                    }`}
-                    onClick={() =>
-                      handleStep(tile.x - pos.x, tile.y - pos.y)
-                    }
+                    className="btn-outline btn-sm"
+                    onClick={() => handleStep(0, -1)}
                   >
-                    {isPlayer ? (
-                      <LordAvatarSVG
-                        cosmetics={equippedCosmetics}
-                        weaponKey={raidLoadout.weaponKey}
-                        armorKey={raidLoadout.armorKey}
-                        bootsKey={raidLoadout.bootsKey}
-                        size="token"
-                        facing={facing}
-                        isMoving
+                    ↑ 上移 (W)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-outline btn-sm"
+                    onClick={() => handleStep(-1, 0)}
+                  >
+                    ← 左移 (A)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-outline btn-sm"
+                    onClick={() => handleStep(0, 1)}
+                  >
+                    ↓ 下移 (S)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-outline btn-sm"
+                    onClick={() => handleStep(1, 0)}
+                  >
+                    → 右移 (D)
+                  </button>
+
+                  {currentTile?.kind === "portal" && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={handleUsePortal}
+                    >
+                      <Compass size={ICON.xs} />
+                      <span>{currentTile.portalLabel ?? "踏入星盘传送门"}</span>
+                    </button>
+                  )}
+
+                  {canExtractHere && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() =>
+                        setChanneling({
+                          label: "正在呼叫信标撤离 (2.8s)",
+                          kind: currentTile.kind,
+                          x: pos.x,
+                          y: pos.y,
+                          startedAt: Date.now(),
+                          durationMs: getChestChannelMs(
+                            currentTile.kind,
+                            scavRemMs > 0,
+                          ),
+                          progressPct: 0,
+                        })
+                      }
+                    >
+                      <Sparkles size={ICON.xs} />
+                      <span>呼叫信标撤离 (带走全部背囊物资)</span>
+                    </button>
+                  )}
+
+                  {currentTile?.kind === "merchant" && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => {
+                        setActiveContainerTitle("荒原游商营帐 · 局内易物驿站");
+                        setShowLootModal(true);
+                      }}
+                    >
+                      <span>与荒原游商交易</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="raid-live-log-ticker">
+                  <span>{raidLog[0] ?? "探索裂隙中..."}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Tactical Radar Minimap & 4-Zone Portal Topology Sidebar */}
+            <aside className="raid-minimap-dock" aria-label="荒原裂隙战术小地图">
+              <div className="subpanel-head">
+                <h3>
+                  <Compass size={ICON.sm} />
+                  <span>裂隙战术小地图</span>
+                </h3>
+              </div>
+
+              {/* 4-Zone Portal Topology Strip */}
+              <div className="minimap-zone-topology">
+                {zones.map((z) => {
+                  const isCur = z.id === curZoneId;
+                  const isVis = zonesVisitedSet.has(z.id);
+                  return (
+                    <div
+                      key={z.id}
+                      className={`minimap-zone-pill ${isCur ? "zone-pill-active" : isVis ? "zone-pill-visited" : ""}`}
+                    >
+                      <span className="mono-num">Z{z.id + 1}</span>
+                      <strong>{z.name.split(" · ")[1] ?? z.name}</strong>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Live 9x9 Pixel Radar Grid */}
+              <div className="raid-minimap-radar-box">
+                <div
+                  className="raid-minimap-grid"
+                  style={{
+                    gridTemplateColumns: `repeat(${currentZone.width}, 18px)`,
+                  }}
+                >
+                  {currentZone.tiles.map((t) => {
+                    const isP = t.x === pos.x && t.y === pos.y;
+                    const isExp = currentZone.explored.has(`${t.x},${t.y}`);
+                    let cellCls = "minimap-floor";
+                    if (isP) cellCls = "minimap-player";
+                    else if (!isExp) cellCls = "minimap-fog";
+                    else if (t.kind === "wall") cellCls = "minimap-wall";
+                    else if (t.kind === "portal") cellCls = "minimap-portal";
+                    else if (
+                      t.kind === "extract_early" ||
+                      t.kind === "extract_deep"
+                    )
+                      cellCls = "minimap-extract";
+                    else if (t.kind === "merchant")
+                      cellCls = "minimap-merchant";
+                    else if (
+                      (t.kind === "chest_wood" ||
+                        t.kind === "chest_iron" ||
+                        t.kind === "chest_coffin" ||
+                        t.kind === "chest_abyss") &&
+                      !t.searched
+                    )
+                      cellCls = "minimap-chest";
+                    else if (
+                      (t.kind === "enemy_raider" ||
+                        t.kind === "enemy_worm" ||
+                        t.kind === "enemy_boss") &&
+                      !t.defeated
+                    )
+                      cellCls = "minimap-enemy";
+
+                    return (
+                      <span
+                        key={`mm_${t.x}_${t.y}`}
+                        className={`minimap-cell ${cellCls}`}
                       />
-                    ) : !isExplored ? (
-                      <span className="tile-fog-pattern mono-num">?</span>
-                    ) : (
-                      <RaidTileSpriteSVG
-                        kind={tile.kind}
-                        searched={tile.searched}
-                        defeated={tile.defeated}
-                        extractOpen={earlyExtractOpen}
-                      />
+                    );
+                  })}
+                </div>
+                <div className="minimap-coord-bar mono-num">
+                  <span>
+                    当前坐标 ({pos.x}, {pos.y})
+                  </span>
+                  <span>
+                    已探明{" "}
+                    {Math.round(
+                      (currentZone.explored.size / currentZone.tiles.length) *
+                        100,
                     )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Bottom Floating Action Bar on Map */}
-            <div className="raid-map-action-dock">
-              <div className="quick-alloc-bar">
-                <button
-                  type="button"
-                  className="btn-outline btn-sm"
-                  onClick={() => handleStep(0, -1)}
-                >
-                  ↑ 上移 (W)
-                </button>
-                <button
-                  type="button"
-                  className="btn-outline btn-sm"
-                  onClick={() => handleStep(-1, 0)}
-                >
-                  ← 左移 (A)
-                </button>
-                <button
-                  type="button"
-                  className="btn-outline btn-sm"
-                  onClick={() => handleStep(0, 1)}
-                >
-                  ↓ 下移 (S)
-                </button>
-                <button
-                  type="button"
-                  className="btn-outline btn-sm"
-                  onClick={() => handleStep(1, 0)}
-                >
-                  → 右移 (D)
-                </button>
-
-                {currentTile?.kind === "portal" && (
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={handleUsePortal}
-                  >
-                    <Compass size={ICON.xs} />
-                    <span>{currentTile.portalLabel ?? "踏入星盘传送门"}</span>
-                  </button>
-                )}
-
-                {canExtractHere && (
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() =>
-                      setChanneling({
-                        label: "正在呼叫信标撤离 (2.8s)",
-                        kind: currentTile.kind,
-                        x: pos.x,
-                        y: pos.y,
-                        startedAt: Date.now(),
-                        durationMs: getChestChannelMs(
-                          currentTile.kind,
-                          scavRemMs > 0,
-                        ),
-                        progressPct: 0,
-                      })
-                    }
-                  >
-                    <Sparkles size={ICON.xs} />
-                    <span>呼叫信标撤离 (带走全部背囊物资)</span>
-                  </button>
-                )}
-
-                {currentTile?.kind === "merchant" && (
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => {
-                      setActiveContainerTitle("荒原游商营帐 · 局内易物驿站");
-                      setShowLootModal(true);
-                    }}
-                  >
-                    <span>与荒原游商交易</span>
-                  </button>
-                )}
+                    %
+                  </span>
+                </div>
               </div>
 
-              <div className="raid-live-log-ticker">
-                <span>{raidLog[0] ?? "探索裂隙中..."}</span>
+              {/* Minimap Legend */}
+              <div className="minimap-legend-grid">
+                <span>
+                  <i className="legend-dot minimap-player" /> 领主位置
+                </span>
+                <span>
+                  <i className="legend-dot minimap-portal" /> 星盘传送门
+                </span>
+                <span>
+                  <i className="legend-dot minimap-extract" /> 撤离信标
+                </span>
+                <span>
+                  <i className="legend-dot minimap-chest" /> 未开宝箱
+                </span>
+                <span>
+                  <i className="legend-dot minimap-merchant" /> 游商营帐
+                </span>
+                <span>
+                  <i className="legend-dot minimap-enemy" /> 荒原敌军
+                </span>
               </div>
-            </div>
+
+              <div className="tab-body">
+                <button
+                  type="button"
+                  className="btn-primary btn-block mono-num"
+                  onClick={() => setShowLootModal(true)}
+                >
+                  <Box size={ICON.xs} />
+                  <span>
+                    打开行囊 ({backpack.length}/{raidLoadout.backpackCapacity})
+                  </span>
+                </button>
+              </div>
+            </aside>
           </div>
 
           {/* ====================================================================
@@ -1428,10 +1578,10 @@ export function WastelandRaidPanel({
               <div className="raid-loot-3col-sheet">
                 <div className="modal-header">
                   <div>
-                    <h2>战术行囊与容器搜索（支持鼠标拖拽或点击转移）</h2>
+                    <h2>战术行囊与战利品搜刮（支持鼠标拖拽或点击转移）</h2>
                     <p>
-                      左栏：随身背囊与本季安全保险箱 · 中栏：2.5D
-                      体素领主穿戴与药水使用 · 右栏：{activeContainerTitle}
+                      随身背囊与本季安全保险箱 · 领主披挂与战术药水 ·{" "}
+                      {activeContainerTitle}
                     </p>
                   </div>
                   <div className="toolbar-actions">
@@ -1576,12 +1726,12 @@ export function WastelandRaidPanel({
                     </div>
                   </div>
 
-                  {/* CENTER COLUMN: 2.5D Minecraft Voxel Character + Equipped Gear + Tactical Potions */}
+                  {/* CENTER COLUMN: Lord Character + Equipped Gear + Tactical Potions */}
                   <div className="subpanel">
                     <div className="subpanel-head">
                       <h3>
                         <Swords size={ICON.sm} />
-                        <span>领主体素穿戴与局内药水使用</span>
+                        <span>领主披挂穿戴与局内药水使用</span>
                       </h3>
                     </div>
                     <div className="raid-center-avatar-stage">
@@ -2012,12 +2162,12 @@ export function WastelandRaidPanel({
       </div>
 
       <div className="tab-body split-2col">
-        {/* Left Subpanel: 2.5D Minecraft Voxel Character Stage & Equipped Slots */}
+        {/* Left Subpanel: Lord Character Stage & Equipped Slots */}
         <div className="subpanel">
           <div className="subpanel-head">
             <h3>
               <Shield size={ICON.sm} />
-              <span>领主体素武装预览（点击可四向旋转检视）</span>
+              <span>领主武装披挂预览（点击可四向旋转检视）</span>
             </h3>
           </div>
 
@@ -2063,7 +2213,7 @@ export function WastelandRaidPanel({
               <strong>{raidLoadout.totalAtk} ATK</strong>
             </div>
             <div className="ledger-row">
-              <span>2D 地图移动步频间隔</span>
+              <span>荒原行军步频间隔</span>
               <strong>{raidLoadout.moveCooldownMs} ms/格</strong>
             </div>
             <div className="ledger-row">
@@ -2283,10 +2433,10 @@ export function LordProfileWardrobeBar({
 
         <div className="lord-profile-details">
           <div className="water-label">
-            2.5D 体素工程立绘 · 荒原地图实时显形
+            领主真身披挂 · 荒原出征与主城同辉
           </div>
           <div className="water-rate mono-num">
-            S1 赛季外观典藏：{ownedCosCount} / {cosmetics.length} 件 · 唯一下落藏品：
+            S1 外观典藏：{ownedCosCount}/{cosmetics.length} · 唯一秘宝：
             {state.collectibles.length} 件
           </div>
           <div className="bp-costs" style={{ marginTop: "6px" }}>
@@ -2321,58 +2471,93 @@ export function LordProfileWardrobeBar({
       </div>
 
       {showWardrobe && (
-        <div className="blueprint-list">
-          {cosmetics.map((cos) => (
-            <article
-              key={cos.itemKey}
-              className={`bp-card ${cos.equipped ? "bp-ready" : ""}`}
-            >
-              <div className="bp-top">
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <RaidItemIconSVG itemKey={cos.itemKey} size={ICON.xl} />
-                  <div>
-                    <strong>{cos.name}</strong>
-                    <span
-                      className={`rarity-badge rarity-${cos.rarity.toLowerCase()}`}
-                    >
-                      {cos.rarity}
-                    </span>
-                  </div>
+        <div
+          className={defaultExpanded ? "blueprint-list" : "modal-backdrop"}
+          role={defaultExpanded ? undefined : "dialog"}
+          aria-modal={defaultExpanded ? undefined : "true"}
+          aria-label="领主赛季外观衣橱"
+        >
+          <div className={defaultExpanded ? "blueprint-list" : "modal-sheet"}>
+            {!defaultExpanded && (
+              <div className="modal-header">
+                <div>
+                  <h2>领主衣橱 · S1 赛季限定外观披挂</h2>
+                  <p>
+                    穿戴后将在主城个人档案、斥候整备厅与荒原 2D 裂隙战场中实时显形（已解锁{" "}
+                    {ownedCosCount} / {cosmetics.length} 件）
+                  </p>
                 </div>
-                <span className="tag-badge mono-num">
-                  持有 {cos.ownedCount}
-                </span>
-              </div>
-              <p className="bp-desc">
-                {cos.seasonTag} · {cos.visualEffect}
-              </p>
-              <div className="bp-footer">
-                <span className="cost-chip">{cos.slot}</span>
                 <button
                   type="button"
-                  className={
-                    cos.equipped ? "btn-outline btn-sm" : "btn-primary btn-sm"
-                  }
-                  data-pop={cos.equipped ? "卸下外观" : `✦ 穿戴 ${cos.name}`}
-                  disabled={cos.ownedCount <= 0 && !cos.equipped}
-                  onClick={() =>
-                    void runAction(() =>
-                      api.equipCosmetic({
-                        slot: cos.slot,
-                        itemKey: cos.equipped ? "" : cos.itemKey,
-                      }),
-                    )
-                  }
+                  className="btn-primary"
+                  onClick={() => setShowWardrobe(false)}
                 >
-                  {cos.equipped
-                    ? "卸下"
-                    : cos.ownedCount > 0
-                      ? "穿戴"
-                      : "荒原秘宝库掉落 / 市场求购"}
+                  完成穿戴
                 </button>
               </div>
-            </article>
-          ))}
+            )}
+            <div className="blueprint-list">
+              {cosmetics.map((cos) => (
+                <article
+                  key={cos.itemKey}
+                  className={`bp-card ${cos.equipped ? "bp-ready" : ""}`}
+                >
+                  <div className="bp-top">
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <RaidItemIconSVG itemKey={cos.itemKey} size={ICON.xl} />
+                      <div>
+                        <strong>{cos.name}</strong>
+                        <span
+                          className={`rarity-badge rarity-${cos.rarity.toLowerCase()}`}
+                        >
+                          {cos.rarity}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="tag-badge mono-num">
+                      持有 {cos.ownedCount}
+                    </span>
+                  </div>
+                  <p className="bp-desc">
+                    {cos.seasonTag} · {cos.visualEffect}
+                  </p>
+                  <div className="bp-footer">
+                    <span className="cost-chip">{cos.slot}</span>
+                    <button
+                      type="button"
+                      className={
+                        cos.equipped
+                          ? "btn-outline btn-sm"
+                          : "btn-primary btn-sm"
+                      }
+                      data-pop={cos.equipped ? "卸下外观" : `✦ 穿戴 ${cos.name}`}
+                      disabled={cos.ownedCount <= 0 && !cos.equipped}
+                      onClick={() =>
+                        void runAction(() =>
+                          api.equipCosmetic({
+                            slot: cos.slot,
+                            itemKey: cos.equipped ? "" : cos.itemKey,
+                          }),
+                        )
+                      }
+                    >
+                      {cos.equipped
+                        ? "卸下"
+                        : cos.ownedCount > 0
+                          ? "穿戴"
+                          : "荒原秘宝库掉落 / 市场求购"}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </section>

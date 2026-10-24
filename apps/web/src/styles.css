@@ -221,6 +221,11 @@ button:disabled {
   width: 100%;
 }
 
+.btn-sm {
+  padding: 4px 9px;
+  font-size: var(--font-xs);
+}
+
 .btn-step {
   padding: 3px 7px;
   font-size: var(--font-xs);
@@ -294,6 +299,18 @@ button:disabled {
 .table-wrap {
   width: 100%;
   overflow-x: auto;
+}
+
+.table-scroll {
+  max-height: 290px;
+  overflow-y: auto;
+}
+
+.empty-cell {
+  text-align: center;
+  padding: 18px 10px;
+  color: var(--text-muted);
+  font-size: var(--font-xs);
 }
 
 .ink-table {
