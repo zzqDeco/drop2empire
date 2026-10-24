@@ -1589,21 +1589,158 @@ func (p *WarDaySettlementDTO) String() string {
 	return fmt.Sprintf("WarDaySettlementDTO(%+v)", *p)
 }
 
+type GuildMemberDTO struct {
+	Handle       string `thrift:"handle,1,required" json:"handle"`
+	Role         string `thrift:"role,2,required" json:"role"`
+	Contribution int64  `thrift:"contribution,3,required" json:"contribution"`
+	WarDeployed  int32  `thrift:"warDeployed,4,required" json:"warDeployed"`
+}
+
+func NewGuildMemberDTO() *GuildMemberDTO {
+	return &GuildMemberDTO{}
+}
+
+func (p *GuildMemberDTO) InitDefault() {
+}
+
+func (p *GuildMemberDTO) GetHandle() (v string) {
+	return p.Handle
+}
+
+func (p *GuildMemberDTO) GetRole() (v string) {
+	return p.Role
+}
+
+func (p *GuildMemberDTO) GetContribution() (v int64) {
+	return p.Contribution
+}
+
+func (p *GuildMemberDTO) GetWarDeployed() (v int32) {
+	return p.WarDeployed
+}
+
+func (p *GuildMemberDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GuildMemberDTO(%+v)", *p)
+}
+
+type GuildDTO struct {
+	GuildId           string            `thrift:"guildId,1,required" json:"guildId"`
+	Name              string            `thrift:"name,2,required" json:"name"`
+	Tag               string            `thrift:"tag,3,required" json:"tag"`
+	Faction           string            `thrift:"faction,4,required" json:"faction"`
+	FactionName       string            `thrift:"factionName,5,required" json:"factionName"`
+	LeaderHandle      string            `thrift:"leaderHandle,6,required" json:"leaderHandle"`
+	Level             int32             `thrift:"level,7,required" json:"level"`
+	Xp                int64             `thrift:"xp,8,required" json:"xp"`
+	NextLevelXp       int64             `thrift:"nextLevelXp,9,required" json:"nextLevelXp"`
+	MemberCount       int32             `thrift:"memberCount,10,required" json:"memberCount"`
+	TreasuryGoldBasis int64             `thrift:"treasuryGoldBasis,11,required" json:"treasuryGoldBasis"`
+	RallyNodeId       string            `thrift:"rallyNodeId,12,required" json:"rallyNodeId"`
+	RallyNodeName     string            `thrift:"rallyNodeName,13,required" json:"rallyNodeName"`
+	Announcement      string            `thrift:"announcement,14,required" json:"announcement"`
+	BonusSummary      string            `thrift:"bonusSummary,15,required" json:"bonusSummary"`
+	Members           []*GuildMemberDTO `thrift:"members,16,required,list<GuildMemberDTO>" json:"members"`
+}
+
+func NewGuildDTO() *GuildDTO {
+	return &GuildDTO{}
+}
+
+func (p *GuildDTO) InitDefault() {
+}
+
+func (p *GuildDTO) GetGuildId() (v string) {
+	return p.GuildId
+}
+
+func (p *GuildDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *GuildDTO) GetTag() (v string) {
+	return p.Tag
+}
+
+func (p *GuildDTO) GetFaction() (v string) {
+	return p.Faction
+}
+
+func (p *GuildDTO) GetFactionName() (v string) {
+	return p.FactionName
+}
+
+func (p *GuildDTO) GetLeaderHandle() (v string) {
+	return p.LeaderHandle
+}
+
+func (p *GuildDTO) GetLevel() (v int32) {
+	return p.Level
+}
+
+func (p *GuildDTO) GetXp() (v int64) {
+	return p.Xp
+}
+
+func (p *GuildDTO) GetNextLevelXp() (v int64) {
+	return p.NextLevelXp
+}
+
+func (p *GuildDTO) GetMemberCount() (v int32) {
+	return p.MemberCount
+}
+
+func (p *GuildDTO) GetTreasuryGoldBasis() (v int64) {
+	return p.TreasuryGoldBasis
+}
+
+func (p *GuildDTO) GetRallyNodeId() (v string) {
+	return p.RallyNodeId
+}
+
+func (p *GuildDTO) GetRallyNodeName() (v string) {
+	return p.RallyNodeName
+}
+
+func (p *GuildDTO) GetAnnouncement() (v string) {
+	return p.Announcement
+}
+
+func (p *GuildDTO) GetBonusSummary() (v string) {
+	return p.BonusSummary
+}
+
+func (p *GuildDTO) GetMembers() (v []*GuildMemberDTO) {
+	return p.Members
+}
+
+func (p *GuildDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GuildDTO(%+v)", *p)
+}
+
 type WarStateDTO struct {
-	SeasonCode          string                 `thrift:"seasonCode,1,required" json:"seasonCode"`
-	SeasonName          string                 `thrift:"seasonName,2,required" json:"seasonName"`
-	CurrentDay          int32                  `thrift:"currentDay,3,required" json:"currentDay"`
-	NextSettlementLabel string                 `thrift:"nextSettlementLabel,4,required" json:"nextSettlementLabel"`
-	PlayerGuild         string                 `thrift:"playerGuild,5,required" json:"playerGuild"`
-	PlayerGuildName     string                 `thrift:"playerGuildName,6,required" json:"playerGuildName"`
-	PlayerRole          string                 `thrift:"playerRole,7,required" json:"playerRole"`
-	DailyBudgetUsed     int32                  `thrift:"dailyBudgetUsed,8,required" json:"dailyBudgetUsed"`
-	DailyBudgetCap      int32                  `thrift:"dailyBudgetCap,9,required" json:"dailyBudgetCap"`
-	ObsidianTotalScore  int32                  `thrift:"obsidianTotalScore,10,required" json:"obsidianTotalScore"`
-	ArgentTotalScore    int32                  `thrift:"argentTotalScore,11,required" json:"argentTotalScore"`
-	Nodes               []*WarNodeDTO          `thrift:"nodes,12,required,list<WarNodeDTO>" json:"nodes"`
-	Edges               []*WarEdgeDTO          `thrift:"edges,13,required,list<WarEdgeDTO>" json:"edges"`
-	SettlementHistory   []*WarDaySettlementDTO `thrift:"settlementHistory,14,required,list<WarDaySettlementDTO>" json:"settlementHistory"`
+	SeasonCode              string                 `thrift:"seasonCode,1,required" json:"seasonCode"`
+	SeasonName              string                 `thrift:"seasonName,2,required" json:"seasonName"`
+	CurrentDay              int32                  `thrift:"currentDay,3,required" json:"currentDay"`
+	NextSettlementLabel     string                 `thrift:"nextSettlementLabel,4,required" json:"nextSettlementLabel"`
+	PlayerGuild             string                 `thrift:"playerGuild,5,required" json:"playerGuild"`
+	PlayerGuildName         string                 `thrift:"playerGuildName,6,required" json:"playerGuildName"`
+	PlayerRole              string                 `thrift:"playerRole,7,required" json:"playerRole"`
+	DailyBudgetUsed         int32                  `thrift:"dailyBudgetUsed,8,required" json:"dailyBudgetUsed"`
+	DailyBudgetCap          int32                  `thrift:"dailyBudgetCap,9,required" json:"dailyBudgetCap"`
+	ObsidianTotalScore      int32                  `thrift:"obsidianTotalScore,10,required" json:"obsidianTotalScore"`
+	ArgentTotalScore        int32                  `thrift:"argentTotalScore,11,required" json:"argentTotalScore"`
+	Nodes                   []*WarNodeDTO          `thrift:"nodes,12,required,list<WarNodeDTO>" json:"nodes"`
+	Edges                   []*WarEdgeDTO          `thrift:"edges,13,required,list<WarEdgeDTO>" json:"edges"`
+	SettlementHistory       []*WarDaySettlementDTO `thrift:"settlementHistory,14,required,list<WarDaySettlementDTO>" json:"settlementHistory"`
+	JoinedGuildId           string                 `thrift:"joinedGuildId,15,required" json:"joinedGuildId"`
+	PlayerGuildContribution int64                  `thrift:"playerGuildContribution,16,required" json:"playerGuildContribution"`
+	Guilds                  []*GuildDTO            `thrift:"guilds,17,required,list<GuildDTO>" json:"guilds"`
 }
 
 func NewWarStateDTO() *WarStateDTO {
@@ -1667,6 +1804,18 @@ func (p *WarStateDTO) GetEdges() (v []*WarEdgeDTO) {
 
 func (p *WarStateDTO) GetSettlementHistory() (v []*WarDaySettlementDTO) {
 	return p.SettlementHistory
+}
+
+func (p *WarStateDTO) GetJoinedGuildId() (v string) {
+	return p.JoinedGuildId
+}
+
+func (p *WarStateDTO) GetPlayerGuildContribution() (v int64) {
+	return p.PlayerGuildContribution
+}
+
+func (p *WarStateDTO) GetGuilds() (v []*GuildDTO) {
+	return p.Guilds
 }
 
 func (p *WarStateDTO) String() string {
@@ -3220,6 +3369,98 @@ func (p *SwitchGuildReq) String() string {
 	return fmt.Sprintf("SwitchGuildReq(%+v)", *p)
 }
 
+type GuildActionReq struct {
+	Action      string  `thrift:"action,1,required" json:"action"`
+	GuildId     *string `thrift:"guildId,2,optional" json:"guildId,omitempty"`
+	Name        *string `thrift:"name,3,optional" json:"name,omitempty"`
+	Tag         *string `thrift:"tag,4,optional" json:"tag,omitempty"`
+	Faction     *string `thrift:"faction,5,optional" json:"faction,omitempty"`
+	RallyNodeId *string `thrift:"rallyNodeId,6,optional" json:"rallyNodeId,omitempty"`
+}
+
+func NewGuildActionReq() *GuildActionReq {
+	return &GuildActionReq{}
+}
+
+func (p *GuildActionReq) InitDefault() {
+}
+
+func (p *GuildActionReq) GetAction() (v string) {
+	return p.Action
+}
+
+var GuildActionReq_GuildId_DEFAULT string
+
+func (p *GuildActionReq) GetGuildId() (v string) {
+	if !p.IsSetGuildId() {
+		return GuildActionReq_GuildId_DEFAULT
+	}
+	return *p.GuildId
+}
+
+var GuildActionReq_Name_DEFAULT string
+
+func (p *GuildActionReq) GetName() (v string) {
+	if !p.IsSetName() {
+		return GuildActionReq_Name_DEFAULT
+	}
+	return *p.Name
+}
+
+var GuildActionReq_Tag_DEFAULT string
+
+func (p *GuildActionReq) GetTag() (v string) {
+	if !p.IsSetTag() {
+		return GuildActionReq_Tag_DEFAULT
+	}
+	return *p.Tag
+}
+
+var GuildActionReq_Faction_DEFAULT string
+
+func (p *GuildActionReq) GetFaction() (v string) {
+	if !p.IsSetFaction() {
+		return GuildActionReq_Faction_DEFAULT
+	}
+	return *p.Faction
+}
+
+var GuildActionReq_RallyNodeId_DEFAULT string
+
+func (p *GuildActionReq) GetRallyNodeId() (v string) {
+	if !p.IsSetRallyNodeId() {
+		return GuildActionReq_RallyNodeId_DEFAULT
+	}
+	return *p.RallyNodeId
+}
+
+func (p *GuildActionReq) IsSetGuildId() bool {
+	return p.GuildId != nil
+}
+
+func (p *GuildActionReq) IsSetName() bool {
+	return p.Name != nil
+}
+
+func (p *GuildActionReq) IsSetTag() bool {
+	return p.Tag != nil
+}
+
+func (p *GuildActionReq) IsSetFaction() bool {
+	return p.Faction != nil
+}
+
+func (p *GuildActionReq) IsSetRallyNodeId() bool {
+	return p.RallyNodeId != nil
+}
+
+func (p *GuildActionReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GuildActionReq(%+v)", *p)
+}
+
 type DeployWarTroopsReq struct {
 	NodeId        string `thrift:"nodeId,1,required" json:"nodeId"`
 	InfantryDelta int32  `thrift:"infantryDelta,2,required" json:"infantryDelta"`
@@ -3556,6 +3797,8 @@ type EmpireService interface {
 	CancelMarketOrder(ctx context.Context, req *CancelMarketOrderReq) (r *DashboardStateResp, err error)
 
 	SwitchGuild(ctx context.Context, req *SwitchGuildReq) (r *DashboardStateResp, err error)
+
+	GuildAction(ctx context.Context, req *GuildActionReq) (r *DashboardStateResp, err error)
 
 	DeployWarTroops(ctx context.Context, req *DeployWarTroopsReq) (r *DashboardStateResp, err error)
 

@@ -337,6 +337,8 @@ type PlayerState struct {
 	GoldFrozenBasis         int64                  `json:"goldFrozenBasis"`
 	ActivityPoints          int32                  `json:"activityPoints"`
 	GuildCode               string                 `json:"guildCode"`
+	JoinedGuildID           string                 `json:"joinedGuildId"`
+	GuildContribution       int64                  `json:"guildContribution"`
 	DailyWarBudgetUsed      int32                  `json:"dailyWarBudgetUsed"`
 	SpeedMultiplier         int32                  `json:"speedMultiplier"`
 	TotalManualClicks       int64                  `json:"totalManualClicks"`
@@ -422,6 +424,27 @@ type WarBattleNodeReport struct {
 	CasualtySummary       string `json:"casualtySummary"`
 }
 
+type GuildMember struct {
+	Handle       string `json:"handle"`
+	Role         string `json:"role"`
+	Contribution int64  `json:"contribution"`
+	WarDeployed  int32  `json:"warDeployed"`
+}
+
+type GuildState struct {
+	GuildID           string        `json:"guildId"`
+	Name              string        `json:"name"`
+	Tag               string        `json:"tag"`
+	Faction           string        `json:"faction"`
+	LeaderHandle      string        `json:"leaderHandle"`
+	Level             int32         `json:"level"`
+	XP                int64         `json:"xp"`
+	TreasuryGoldBasis int64         `json:"treasuryGoldBasis"`
+	RallyNodeID       string        `json:"rallyNodeId"`
+	Announcement      string        `json:"announcement"`
+	Members           []GuildMember `json:"members"`
+}
+
 type WarDaySettlement struct {
 	DayIndex              int32                 `json:"dayIndex"`
 	SettledAt             string                `json:"settledAt"`
@@ -458,6 +481,8 @@ type WorldState struct {
 	WarNodes               []WarNodeState          `json:"warNodes"`
 	WarEdges               []WarEdge               `json:"warEdges"`
 	WarHistory             []WarDaySettlement      `json:"warHistory"`
+	Guilds                 []GuildState            `json:"guilds"`
+	NextGuildSeq           int64                   `json:"nextGuildSeq"`
 	Collectibles           []CollectibleItem       `json:"collectibles"`
 	NextOrderSeq           int64                   `json:"nextOrderSeq"`
 	NextTradeSeq           int64                   `json:"nextTradeSeq"`

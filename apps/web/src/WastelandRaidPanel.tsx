@@ -11,7 +11,7 @@ import { LordAvatarSVG } from "./LordAvatarSVG";
 
 interface WastelandRaidPanelProps {
   state: DashboardStateResp;
-  busy: boolean;
+  busy?: boolean;
   runAction: (
     fn: () => Promise<DashboardStateResp>,
     msg?: string,
@@ -388,7 +388,6 @@ function getChestChannelMs(kind: TileKind, speedBuffActive: boolean): number {
 
 export function WastelandRaidPanel({
   state,
-  busy,
   runAction,
 }: WastelandRaidPanelProps) {
   const { raidLoadout, raidGears, equippedCosmetics } = state;
@@ -1383,7 +1382,7 @@ export function WastelandRaidPanel({
                     <button
                       type="button"
                       className="btn-primary btn-sm"
-                      disabled={busy}
+                      data-pop="✓ 研读蓝图"
                       onClick={() =>
                         void runAction(() =>
                           api.learnRaidBlueprint({
@@ -1400,7 +1399,8 @@ export function WastelandRaidPanel({
                     <button
                       type="button"
                       className="btn-primary btn-sm"
-                      disabled={!g.canCraft || busy}
+                      data-pop={`+1 ${g.name}`}
+                      disabled={!g.canCraft}
                       onClick={() =>
                         void runAction(() =>
                           api.manageRaidGear({
@@ -1420,7 +1420,7 @@ export function WastelandRaidPanel({
                     <button
                       type="button"
                       className="btn-outline btn-sm"
-                      disabled={busy}
+                      data-pop={g.equipped ? "卸下装备" : `✦ 装备 ${g.name}`}
                       onClick={() =>
                         void runAction(() =>
                           api.manageRaidGear({
@@ -1450,7 +1450,7 @@ export function WastelandRaidPanel({
           <button
             type="button"
             className="btn-primary"
-            disabled={busy}
+            data-pop="🚀 荒原启程"
             onClick={() => void runAction(() => api.startRaid())}
           >
             <Plus size={ICON.xs} />
@@ -1478,6 +1478,7 @@ export function WastelandRaidPanel({
                     key={`${card.cardCode}_${slotIdx}`}
                     type="button"
                     className={`btn-chip ${replaceSlotIdx === slotIdx ? "active" : ""}`}
+                    data-pop="移除增益"
                     onClick={() => {
                       setReplaceSlotIdx(slotIdx);
                       void runAction(() =>
@@ -1537,7 +1538,8 @@ export function WastelandRaidPanel({
                 <button
                   type="button"
                   className="btn-primary btn-sm"
-                  disabled={!card.canBuy || busy}
+                  data-pop={`+${card.name}`}
+                  disabled={!card.canBuy}
                   onClick={() =>
                     void runAction(() =>
                       api.draftRaidBuff({
@@ -1574,7 +1576,8 @@ export function WastelandRaidPanel({
             <button
               type="button"
               className="btn-outline btn-sm"
-              disabled={!raidLoadout.canReroll || busy}
+              data-pop="↻ 刷新增益池"
+              disabled={!raidLoadout.canReroll}
               onClick={() =>
                 void runAction(() => api.draftRaidBuff({ action: "reroll" }))
               }
@@ -1591,17 +1594,16 @@ export function WastelandRaidPanel({
 
 export function LordProfileWardrobeBar({
   state,
-  busy,
   runAction,
 }: {
   state: DashboardStateResp;
-  busy: boolean;
+  busy?: boolean;
   runAction: (
     fn: () => Promise<DashboardStateResp>,
     msg?: string,
   ) => Promise<void>;
 }) {
-  const [showWardrobe, setShowWardrobe] = useState(false);
+  const [showWardrobe, setShowWardrobe] = useState(true);
   const { player, equippedCosmetics, cosmetics, raidLoadout } = state;
   const ownedCosCount = cosmetics.filter((c) => c.ownedCount > 0).length;
 
@@ -1618,10 +1620,10 @@ export function LordProfileWardrobeBar({
           />
           <div className="water-readout">
             <span className="water-label">
-              👑 领主形象 · {player.handle}（{player.professionName}）
+              👑 领主工程蚀刻立绘 · {player.handle}（{player.professionName}）
             </span>
             <span className="water-rate mono-num">
-              S1 赛季外观典藏：{ownedCosCount} / {cosmetics.length} 件（荒原地图实时显形 · 可在市场交易）
+              S1 赛季外观典藏：{ownedCosCount} / {cosmetics.length} 件（荒原地图实时显形 · 可在市场交易 · 跨赛季永久保留）
             </span>
           </div>
         </div>
@@ -1631,7 +1633,7 @@ export function LordProfileWardrobeBar({
           onClick={() => setShowWardrobe((v) => !v)}
         >
           <Sparkles size={ICON.xs} />
-          <span>{showWardrobe ? "收起衣橱" : "换装衣橱"}</span>
+          <span>{showWardrobe ? "收起衣橱" : "展开衣橱"}</span>
         </button>
       </div>
 
@@ -1665,7 +1667,8 @@ export function LordProfileWardrobeBar({
                   className={
                     cos.equipped ? "btn-outline btn-sm" : "btn-primary btn-sm"
                   }
-                  disabled={(cos.ownedCount <= 0 && !cos.equipped) || busy}
+                  data-pop={cos.equipped ? "卸下外观" : `✦ 穿戴 ${cos.name}`}
+                  disabled={cos.ownedCount <= 0 && !cos.equipped}
                   onClick={() =>
                     void runAction(() =>
                       api.equipCosmetic({

@@ -55,8 +55,9 @@ All player endpoints authenticate via the `Authorization: Bearer <session_token>
 | `POST /api/v1/empire/equipment/toggle` | `ToggleEquipItem` | Installs or removes a cross-profession device (`auto_pump`, `hermes_catalyst`, `astral_scroll`, `titan_tools`) in the player's 4-slot workshop rack. |
 | `POST /api/v1/empire/market/orders` | `PlaceMarketOrder` | Places a `BID` or `ASK` limit order on the CLOB spot market (supports resources, crafted devices, war gear, **unlearned raid blueprints `bp_*`**, and **S1 animated cosmetics `cos_*`**). |
 | `POST /api/v1/empire/market/orders/cancel` | `CancelMarketOrder` | Cancels an open limit order and unfreezes escrowed gold or items. |
-| `POST /api/v1/empire/war/chamber` | `SwitchChamber` | Switches allegiance between Obsidian (`obsidian`) and Argent (`argent`) chambers. |
-| `POST /api/v1/empire/war/deploy` | `DeployTroops` | Deploys infantry, archer, and cavalry regiments to a connected war node (up to 100 daily budget points). |
+| `POST /api/v1/empire/war/guild` | `SwitchGuild` | Switches allegiance between Obsidian (`OBSIDIAN`) and Argent (`ARGENT`) chambers. |
+| `POST /api/v1/empire/war/guild-action` | `GuildAction` | Executes a guild operation (`join`, `create`, `donate_supplies`, `donate_gold`, `set_rally`). |
+| `POST /api/v1/empire/war/deploy` | `DeployWarTroops` | Deploys infantry, archer, and cavalry regiments under the player's joined Guild to a connected war node (up to 100 daily budget points; grants `+5` bonus activity points when deploying to the Guild's `rallyNodeId`). |
 | `POST /api/v1/empire/collectibles/mint` | `MintCollectibleBox` | Spends `80` war activity points to mint a procedural UV-etched collectible relic (`S1·墨械典藏宝箱`). |
 
 ---

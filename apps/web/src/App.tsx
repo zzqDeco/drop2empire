@@ -5,13 +5,17 @@ import {
   type DashboardStateResp,
 } from "@drop2empire/api-client";
 import {
+  Award,
   Compass,
+  Cpu,
   Droplets,
   Hammer,
   LogOut,
   Moon,
   Plus,
+  Scale,
   Sun,
+  Swords,
   TrendingUp,
   UserCheck,
 } from "lucide-react";
@@ -24,9 +28,15 @@ import {
   WastelandRaidPanel,
 } from "./WastelandRaidPanel";
 import { AdminConsoleView } from "./AdminConsoleView";
-import { MacroEmpireWorkspace } from "./MacroEmpireWorkspace";
+import {
+  MarketSceneView,
+  SeasonRelicVaultPanel,
+  SettingsChronicleModal,
+  WarGuildSceneView,
+} from "./MacroEmpireWorkspace";
 
 type AuthMode = "login" | "register";
+type GameScene = "settlement" | "scout" | "market" | "war" | "lord";
 
 export function App() {
   const isAdminRoute = useMemo(
@@ -44,6 +54,8 @@ export function App() {
   const [noticeBanner, setNoticeBanner] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme());
   const [presetInput, setPresetInput] = useState("");
+  const [activeScene, setActiveScene] = useState<GameScene>("settlement");
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Authentication form state
   const initialInviteCode = useMemo(() => {
@@ -63,6 +75,9 @@ export function App() {
   const [inFlightClicks, setInFlightClicks] = useState(0);
   const [waterBursts, setWaterBursts] = useState<
     Array<{ id: number; label: string }>
+  >([]);
+  const [actionBursts, setActionBursts] = useState<
+    Array<{ id: number; x: number; y: number; label: string }>
   >([]);
 
   // Smooth visual interpolation offset (ms since last state update)
@@ -164,10 +179,29 @@ export function App() {
       await api.logoutAccount();
     } finally {
       setState(null);
+      setShowSettingsModal(false);
       setNoticeBanner(null);
       setErrorBanner(null);
       setBusy(false);
     }
+  };
+
+  const handleGlobalButtonPop = (e: React.MouseEvent<HTMLDivElement>) => {
+    const btn = (e.target as HTMLElement | null)?.closest?.("button");
+    if (!btn || btn.disabled) return;
+    const popLabel = btn.getAttribute("data-pop");
+    if (!popLabel) return;
+    const rect = btn.getBoundingClientRect();
+    const burstId = Date.now() + Math.random();
+    const x = Math.round(rect.left + rect.width / 2);
+    const y = Math.round(rect.top);
+    setActionBursts((prev) => [
+      ...prev.slice(-7),
+      { id: burstId, x, y, label: popLabel },
+    ]);
+    window.setTimeout(() => {
+      setActionBursts((prev) => prev.filter((b) => b.id !== burstId));
+    }, 660);
   };
 
   const interpSeconds = useMemo(() => {
@@ -330,11 +364,7 @@ export function App() {
                 />
               </label>
             )}
-            <button
-              type="submit"
-              className="btn-water-strike btn-block"
-              disabled={busy}
-            >
+            <button type="submit" className="btn-water-strike btn-block">
               {authMode === "register" ? "注册并进入" : "进入"}
             </button>
           </form>
@@ -344,7 +374,7 @@ export function App() {
   }
 
   // ============================================================================
-  // PLAYER GAME VIEW: Minimalist, progressive unfolding
+  // PLAYER GAME VIEW: Minimalist, progressive multi-scene unfolding
   // ============================================================================
   const { player, resources, jobs, blueprints, professions } = state;
   const waterRes = resources.find((r) => r.key === "water")!;
@@ -449,7 +479,10 @@ export function App() {
 
   if (isOpeningStage) {
     return (
-      <div className="app-shell opening-shell">
+      <div
+        className="app-shell opening-shell"
+        onClickCapture={handleGlobalButtonPop}
+      >
         <div className="corner-utility-bar">
           <span className="tag-badge mono-num">{player.handle}</span>
           <button
@@ -529,7 +562,8 @@ export function App() {
               <button
                 type="button"
                 className="btn-primary btn-block"
-                disabled={liveWaterMilli < 10000 || busy || !canSeeFirstRecruit}
+                data-pop="+1 居民"
+                disabled={liveWaterMilli < 10000 || !canSeeFirstRecruit}
                 onClick={() =>
                   void runAction(() => api.recruitResident({ count: 1 }))
                 }
@@ -544,11 +578,17 @@ export function App() {
     );
   }
 
-  // Stage B: Population >= 1 -> Progressive Unfolding Dashboard
+  // Stage B: Population >= 1 -> Progressive Multi-Scene Unfolding Dashboard
   const showJobAllocationColumn = axeUnlocked || player.profession !== "none";
   const showProfessionChoice =
     treasureUnlocked && player.profession === "none";
   const showAdvancedWorld = player.profession !== "none";
+  const showScoutScene = scoutCampUnlocked || showAdvancedWorld;
+  const showLordScene =
+    scoutCampUnlocked ||
+    showAdvancedWorld ||
+    state.cosmetics.some((c) => c.ownedCount > 0) ||
+    state.collectibles.length > 0;
 
   const unlockedResources = resources.filter((r) => r.unlocked);
   const unlockedJobs = jobs.filter((j) => j.unlocked);
@@ -610,16 +650,16 @@ export function App() {
                   ? {
                       key: "ch8-prof",
                       tag: "第八章 · 圣坛择业",
-                      text: "远古宝藏轰然开启！择定你的终身职业，步入跨职业贸易与商会战争纪元。",
+                      text: "远古宝藏轰然开启！择定你的终身职业，解锁【工坊与市场】与【公会与战区】场景。",
                     }
                   : {
                       key: "ch9-empire",
                       tag: "第九章 · 滴水成城",
-                      text: "聚落已蜕变为帝国重镇。在下方工坊制造专属制品、挂单贸易，率军争夺黑曜与白银城池。",
+                      text: "聚落已蜕变为帝国重镇。在上方切换【聚落生产】【荒原斥候】【工坊与市场】【公会与战区】【领主与藏品】五大场景。",
                     };
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" onClickCapture={handleGlobalButtonPop}>
       <header className="topbar">
         <div className="brand-cluster">
           <div className="brand-emblem">D2E</div>
@@ -684,6 +724,14 @@ export function App() {
         <div className="toolbar-actions">
           <button
             type="button"
+            className="btn-outline"
+            onClick={() => setShowSettingsModal(true)}
+          >
+            <Scale size={ICON.xs} />
+            <span>设置 · 纪事 ({state.eventLogs.length})</span>
+          </button>
+          <button
+            type="button"
             className="btn-icon"
             aria-label="切换主题"
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}
@@ -735,557 +783,699 @@ export function App() {
         </span>
       </section>
 
-      {/* Always-visible Animated Lord Profile & S1 Wardrobe Bar */}
-      <LordProfileWardrobeBar state={state} busy={busy} runAction={runAction} />
+      {/* Multi-Scene Switcher Bar (Progressive Disclosure) */}
+      {(showScoutScene || showAdvancedWorld || showLordScene) && (
+        <nav
+          className="lower-workspace"
+          style={{ marginTop: "var(--space-3)", marginBottom: 0 }}
+          aria-label="玩法场景切换"
+        >
+          <div className="tabs-header">
+            <div className="tab-buttons" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeScene === "settlement"}
+                className={`tab-btn ${activeScene === "settlement" ? "active" : ""}`}
+                onClick={() => setActiveScene("settlement")}
+              >
+                <Droplets size={ICON.sm} />
+                <span>聚落生产</span>
+              </button>
 
-      {/* Profession Selection Gate */}
-      {showProfessionChoice && (
-        <section className="profession-gate-banner" aria-label="选择职业">
-          <div className="section-head">
-            <div>
-              <span className="tag-badge tag-warning">神秘的宝藏</span>
-              <h2>选择职业</h2>
-              <p>选定后不可更改。</p>
-            </div>
-          </div>
-          <div className="profession-grid">
-            {professions.map((pr) => (
-              <article key={pr.code} className="profession-card">
-                <div className="profession-card-top">
-                  <div>
-                    <h3>{pr.name}</h3>
-                    <span className="profession-subtitle">{pr.title}</span>
-                  </div>
-                  <span className="tag-badge">{pr.artifactName}</span>
-                </div>
-                <dl className="profession-specs">
-                  <div>
-                    <dt>独占制品</dt>
-                    <dd>{pr.exclusiveOutputs.join("、")}</dd>
-                  </div>
-                  <div>
-                    <dt>职业加成</dt>
-                    <dd>{pr.passiveBonusText}</dd>
-                  </div>
-                </dl>
+              {showScoutScene && (
                 <button
                   type="button"
-                  className="btn-primary btn-block"
-                  disabled={busy}
-                  onClick={() =>
-                    void runAction(() =>
-                      api.chooseProfession({ profession: pr.code }),
-                    )
-                  }
+                  role="tab"
+                  aria-selected={activeScene === "scout"}
+                  className={`tab-btn ${activeScene === "scout" ? "active" : ""}`}
+                  onClick={() => setActiveScene("scout")}
                 >
-                  <UserCheck size={ICON.sm} />
-                  <span>就职 {pr.name}</span>
+                  <Compass size={ICON.sm} />
+                  <span>荒原斥候与游商</span>
                 </button>
-              </article>
-            ))}
+              )}
+
+              {showAdvancedWorld && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeScene === "market"}
+                  className={`tab-btn ${activeScene === "market" ? "active" : ""}`}
+                  onClick={() => setActiveScene("market")}
+                >
+                  <Cpu size={ICON.sm} />
+                  <span>工坊与市场</span>
+                </button>
+              )}
+
+              {showAdvancedWorld && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeScene === "war"}
+                  className={`tab-btn ${activeScene === "war" ? "active" : ""}`}
+                  onClick={() => setActiveScene("war")}
+                >
+                  <Swords size={ICON.sm} />
+                  <span>公会与战区 (D{state.war.currentDay})</span>
+                </button>
+              )}
+
+              {showLordScene && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeScene === "lord"}
+                  className={`tab-btn ${activeScene === "lord" ? "active" : ""}`}
+                  onClick={() => setActiveScene("lord")}
+                >
+                  <Award size={ICON.sm} />
+                  <span>领主与藏品</span>
+                </button>
+              )}
+            </div>
           </div>
-        </section>
+        </nav>
       )}
 
-      {/* Main Upper Dashboard (Micro Settlement Layer) */}
-      <main
-        className={`dashboard-grid ${!showJobAllocationColumn ? "dashboard-grid-2col" : ""}`}
-      >
-        {/* Column 1: Resources */}
-        <section className="panel" aria-label="资源">
-          <div className="panel-header">
-            <div className="panel-title">
-              <Droplets size={ICON.sm} />
-              <h2>资源</h2>
-            </div>
-            <span className="tag-badge mono-num">
-              {formatRate(waterRes.netRatePerSecMilli)}
-            </span>
-          </div>
-
-          {state.hydrationWarning && (
-            <div className="status-banner status-danger" role="alert">
-              <span>⚠️ 聚落断水：非汲水岗位效率 -50%</span>
-            </div>
-          )}
-
-          <div className="water-hero-box">
-            <div className="water-readout">
-              <span className="water-label">💧 水</span>
-              <strong className="water-big-num mono-num">
-                {formatResource(liveWaterMilli, 1)}
-              </strong>
-              <span className="water-rate mono-num">
-                {waterRes.capacityMilli > 0
-                  ? `/ ${formatResource(waterRes.capacityMilli, 0)} · ${formatRate(waterRes.netRatePerSecMilli)}`
-                  : formatRate(waterRes.netRatePerSecMilli)}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="btn-water-strike"
-              onClick={handleGatherWater}
-            >
-              <Droplets size={ICON.md} />
-              <span>打水 +{firstResBpUnlocked ? "2" : "1"}</span>
-              <span className="water-burst-layer" aria-hidden="true">
-                {waterBursts.map((b) => (
-                  <span key={b.id}>
-                    <span className="water-ripple-ring" />
-                    <span className="water-float-pop mono-num">{b.label}</span>
-                  </span>
-                ))}
-              </span>
-            </button>
-          </div>
-
-          {unlockedResources.length > 1 && (
-            <div className="table-wrap">
-              <table className="ink-table">
-                <thead>
-                  <tr>
-                    <th>物资</th>
-                    {showAdvancedWorld && <th>类型</th>}
-                    <th className="num-col">库存 / 上限</th>
-                    <th className="num-col">净速</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {unlockedResources.map((r) => {
-                    const rawLive =
-                      r.key === "water"
-                        ? liveWaterMilli
-                        : r.amountMilli +
-                          Math.floor(r.netRatePerSecMilli * interpSeconds);
-                    const liveAmt = Math.max(
-                      0,
-                      r.capacityMilli > 0
-                        ? Math.min(r.capacityMilli, rawLive)
-                        : rawLive,
-                    );
-                    const isContinuous =
-                      r.tier === "basic" ||
-                      r.key === "charcoal" ||
-                      r.key === "flint" ||
-                      r.key === "ancient_shard";
-                    return (
-                      <tr key={r.key} className="res-row-enter">
-                        <td className="res-name-cell">
-                          <span>{r.name}</span>
-                          {r.frozenMilli > 0 && (
-                            <small className="frozen-tag mono-num">
-                              冻:{formatResource(r.frozenMilli, 0)}
-                            </small>
-                          )}
-                        </td>
-                        {showAdvancedWorld && (
-                          <td>
-                            <span className="tier-pill">{r.tier}</span>
-                          </td>
-                        )}
-                        <td className="num-col mono-num">
-                          {formatResource(
-                            isContinuous ? liveAmt : r.amountMilli,
-                            r.tier === "basic" || r.key === "charcoal" ? 1 : 1,
-                          )}
-                          {r.capacityMilli > 0 && (
-                            <small className="metric-sub mono-num">
-                              {" "}
-                              / {formatResource(r.capacityMilli, 0)}
-                            </small>
-                          )}
-                        </td>
-                        <td
-                          className={`num-col mono-num ${
-                            r.netRatePerSecMilli > 0
-                              ? "rate-pos"
-                              : r.netRatePerSecMilli < 0
-                                ? "cost-lack"
-                                : "rate-zero"
-                          }`}
-                        >
-                          {r.netRatePerSecMilli !== 0
-                            ? formatRate(r.netRatePerSecMilli)
-                            : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        {/* Column 2: Worker Allocation — ONLY rendered after Axe Blueprint unlocks */}
-        {showJobAllocationColumn && (
-          <section className="panel" aria-label="岗位">
-            <div className="panel-header">
-              <div className="panel-title">
-                <Hammer size={ICON.sm} />
-                <h2>岗位</h2>
+      {/* ========================================================================
+          SCENE 1: 聚落生产 (Settlement Production, Edicts, Blueprints & Profession Gate)
+          ======================================================================== */}
+      {activeScene === "settlement" && (
+        <div key="scene-settlement">
+          {showProfessionChoice && (
+            <section className="profession-gate-banner" aria-label="选择职业">
+              <div className="section-head">
+                <div>
+                  <span className="tag-badge tag-warning">神秘的宝藏</span>
+                  <h2>选择终身职业（解锁工坊市场与公会战区）</h2>
+                  <p>选定后本赛季不可更改，不同职业享有专属工坊制造配方与聚落加成。</p>
+                </div>
               </div>
-              <span className="tag-badge mono-num">
-                {player.populationAssigned} / {player.populationTotal}
-              </span>
-            </div>
-
-            <div className="quick-alloc-bar">
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() =>
-                  void runAction(() =>
-                    api.allocateWorkers({ mode: "auto_balanced" }),
-                  )
-                }
-              >
-                均衡
-              </button>
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() =>
-                  void runAction(() =>
-                    api.allocateWorkers({ mode: "water_focus" }),
-                  )
-                }
-              >
-                打水优先
-              </button>
-              {axeUnlocked && (
-                <button
-                  type="button"
-                  className="btn-outline"
-                  onClick={() =>
-                    void runAction(() =>
-                      api.allocateWorkers({ mode: "wood_focus" }),
-                    )
-                  }
-                >
-                  伐木优先
-                </button>
-              )}
-              {quarryUnlocked && (
-                <button
-                  type="button"
-                  className="btn-outline"
-                  onClick={() =>
-                    void runAction(() =>
-                      api.allocateWorkers({ mode: "stone_focus" }),
-                    )
-                  }
-                >
-                  采石优先
-                </button>
-              )}
-            </div>
-
-            <div className="job-list">
-              {unlockedJobs.map((job) => {
-                const canAddPool =
-                  job.jobKey === "water"
-                    ? player.populationTotal - job.assigned
-                    : player.populationIdle + waterAssignedCount;
-
-                return (
-                  <div
-                    key={job.jobKey}
-                    className={`job-row ${!job.unlocked ? "job-row-locked" : ""}`}
-                  >
-                    <div className="job-info">
-                      <div className="job-title-line">
-                        <strong>{job.name}</strong>
-                        {job.efficiencyPct !== 100 && (
-                          <span className="tag-badge mono-num">
-                            {job.efficiencyPct}%
-                          </span>
-                        )}
-                      </div>
-                      <small className="job-sub mono-num">
-                        {(job.effectiveRateMilli / 1000).toFixed(2)}/s ·{" "}
-                        {job.inputSummary}
-                      </small>
-                    </div>
-
-                    <div className="job-controls">
-                      <div className="job-rate-box mono-num">
-                        {formatRate(job.totalOutputPerSecMilli)}
-                      </div>
-                      <div className="stepper-group">
-                        <button
-                          type="button"
-                          className="btn-step mono-num"
-                          disabled={job.assigned < 5 || busy}
-                          onClick={() => adjustJobCount(job.jobKey, -5)}
-                        >
-                          -5
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-step mono-num"
-                          disabled={job.assigned <= 0 || busy}
-                          onClick={() => adjustJobCount(job.jobKey, -1)}
-                        >
-                          -1
-                        </button>
-                        <span className="job-count mono-num">
-                          {job.assigned}
-                        </span>
-                        <button
-                          type="button"
-                          className="btn-step mono-num"
-                          disabled={canAddPool < 1 || busy}
-                          onClick={() => adjustJobCount(job.jobKey, 1)}
-                        >
-                          +1
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-step mono-num"
-                          disabled={canAddPool < 5 || busy}
-                          onClick={() => adjustJobCount(job.jobKey, 5)}
-                        >
-                          +5
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {unlockedEdicts.length > 0 && (
-              <div className="blueprint-list">
-                <hr className="ink-divider" />
-                {unlockedEdicts.map((ed) => (
-                  <article
-                    key={ed.code}
-                    className={`bp-card ${ed.active ? "bp-ready" : ""}`}
-                  >
-                    <div className="bp-top">
+              <div className="profession-grid">
+                {professions.map((pr) => (
+                  <article key={pr.code} className="profession-card">
+                    <div className="profession-card-top">
                       <div>
-                        <strong>{ed.name}</strong>
-                        <span
-                          className={`tag-badge ${ed.active ? "tag-success" : ""}`}
-                        >
-                          {ed.active ? "已启用" : "待命"}
-                        </span>
+                        <h3>{pr.name}</h3>
+                        <span className="profession-subtitle">{pr.title}</span>
                       </div>
-                      <button
-                        type="button"
-                        className={
-                          ed.active
-                            ? "btn-outline btn-sm"
-                            : "btn-primary btn-sm"
-                        }
-                        disabled={busy}
-                        onClick={() =>
-                          void runAction(() =>
-                            api.toggleEdict({ code: ed.code }),
-                          )
-                        }
-                      >
-                        {ed.active ? "关闭" : "开启"}
-                      </button>
+                      <span className="tag-badge">{pr.artifactName}</span>
                     </div>
-                    <p className="bp-desc">
-                      {ed.effectSummary}（{ed.drawbackSummary}）
-                    </p>
-                  </article>
-                ))}
-              </div>
-            )}
-
-            {quarryUnlocked && (
-              <div className="preset-bar">
-                {state.presets.length > 0 && (
-                  <div className="preset-chips">
-                    {state.presets.map((pr) => (
-                      <button
-                        key={pr.name}
-                        type="button"
-                        className="btn-chip"
-                        onClick={() =>
-                          void runAction(() =>
-                            api.allocateWorkers({
-                              mode: "preset",
-                              presetName: pr.name,
-                            }),
-                          )
-                        }
-                      >
-                        {pr.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <form
-                  className="preset-save-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!presetInput.trim()) return;
-                    void runAction(() =>
-                      api.saveAllocationPreset({ name: presetInput.trim() }),
-                    );
-                    setPresetInput("");
-                  }}
-                >
-                  <input
-                    type="text"
-                    placeholder="方案名..."
-                    value={presetInput}
-                    onChange={(e) => setPresetInput(e.target.value)}
-                  />
-                  <button type="submit" className="btn-outline">
-                    保存
-                  </button>
-                </form>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Column 3: Recruitment & Blueprints */}
-        <section className="panel" aria-label="发展">
-          <div className="panel-header">
-            <div className="panel-title">
-              <Compass size={ICON.sm} />
-              <h2>发展</h2>
-            </div>
-            <span className="tag-badge mono-num">
-              人口 {player.populationTotal}
-            </span>
-          </div>
-
-          <div className="recruit-card">
-            <div className="recruit-meta">
-              <div className="recruit-head">
-                <strong>招募居民</strong>
-                <span className="tag-badge mono-num">
-                  {formatETA(player.nextResidentEtaSeconds)}
-                </span>
-              </div>
-              <div className="recruit-cost mono-num">
-                -{formatResource(player.nextResidentCostWaterMilli, 1)} 水
-              </div>
-            </div>
-            <div className="recruit-btns">
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={
-                  liveWaterMilli < player.nextResidentCostWaterMilli || busy
-                }
-                onClick={() =>
-                  void runAction(() => api.recruitResident({ count: 1 }))
-                }
-              >
-                <Plus size={ICON.xs} />
-                <span>+1</span>
-              </button>
-              {player.populationTotal >= 5 && (
-                <button
-                  type="button"
-                  className="btn-outline mono-num"
-                  disabled={
-                    liveWaterMilli < player.nextResidentCostWaterMilli || busy
-                  }
-                  onClick={() =>
-                    void runAction(() => api.recruitResident({ count: 5 }))
-                  }
-                >
-                  +5
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="blueprint-list">
-            {activeBlueprints.map((bp) => {
-              const popOK = player.populationTotal >= bp.requiredPopulation;
-              return (
-                <article
-                  key={bp.code}
-                  className={`bp-card ${bp.canUnlock ? "bp-ready" : ""}`}
-                >
-                  <div className="bp-top">
-                    <div>
-                      <strong>{bp.name}</strong>
-                      <span
-                        className={`bp-pop-req mono-num ${popOK ? "rate-pos" : ""}`}
-                      >
-                        人口 {player.populationTotal}/{bp.requiredPopulation}
-                      </span>
-                    </div>
-                    <span className="tag-badge mono-num">
-                      {formatETA(bp.etaSeconds)}
-                    </span>
-                  </div>
-                  <p className="bp-desc">{bp.effectSummary}</p>
-                  <div className="bp-footer">
-                    <div className="bp-costs">
-                      {bp.costs.map((c) => {
-                        const cur =
-                          c.resourceKey === "water"
-                            ? liveWaterMilli
-                            : c.currentMilli;
-                        const ok = cur >= c.requiredMilli;
-                        return (
-                          <span
-                            key={c.resourceKey}
-                            className={`cost-chip mono-num ${ok ? "cost-ok" : "cost-lack"}`}
-                          >
-                            {c.resourceName} {formatResource(cur, 0)}/
-                            {formatResource(c.requiredMilli, 0)}
-                          </span>
-                        );
-                      })}
-                    </div>
+                    <dl className="profession-specs">
+                      <div>
+                        <dt>独占制品</dt>
+                        <dd>{pr.exclusiveOutputs.join("、")}</dd>
+                      </div>
+                      <div>
+                        <dt>职业加成</dt>
+                        <dd>{pr.passiveBonusText}</dd>
+                      </div>
+                    </dl>
                     <button
                       type="button"
-                      className="btn-primary"
-                      disabled={!bp.canUnlock || busy}
+                      className="btn-primary btn-block"
+                      data-pop={`★ 就职 ${pr.name}`}
                       onClick={() =>
                         void runAction(() =>
-                          api.unlockBlueprint({ code: bp.code }),
+                          api.chooseProfession({ profession: pr.code }),
                         )
                       }
                     >
-                      解锁
+                      <UserCheck size={ICON.sm} />
+                      <span>就职 {pr.name}</span>
                     </button>
-                  </div>
-                </article>
-              );
-            })}
-
-            {completedBlueprints.length > 0 && (
-              <details className="settlement-item">
-                <summary className="mono-num">
-                  已解锁 ({completedBlueprints.length})
-                </summary>
-                {completedBlueprints.map((bp) => (
-                  <div key={bp.code} className="bp-card bp-unlocked">
-                    <div className="bp-top">
-                      <strong>{bp.name}</strong>
-                      <span className="tag-badge tag-success">✓</span>
-                    </div>
-                    <p className="bp-desc">{bp.effectSummary}</p>
-                  </div>
+                  </article>
                 ))}
-              </details>
-            )}
-          </div>
-        </section>
-      </main>
+              </div>
+            </section>
+          )}
 
-      {/* Wasteland Multi-Zone Portal Extraction Roguelite & Caravan Barter: ONLY rendered after Scout Camp unlocks */}
-      {scoutCampUnlocked && (
+          <main
+            className={`dashboard-grid ${!showJobAllocationColumn ? "dashboard-grid-2col" : ""}`}
+          >
+            {/* Column 1: Resources (with Separate Gross / Drain / Net Rates) */}
+            <section className="panel" aria-label="资源">
+              <div className="panel-header">
+                <div className="panel-title">
+                  <Droplets size={ICON.sm} />
+                  <h2>资源账本</h2>
+                </div>
+                <span className="tag-badge mono-num">
+                  净速 {formatRate(waterRes.netRatePerSecMilli)}
+                </span>
+              </div>
+
+              {state.hydrationWarning && (
+                <div className="status-banner status-danger" role="alert">
+                  <span>⚠️ 聚落断水：非汲水岗位效率 -50%</span>
+                </div>
+              )}
+
+              <div className="water-hero-box">
+                <div className="water-readout">
+                  <span className="water-label">💧 聚落储水</span>
+                  <strong className="water-big-num mono-num">
+                    {formatResource(liveWaterMilli, 1)}
+                    {waterRes.capacityMilli > 0 && (
+                      <small className="metric-sub mono-num">
+                        {" "}
+                        / {formatResource(waterRes.capacityMilli, 0)}
+                      </small>
+                    )}
+                  </strong>
+                  <span className="water-rate mono-num">
+                    <span className="rate-pos">
+                      增速 +{formatResource(waterRes.grossRatePerSecMilli, 2)}/s
+                    </span>
+                    {" · "}
+                    <span
+                      className={
+                        waterRes.drainRatePerSecMilli > 0
+                          ? "cost-lack"
+                          : "rate-zero"
+                      }
+                    >
+                      消耗 -{formatResource(waterRes.drainRatePerSecMilli, 2)}/s
+                    </span>
+                    {" · "}
+                    <span>
+                      净速 {formatRate(waterRes.netRatePerSecMilli)}
+                    </span>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-water-strike"
+                  onClick={handleGatherWater}
+                >
+                  <Droplets size={ICON.md} />
+                  <span>打水 +{firstResBpUnlocked ? "2" : "1"}</span>
+                  <span className="water-burst-layer" aria-hidden="true">
+                    {waterBursts.map((b) => (
+                      <span key={b.id}>
+                        <span className="water-ripple-ring" />
+                        <span className="water-float-pop mono-num">
+                          {b.label}
+                        </span>
+                      </span>
+                    ))}
+                  </span>
+                </button>
+              </div>
+
+              {unlockedResources.length > 1 && (
+                <div className="table-wrap">
+                  <table className="ink-table">
+                    <thead>
+                      <tr>
+                        <th>物资</th>
+                        <th className="num-col">库存 / 上限</th>
+                        <th className="num-col">增速</th>
+                        <th className="num-col">消耗</th>
+                        <th className="num-col">净速</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {unlockedResources.map((r) => {
+                        const rawLive =
+                          r.key === "water"
+                            ? liveWaterMilli
+                            : r.amountMilli +
+                              Math.floor(r.netRatePerSecMilli * interpSeconds);
+                        const liveAmt = Math.max(
+                          0,
+                          r.capacityMilli > 0
+                            ? Math.min(r.capacityMilli, rawLive)
+                            : rawLive,
+                        );
+                        const isContinuous =
+                          r.tier === "basic" ||
+                          r.key === "charcoal" ||
+                          r.key === "flint" ||
+                          r.key === "ancient_shard";
+                        return (
+                          <tr key={r.key} className="res-row-enter">
+                            <td className="res-name-cell">
+                              <span>{r.name}</span>
+                              {r.frozenMilli > 0 && (
+                                <small className="frozen-tag mono-num">
+                                  冻:{formatResource(r.frozenMilli, 0)}
+                                </small>
+                              )}
+                            </td>
+                            <td className="num-col mono-num">
+                              {formatResource(
+                                isContinuous ? liveAmt : r.amountMilli,
+                                1,
+                              )}
+                              {r.capacityMilli > 0 && (
+                                <small className="metric-sub mono-num">
+                                  {" "}
+                                  / {formatResource(r.capacityMilli, 0)}
+                                </small>
+                              )}
+                            </td>
+                            <td
+                              className={`num-col mono-num ${
+                                r.grossRatePerSecMilli > 0
+                                  ? "rate-pos"
+                                  : "rate-zero"
+                              }`}
+                            >
+                              {r.grossRatePerSecMilli > 0
+                                ? `+${formatResource(r.grossRatePerSecMilli, 2)}/s`
+                                : "—"}
+                            </td>
+                            <td
+                              className={`num-col mono-num ${
+                                r.drainRatePerSecMilli > 0
+                                  ? "cost-lack"
+                                  : "rate-zero"
+                              }`}
+                            >
+                              {r.drainRatePerSecMilli > 0
+                                ? `-${formatResource(r.drainRatePerSecMilli, 2)}/s`
+                                : "—"}
+                            </td>
+                            <td
+                              className={`num-col mono-num ${
+                                r.netRatePerSecMilli > 0
+                                  ? "rate-pos"
+                                  : r.netRatePerSecMilli < 0
+                                    ? "cost-lack"
+                                    : "rate-zero"
+                              }`}
+                            >
+                              {r.netRatePerSecMilli !== 0
+                                ? formatRate(r.netRatePerSecMilli)
+                                : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/* Column 2: Worker Allocation & Colony Edicts */}
+            {showJobAllocationColumn && (
+              <section className="panel" aria-label="岗位">
+                <div className="panel-header">
+                  <div className="panel-title">
+                    <Hammer size={ICON.sm} />
+                    <h2>岗位与法令</h2>
+                  </div>
+                  <span className="tag-badge mono-num">
+                    {player.populationAssigned} / {player.populationTotal}
+                  </span>
+                </div>
+
+                <div className="quick-alloc-bar">
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    data-pop="✓ 均衡调配"
+                    onClick={() =>
+                      void runAction(() =>
+                        api.allocateWorkers({ mode: "auto_balanced" }),
+                      )
+                    }
+                  >
+                    均衡
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    data-pop="💧 打水优先"
+                    onClick={() =>
+                      void runAction(() =>
+                        api.allocateWorkers({ mode: "water_focus" }),
+                      )
+                    }
+                  >
+                    打水优先
+                  </button>
+                  {axeUnlocked && (
+                    <button
+                      type="button"
+                      className="btn-outline"
+                      data-pop="🪵 伐木优先"
+                      onClick={() =>
+                        void runAction(() =>
+                          api.allocateWorkers({ mode: "wood_focus" }),
+                        )
+                      }
+                    >
+                      伐木优先
+                    </button>
+                  )}
+                  {quarryUnlocked && (
+                    <button
+                      type="button"
+                      className="btn-outline"
+                      data-pop="🪨 采石优先"
+                      onClick={() =>
+                        void runAction(() =>
+                          api.allocateWorkers({ mode: "stone_focus" }),
+                        )
+                      }
+                    >
+                      采石优先
+                    </button>
+                  )}
+                </div>
+
+                <div className="job-list">
+                  {unlockedJobs.map((job) => {
+                    const canAddPool =
+                      job.jobKey === "water"
+                        ? player.populationTotal - job.assigned
+                        : player.populationIdle + waterAssignedCount;
+
+                    return (
+                      <div
+                        key={job.jobKey}
+                        className={`job-row ${!job.unlocked ? "job-row-locked" : ""}`}
+                      >
+                        <div className="job-info">
+                          <div className="job-title-line">
+                            <strong>{job.name}</strong>
+                            {job.efficiencyPct !== 100 && (
+                              <span className="tag-badge mono-num">
+                                {job.efficiencyPct}%
+                              </span>
+                            )}
+                          </div>
+                          <small className="job-sub mono-num">
+                            {(job.effectiveRateMilli / 1000).toFixed(2)}/s ·{" "}
+                            {job.inputSummary}
+                          </small>
+                        </div>
+
+                        <div className="job-controls">
+                          <div className="job-rate-box mono-num">
+                            {formatRate(job.totalOutputPerSecMilli)}
+                          </div>
+                          <div className="stepper-group">
+                            <button
+                              type="button"
+                              className="btn-step mono-num"
+                              data-pop={`-5 ${job.name}`}
+                              disabled={job.assigned < 5}
+                              onClick={() => adjustJobCount(job.jobKey, -5)}
+                            >
+                              -5
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-step mono-num"
+                              data-pop={`-1 ${job.name}`}
+                              disabled={job.assigned <= 0}
+                              onClick={() => adjustJobCount(job.jobKey, -1)}
+                            >
+                              -1
+                            </button>
+                            <span className="job-count mono-num">
+                              {job.assigned}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn-step mono-num"
+                              data-pop={`+1 ${job.name}`}
+                              disabled={canAddPool < 1}
+                              onClick={() => adjustJobCount(job.jobKey, 1)}
+                            >
+                              +1
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-step mono-num"
+                              data-pop={`+5 ${job.name}`}
+                              disabled={canAddPool < 5}
+                              onClick={() => adjustJobCount(job.jobKey, 5)}
+                            >
+                              +5
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {unlockedEdicts.length > 0 && (
+                  <div className="blueprint-list">
+                    <hr className="ink-divider" />
+                    {unlockedEdicts.map((ed) => (
+                      <article
+                        key={ed.code}
+                        className={`bp-card ${ed.active ? "bp-ready" : ""}`}
+                      >
+                        <div className="bp-top">
+                          <div>
+                            <strong>{ed.name}</strong>
+                            <span
+                              className={`tag-badge ${ed.active ? "tag-success" : ""}`}
+                            >
+                              {ed.active ? "已启用" : "待命"}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className={
+                              ed.active
+                                ? "btn-outline btn-sm"
+                                : "btn-primary btn-sm"
+                            }
+                            data-pop={
+                              ed.active ? `关闭 ${ed.name}` : `✓ 开启 ${ed.name}`
+                            }
+                            onClick={() =>
+                              void runAction(() =>
+                                api.toggleEdict({ code: ed.code }),
+                              )
+                            }
+                          >
+                            {ed.active ? "关闭" : "开启"}
+                          </button>
+                        </div>
+                        <p className="bp-desc">
+                          {ed.effectSummary}（{ed.drawbackSummary}）
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+
+                {quarryUnlocked && (
+                  <div className="preset-bar">
+                    {state.presets.length > 0 && (
+                      <div className="preset-chips">
+                        {state.presets.map((pr) => (
+                          <button
+                            key={pr.name}
+                            type="button"
+                            className="btn-chip"
+                            data-pop={`套用 ${pr.name}`}
+                            onClick={() =>
+                              void runAction(() =>
+                                api.allocateWorkers({
+                                  mode: "preset",
+                                  presetName: pr.name,
+                                }),
+                              )
+                            }
+                          >
+                            {pr.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <form
+                      className="preset-save-form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!presetInput.trim()) return;
+                        void runAction(() =>
+                          api.saveAllocationPreset({
+                            name: presetInput.trim(),
+                          }),
+                        );
+                        setPresetInput("");
+                      }}
+                    >
+                      <input
+                        type="text"
+                        placeholder="方案名..."
+                        value={presetInput}
+                        onChange={(e) => setPresetInput(e.target.value)}
+                      />
+                      <button
+                        type="submit"
+                        className="btn-outline"
+                        data-pop="✓ 保存方案"
+                      >
+                        保存
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Column 3: Resident Recruitment & Blueprints */}
+            <section className="panel" aria-label="发展">
+              <div className="panel-header">
+                <div className="panel-title">
+                  <Compass size={ICON.sm} />
+                  <h2>招募与蓝图</h2>
+                </div>
+                <span className="tag-badge mono-num">
+                  人口 {player.populationTotal}
+                </span>
+              </div>
+
+              <div className="recruit-card">
+                <div className="recruit-meta">
+                  <div className="recruit-head">
+                    <strong>招募居民</strong>
+                    <span className="tag-badge mono-num">
+                      {formatETA(player.nextResidentEtaSeconds)}
+                    </span>
+                  </div>
+                  <div className="recruit-cost mono-num">
+                    -{formatResource(player.nextResidentCostWaterMilli, 1)} 水
+                  </div>
+                </div>
+                <div className="recruit-btns">
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    data-pop="+1 居民"
+                    disabled={
+                      liveWaterMilli < player.nextResidentCostWaterMilli
+                    }
+                    onClick={() =>
+                      void runAction(() => api.recruitResident({ count: 1 }))
+                    }
+                  >
+                    <Plus size={ICON.xs} />
+                    <span>+1</span>
+                  </button>
+                  {player.populationTotal >= 5 && (
+                    <button
+                      type="button"
+                      className="btn-outline mono-num"
+                      data-pop="+5 居民"
+                      disabled={
+                        liveWaterMilli < player.nextResidentCostWaterMilli
+                      }
+                      onClick={() =>
+                        void runAction(() => api.recruitResident({ count: 5 }))
+                      }
+                    >
+                      +5
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="blueprint-list">
+                {activeBlueprints.map((bp) => {
+                  const popOK = player.populationTotal >= bp.requiredPopulation;
+                  return (
+                    <article
+                      key={bp.code}
+                      className={`bp-card ${bp.canUnlock ? "bp-ready" : ""}`}
+                    >
+                      <div className="bp-top">
+                        <div>
+                          <strong>{bp.name}</strong>
+                          <span
+                            className={`bp-pop-req mono-num ${popOK ? "rate-pos" : ""}`}
+                          >
+                            人口 {player.populationTotal}/
+                            {bp.requiredPopulation}
+                          </span>
+                        </div>
+                        <span className="tag-badge mono-num">
+                          {formatETA(bp.etaSeconds)}
+                        </span>
+                      </div>
+                      <p className="bp-desc">{bp.effectSummary}</p>
+                      <div className="bp-footer">
+                        <div className="bp-costs">
+                          {bp.costs.map((c) => {
+                            const cur =
+                              c.resourceKey === "water"
+                                ? liveWaterMilli
+                                : c.currentMilli;
+                            const ok = cur >= c.requiredMilli;
+                            return (
+                              <span
+                                key={c.resourceKey}
+                                className={`cost-chip mono-num ${ok ? "cost-ok" : "cost-lack"}`}
+                              >
+                                {c.resourceName} {formatResource(cur, 0)}/
+                                {formatResource(c.requiredMilli, 0)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          data-pop={`✓ 解锁 ${bp.name}`}
+                          disabled={!bp.canUnlock}
+                          onClick={() =>
+                            void runAction(() =>
+                              api.unlockBlueprint({ code: bp.code }),
+                            )
+                          }
+                        >
+                          解锁
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+
+                {completedBlueprints.length > 0 && (
+                  <details className="settlement-item">
+                    <summary className="mono-num">
+                      已解锁 ({completedBlueprints.length})
+                    </summary>
+                    {completedBlueprints.map((bp) => (
+                      <div key={bp.code} className="bp-card bp-unlocked">
+                        <div className="bp-top">
+                          <strong>{bp.name}</strong>
+                          <span className="tag-badge tag-success">✓</span>
+                        </div>
+                        <p className="bp-desc">{bp.effectSummary}</p>
+                      </div>
+                    ))}
+                  </details>
+                )}
+              </div>
+            </section>
+          </main>
+        </div>
+      )}
+
+      {/* ========================================================================
+          SCENE 2: 荒原斥候与游商 (2D Portal Extraction Roguelite + Caravan Barter)
+          ======================================================================== */}
+      {activeScene === "scout" && showScoutScene && (
         <section
+          key="scene-scout"
           className="dashboard-grid dashboard-grid-2col"
           aria-label="荒原探索与游商驿站"
         >
-          <WastelandRaidPanel state={state} busy={busy} runAction={runAction} />
+          <WastelandRaidPanel state={state} runAction={runAction} />
 
           <section className="panel" aria-label="游商驿站">
             <div className="panel-header">
@@ -1324,7 +1514,8 @@ export function App() {
                     <button
                       type="button"
                       className="btn-primary btn-sm"
-                      disabled={!cf.canTrade || busy}
+                      data-pop={`+${cf.rewardSummary}`}
+                      disabled={!cf.canTrade}
                       onClick={() =>
                         void runAction(() =>
                           api.tradeCaravan({ offerCode: cf.offerCode }),
@@ -1341,10 +1532,78 @@ export function App() {
         </section>
       )}
 
-      {/* Lower Workspace Tabs (Macro & Season Layer): ONLY rendered AFTER choosing a profession */}
-      {showAdvancedWorld && (
-        <MacroEmpireWorkspace state={state} busy={busy} runAction={runAction} />
+      {/* ========================================================================
+          SCENE 3: 工坊与市场 (Workshop Crafting, Equipment Rack & Global CLOB Market)
+          ======================================================================== */}
+      {activeScene === "market" && showAdvancedWorld && (
+        <div key="scene-market" style={{ marginTop: "var(--space-3)" }}>
+          <MarketSceneView state={state} runAction={runAction} />
+        </div>
       )}
+
+      {/* ========================================================================
+          SCENE 4: 公会与战区 (Guild Hall + 8-Node Chamber Territory War)
+          ======================================================================== */}
+      {activeScene === "war" && showAdvancedWorld && (
+        <div key="scene-war" style={{ marginTop: "var(--space-3)" }}>
+          <WarGuildSceneView state={state} runAction={runAction} />
+        </div>
+      )}
+
+      {/* ========================================================================
+          SCENE 5: 领主与藏品 (Blueprint & Ink Lord Wardrobe + Procedural Relics)
+          ======================================================================== */}
+      {activeScene === "lord" && showLordScene && (
+        <div key="scene-lord" style={{ marginTop: "var(--space-3)" }}>
+          <div style={{ margin: "0 18px var(--space-3)" }}>
+            <LordProfileWardrobeBar state={state} runAction={runAction} />
+          </div>
+          <SeasonRelicVaultPanel state={state} runAction={runAction} />
+        </div>
+      )}
+
+      {/* ========================================================================
+          SETTINGS & CHRONICLE MODAL (设置 · 赛季动向与聚落编年纪事)
+          ======================================================================== */}
+      {showSettingsModal && (
+        <SettingsChronicleModal
+          state={state}
+          theme={theme}
+          onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
+          onLogout={() => void handleLogout()}
+          onClose={() => setShowSettingsModal(false)}
+        />
+      )}
+
+      {/* Global Coordinate-Anchored Tactile Pop Layer (Matches [打水] Floating Pop UX) */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 60,
+          overflow: "hidden",
+        }}
+        aria-hidden="true"
+      >
+        {actionBursts.map((b) => (
+          <div
+            key={b.id}
+            style={{
+              position: "fixed",
+              left: `${b.x}px`,
+              top: `${b.y}px`,
+              width: "56px",
+              height: "28px",
+              transform: "translate(-50%, -50%)",
+              pointerEvents: "none",
+            }}
+          >
+            <span className="water-ripple-ring" />
+            <span className="water-float-pop mono-num">{b.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

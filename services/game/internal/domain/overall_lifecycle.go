@@ -152,6 +152,7 @@ func EnsureDefaultAccounts(w *WorldState, now time.Time) {
 		adm.PasswordHash = HashPassword("admin", "admin123456")
 		w.Players["admin"] = adm
 	}
+	EnsureGuildState(w)
 }
 
 func NewDefaultWorld(now time.Time) *WorldState {
@@ -260,6 +261,7 @@ func NewDefaultWorld(now time.Time) *WorldState {
 	AppendLog(veteran, now, "PROFESSION", "账号 archon_demo 已预置完成第一阶段并就职【科学家】，可直接体验跨职业制造、现货挂单、商会城池战与宝箱铸造。")
 	w.Players["archon_demo"] = veteran
 
+	EnsureGuildState(w)
 	SeedNPCMarket(w, now)
 	return w
 }

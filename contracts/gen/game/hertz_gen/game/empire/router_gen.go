@@ -48,6 +48,7 @@ const (
 	PatternPlaceMarketOrder = "POST /api/v1/empire/market/orders"
 	PatternCancelMarketOrder = "POST /api/v1/empire/market/orders/{id}/cancel"
 	PatternSwitchGuild = "POST /api/v1/empire/war/guild"
+	PatternGuildAction = "POST /api/v1/empire/war/guild-action"
 	PatternDeployWarTroops = "POST /api/v1/empire/war/deploy"
 	PatternTriggerWarSettlement = "POST /api/v1/empire/war/settle"
 	PatternRedeemSeasonChest = "POST /api/v1/empire/season/redeem-chest"
@@ -69,7 +70,7 @@ const (
 	PatternRolloverSeason = "POST /api/v1/empire/admin/season/rollover"
 )
 
-// EmpireServiceRoutes lists all 35 route specifications declared on EmpireService.
+// EmpireServiceRoutes lists all 36 route specifications declared on EmpireService.
 var EmpireServiceRoutes = []RouteSpec{
 	{Name: "GetDashboard", Method: "GET", Path: "/api/v1/empire/state", MuxPattern: PatternGetDashboard, RequestType: "GetDashboardReq", ResponseType: "DashboardStateResp"},
 	{Name: "RegisterAccount", Method: "POST", Path: "/api/v1/empire/auth/register", MuxPattern: PatternRegisterAccount, RequestType: "RegisterAccountReq", ResponseType: "DashboardStateResp"},
@@ -87,6 +88,7 @@ var EmpireServiceRoutes = []RouteSpec{
 	{Name: "PlaceMarketOrder", Method: "POST", Path: "/api/v1/empire/market/orders", MuxPattern: PatternPlaceMarketOrder, RequestType: "PlaceMarketOrderReq", ResponseType: "DashboardStateResp"},
 	{Name: "CancelMarketOrder", Method: "POST", Path: "/api/v1/empire/market/orders/:id/cancel", MuxPattern: PatternCancelMarketOrder, RequestType: "CancelMarketOrderReq", ResponseType: "DashboardStateResp"},
 	{Name: "SwitchGuild", Method: "POST", Path: "/api/v1/empire/war/guild", MuxPattern: PatternSwitchGuild, RequestType: "SwitchGuildReq", ResponseType: "DashboardStateResp"},
+	{Name: "GuildAction", Method: "POST", Path: "/api/v1/empire/war/guild-action", MuxPattern: PatternGuildAction, RequestType: "GuildActionReq", ResponseType: "DashboardStateResp"},
 	{Name: "DeployWarTroops", Method: "POST", Path: "/api/v1/empire/war/deploy", MuxPattern: PatternDeployWarTroops, RequestType: "DeployWarTroopsReq", ResponseType: "DashboardStateResp"},
 	{Name: "TriggerWarSettlement", Method: "POST", Path: "/api/v1/empire/war/settle", MuxPattern: PatternTriggerWarSettlement, RequestType: "TriggerWarSettlementReq", ResponseType: "DashboardStateResp"},
 	{Name: "RedeemSeasonChest", Method: "POST", Path: "/api/v1/empire/season/redeem-chest", MuxPattern: PatternRedeemSeasonChest, RequestType: "RedeemSeasonChestReq", ResponseType: "DashboardStateResp"},
@@ -126,6 +128,7 @@ type EmpireServiceRouteHandlers struct {
 	PlaceMarketOrder http.HandlerFunc
 	CancelMarketOrder http.HandlerFunc
 	SwitchGuild http.HandlerFunc
+	GuildAction http.HandlerFunc
 	DeployWarTroops http.HandlerFunc
 	TriggerWarSettlement http.HandlerFunc
 	RedeemSeasonChest http.HandlerFunc
@@ -213,6 +216,10 @@ func RegisterEmpireServiceRoutes(mux *http.ServeMux, h EmpireServiceRouteHandler
 		panic("EmpireServiceRouteHandlers.SwitchGuild (" + PatternSwitchGuild + ") is nil")
 	}
 	mux.HandleFunc(PatternSwitchGuild, h.SwitchGuild)
+	if h.GuildAction == nil {
+		panic("EmpireServiceRouteHandlers.GuildAction (" + PatternGuildAction + ") is nil")
+	}
+	mux.HandleFunc(PatternGuildAction, h.GuildAction)
 	if h.DeployWarTroops == nil {
 		panic("EmpireServiceRouteHandlers.DeployWarTroops (" + PatternDeployWarTroops + ") is nil")
 	}
@@ -590,6 +597,25 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			fn = mw.WrapRoute(RouteSpec{Name: "SwitchGuild", Method: "POST", Path: "/api/v1/empire/war/guild", MuxPattern: PatternSwitchGuild, RequestType: "SwitchGuildReq", ResponseType: "DashboardStateResp"}, fn)
 		}
 		h.SwitchGuild = fn
+	}
+	if h.GuildAction == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req GuildActionReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.GuildAction(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "GuildAction", Method: "POST", Path: "/api/v1/empire/war/guild-action", MuxPattern: PatternGuildAction, RequestType: "GuildActionReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.GuildAction = fn
 	}
 	if h.DeployWarTroops == nil {
 		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

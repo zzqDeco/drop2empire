@@ -310,3 +310,44 @@ func TestSeasonRolloverResetAndPermanentRetention(t *testing.T) {
 		t.Fatalf("expected minted procedural collectibles to be permanently retained across seasons")
 	}
 }
+
+func TestGuildSystemAndRallyBonus(t *testing.T) {
+	now := time.Date(2026, 10, 24, 3, 0, 0, 0, time.UTC)
+	w := NewDefaultWorld(now)
+	p := w.Players["pioneer"]
+	p.Profession = ProfArtisan
+	p.ResourcesMilli[ResWater] = 500 * ResourceScale
+	p.ResourcesMilli[ResWood] = 500 * ResourceScale
+	p.ResourcesMilli[ResStone] = 500 * ResourceScale
+	p.ResourcesMilli[ResInfantryKit] = 10 * ResourceScale
+
+	// Cannot deploy troops before joining/creating a guild
+	if err := DeployWarTroops(w, p, "node_north_fort", 2, 0, 0, now); err == nil {
+		t.Fatal("expected DeployWarTroops without guild to fail")
+	}
+
+	// Create a new guild under ARGENT
+	if err := PerformGuildAction(w, p, "create", "", "星穹铁匠盟", "STAR", GuildArgent, "", now); err != nil {
+		t.Fatal(err)
+	}
+	if p.JoinedGuildID == "" || p.GuildCode != GuildArgent {
+		t.Fatalf("expected pioneer to join newly created ARGENT guild, got id=%s code=%s", p.JoinedGuildID, p.GuildCode)
+	}
+
+	// Donate supplies and set rally node
+	if err := PerformGuildAction(w, p, "donate_supplies", "", "", "", "", "", now); err != nil {
+		t.Fatal(err)
+	}
+	if err := PerformGuildAction(w, p, "set_rally", "", "", "", "", "node_east_fort", now); err != nil {
+		t.Fatal(err)
+	}
+
+	prevPts := p.ActivityPoints
+	if err := DeployWarTroops(w, p, "node_east_fort", 2, 0, 0, now); err != nil {
+		t.Fatal(err)
+	}
+	if p.ActivityPoints != prevPts+5 {
+		t.Fatalf("expected +5 rally bonus activity points, got %d -> %d", prevPts, p.ActivityPoints)
+	}
+	assertMacroLedgerIdentity(t, w)
+}
