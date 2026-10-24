@@ -6,76 +6,6 @@ import (
 	"time"
 )
 
-func DefaultGuilds() []GuildState {
-	return []GuildState{
-		{
-			GuildID:           "guild_obsidian_vanguard",
-			Name:              "墨械先驱团",
-			Tag:               "INK",
-			Faction:           GuildObsidian,
-			LeaderHandle:      "archon_demo",
-			Level:             3,
-			XP:                420,
-			TreasuryGoldBasis: 650 * GoldScale,
-			RallyNodeID:       "node_north_fort",
-			Announcement:      "以水力与黑曜齿轮构筑西线铁壁，优先集结北侧据点！",
-			Members: []GuildMember{
-				{Handle: "archon_demo", Role: "会长", Contribution: 680, WarDeployed: 28},
-				{Handle: "墨匠·玄枢", Role: "副会长", Contribution: 420, WarDeployed: 18},
-				{Handle: "铁砧·墨衡", Role: "精锐", Contribution: 260, WarDeployed: 12},
-			},
-		},
-		{
-			GuildID:           "guild_obsidian_iron",
-			Name:              "黑曜铁卫公会",
-			Tag:               "IRON",
-			Faction:           GuildObsidian,
-			LeaderHandle:      "重甲督军·岩罡",
-			Level:             2,
-			XP:                260,
-			TreasuryGoldBasis: 320 * GoldScale,
-			RallyNodeID:       "node_south_ferry",
-			Announcement:      "专司南线渡口重步兵攻坚，欢迎巨匠与炼金师加盟。",
-			Members: []GuildMember{
-				{Handle: "重甲督军·岩罡", Role: "会长", Contribution: 450, WarDeployed: 22},
-				{Handle: "燧火·赤锤", Role: "精锐", Contribution: 190, WarDeployed: 10},
-			},
-		},
-		{
-			GuildID:           "guild_argent_astral",
-			Name:              "白银星界议会",
-			Tag:               "ASTR",
-			Faction:           GuildArgent,
-			LeaderHandle:      "星轨大导师·凛月",
-			Level:             3,
-			XP:                410,
-			TreasuryGoldBasis: 600 * GoldScale,
-			RallyNodeID:       "node_east_fort",
-			Announcement:      "星盘所指即为白银疆域，协同夺取东侧据点与中央宝藏城。",
-			Members: []GuildMember{
-				{Handle: "星轨大导师·凛月", Role: "会长", Contribution: 640, WarDeployed: 26},
-				{Handle: "银羽·星河", Role: "精锐", Contribution: 290, WarDeployed: 14},
-			},
-		},
-		{
-			GuildID:           "guild_argent_hermes",
-			Name:              "赫尔墨斯炼金会",
-			Tag:               "ALCH",
-			Faction:           GuildArgent,
-			LeaderHandle:      "翠玉炼金师·维克",
-			Level:             2,
-			XP:                240,
-			TreasuryGoldBasis: 280 * GoldScale,
-			RallyNodeID:       "node_center_vault",
-			Announcement:      "海量催化剂与附魔卷轴后勤支援，直插中央宝藏城。",
-			Members: []GuildMember{
-				{Handle: "翠玉炼金师·维克", Role: "会长", Contribution: 410, WarDeployed: 18},
-				{Handle: "白银之翼", Role: "成员", Contribution: 150, WarDeployed: 8},
-			},
-		},
-	}
-}
-
 func EnsureGuildState(w *WorldState) {
 	if len(w.Guilds) == 0 {
 		w.Guilds = DefaultGuilds()
@@ -105,7 +35,7 @@ func GuildNextLevelXP(level int32) int64 {
 	if level < 1 {
 		level = 1
 	}
-	return int64(level) * 500
+	return int64(level) * MacroBalance.GuildXPPerLevel
 }
 
 func GuildBonusSummary(level int32, faction string) string {
@@ -113,13 +43,15 @@ func GuildBonusSummary(level int32, faction string) string {
 	if faction == GuildArgent {
 		factionLabel = "白银同盟"
 	}
+	rallyBonus := MacroBalance.GuildRallyBaseBonusPct + level*MacroBalance.GuildRallyBonusPerLvlPct
+	ptsBonus := level * MacroBalance.GuildWarPtsPerLvl
 	return fmt.Sprintf("%s直属 · Lv.%d 公会战旗：集结目标城池攻防 +%d%%，每日战区结算额外 +%d 活动积分",
-		factionLabel, level, 10+level*3, level*5)
+		factionLabel, level, rallyBonus, ptsBonus)
 }
 
 func addGuildXP(g *GuildState, delta int64) {
 	g.XP += delta
-	for g.Level < 10 && g.XP >= GuildNextLevelXP(g.Level) {
+	for g.Level < MacroBalance.GuildMaxLevel && g.XP >= GuildNextLevelXP(g.Level) {
 		g.XP -= GuildNextLevelXP(g.Level)
 		g.Level++
 	}
@@ -212,18 +144,18 @@ func PerformGuildAction(w *WorldState, p *PlayerState, action, guildID, name, ta
 			Faction:           cleanFaction,
 			LeaderHandle:      p.Handle,
 			Level:             1,
-			XP:                120,
+			XP:                MacroBalance.GuildCreateInitXP,
 			TreasuryGoldBasis: 0,
 			RallyNodeID:       rally,
 			Announcement:      fmt.Sprintf("由领主 %s 创立的墨械战团，全员协同争夺战区要塞！", p.Handle),
 			Members: []GuildMember{
-				{Handle: p.Handle, Role: "会长", Contribution: 100, WarDeployed: 0},
+				{Handle: p.Handle, Role: "会长", Contribution: MacroBalance.GuildCreateInitContrib, WarDeployed: 0},
 			},
 		}
 		w.Guilds = append([]GuildState{newG}, w.Guilds...)
 		p.JoinedGuildID = newID
 		p.GuildCode = cleanFaction
-		p.GuildContribution += 100
+		p.GuildContribution += MacroBalance.GuildCreateInitContrib
 		AppendLog(p, now, "WAR", fmt.Sprintf("★ 成功创立新公会【[%s] %s】（效忠 %s）！", cleanTag, cleanName, cleanFaction))
 		return nil
 
@@ -235,20 +167,21 @@ func PerformGuildAction(w *WorldState, p *PlayerState, action, guildID, name, ta
 		if g == nil {
 			return ErrNotFound("当前所属公会不存在")
 		}
-		waterCost := int64(80) * ResourceScale
-		woodCost := int64(50) * ResourceScale
-		stoneCost := int64(25) * ResourceScale
+		waterCost := MacroBalance.GuildDonateWaterCostMilli
+		woodCost := MacroBalance.GuildDonateWoodCostMilli
+		stoneCost := MacroBalance.GuildDonateStoneCostMilli
 		if p.ResourcesMilli[ResWater] < waterCost || p.ResourcesMilli[ResWood] < woodCost || p.ResourcesMilli[ResStone] < stoneCost {
 			return ErrPrecondition("insufficient_resources", "公会后勤物资捐献需：清水 80、木材 50、石料 25")
 		}
 		p.ResourcesMilli[ResWater] -= waterCost
 		p.ResourcesMilli[ResWood] -= woodCost
 		p.ResourcesMilli[ResStone] -= stoneCost
-		addGuildXP(g, 120)
-		addOrUpdateGuildMember(g, p.Handle, "成员", 100, 0)
-		p.GuildContribution += 100
-		p.ActivityPoints += 15
-		AppendLog(p, now, "WAR", fmt.Sprintf("向公会【%s】捐献后勤物资包：公会经验 +120，个人贡献 +100，活动积分 +15。", g.Name))
+		addGuildXP(g, MacroBalance.GuildDonateSuppliesXP)
+		addOrUpdateGuildMember(g, p.Handle, "成员", MacroBalance.GuildDonateSuppliesContrib, 0)
+		p.GuildContribution += MacroBalance.GuildDonateSuppliesContrib
+		p.ActivityPoints += MacroBalance.GuildDonateSuppliesPts
+		AppendLog(p, now, "WAR", fmt.Sprintf("向公会【%s】捐献后勤物资包：公会经验 +%d，个人贡献 +%d，活动积分 +%d。",
+			g.Name, MacroBalance.GuildDonateSuppliesXP, MacroBalance.GuildDonateSuppliesContrib, MacroBalance.GuildDonateSuppliesPts))
 		return nil
 
 	case "donate_gold":
@@ -259,18 +192,19 @@ func PerformGuildAction(w *WorldState, p *PlayerState, action, guildID, name, ta
 		if g == nil {
 			return ErrNotFound("当前所属公会不存在")
 		}
-		goldCost := int64(50) * GoldScale
+		goldCost := MacroBalance.GuildDonateGoldCostBasis
 		if p.GoldBasis < goldCost {
 			return ErrPrecondition("insufficient_gold", "公会军费捐献需 50.0000 金币")
 		}
 		p.GoldBasis -= goldCost
 		w.TreasuryHeldBasis += goldCost
 		g.TreasuryGoldBasis += goldCost
-		addGuildXP(g, 200)
-		addOrUpdateGuildMember(g, p.Handle, "成员", 180, 0)
-		p.GuildContribution += 180
-		p.ActivityPoints += 25
-		AppendLog(p, now, "WAR", fmt.Sprintf("向公会【%s】金库捐献 50 金币：公会经验 +200，个人贡献 +180，活动积分 +25。", g.Name))
+		addGuildXP(g, MacroBalance.GuildDonateGoldXP)
+		addOrUpdateGuildMember(g, p.Handle, "成员", MacroBalance.GuildDonateGoldContrib, 0)
+		p.GuildContribution += MacroBalance.GuildDonateGoldContrib
+		p.ActivityPoints += MacroBalance.GuildDonateGoldPts
+		AppendLog(p, now, "WAR", fmt.Sprintf("向公会【%s】金库捐献 50 金币：公会经验 +%d，个人贡献 +%d，活动积分 +%d。",
+			g.Name, MacroBalance.GuildDonateGoldXP, MacroBalance.GuildDonateGoldContrib, MacroBalance.GuildDonateGoldPts))
 		return nil
 
 	case "set_rally":
@@ -297,138 +231,6 @@ func PerformGuildAction(w *WorldState, p *PlayerState, action, guildID, name, ta
 
 	default:
 		return ErrInvalidInput("未知的公会操作指令")
-	}
-}
-
-func DefaultWarNodes() []WarNodeState {
-	return []WarNodeState{
-		{
-			NodeID:          "node_west_base",
-			Name:            "曜石大本营",
-			Region:          "west",
-			X:               90,
-			Y:               210,
-			OwnerGuild:      GuildObsidian,
-			DefenseBonusPct: 25,
-			DailyScore:      15,
-			IsTreasureVault: false,
-			ObsidianTroops:  Troops{Infantry: 18, Archer: 14, Cavalry: 12},
-			PlayerDeployed:  map[string]Troops{},
-			IntelNote:       "黑曜大本营",
-		},
-		{
-			NodeID:          "node_west_outpost",
-			Name:            "西境前哨",
-			Region:          "west",
-			X:               260,
-			Y:               210,
-			OwnerGuild:      GuildObsidian,
-			DefenseBonusPct: 25,
-			DailyScore:      20,
-			IsTreasureVault: false,
-			ObsidianTroops:  Troops{Infantry: 12, Archer: 10, Cavalry: 8},
-			PlayerDeployed:  map[string]Troops{},
-			IntelNote:       "西线咽喉",
-		},
-		{
-			NodeID:          "node_north_fort",
-			Name:            "北侧据点",
-			Region:          "north",
-			X:               430,
-			Y:               95,
-			OwnerGuild:      GuildNeutral,
-			DefenseBonusPct: 25,
-			DailyScore:      30,
-			IsTreasureVault: false,
-			NeutralGarrison: Troops{Infantry: 8, Archer: 6, Cavalry: 4},
-			PlayerDeployed:  map[string]Troops{},
-			IntelNote:       "北线高地",
-		},
-		{
-			NodeID:          "node_south_ferry",
-			Name:            "南侧渡口",
-			Region:          "south",
-			X:               500,
-			Y:               325,
-			OwnerGuild:      GuildNeutral,
-			DefenseBonusPct: 25,
-			DailyScore:      30,
-			IsTreasureVault: false,
-			NeutralGarrison: Troops{Infantry: 5, Archer: 10, Cavalry: 4},
-			PlayerDeployed:  map[string]Troops{},
-			IntelNote:       "南线水路",
-		},
-		{
-			NodeID:          "node_center_vault",
-			Name:            "中央宝藏城 ★",
-			Region:          "center",
-			X:               530,
-			Y:               200,
-			OwnerGuild:      GuildNeutral,
-			DefenseBonusPct: 25,
-			DailyScore:      60,
-			IsTreasureVault: true,
-			NeutralGarrison: Troops{Infantry: 14, Archer: 14, Cavalry: 14},
-			PlayerDeployed:  map[string]Troops{},
-			IntelNote:       "核心要塞",
-		},
-		{
-			NodeID:          "node_east_fort",
-			Name:            "东侧据点",
-			Region:          "east",
-			X:               660,
-			Y:               95,
-			OwnerGuild:      GuildNeutral,
-			DefenseBonusPct: 25,
-			DailyScore:      30,
-			IsTreasureVault: false,
-			NeutralGarrison: Troops{Infantry: 6, Archer: 6, Cavalry: 9},
-			PlayerDeployed:  map[string]Troops{},
-			IntelNote:       "东境要塞",
-		},
-		{
-			NodeID:          "node_east_outpost",
-			Name:            "东境前哨",
-			Region:          "east",
-			X:               760,
-			Y:               210,
-			OwnerGuild:      GuildArgent,
-			DefenseBonusPct: 25,
-			DailyScore:      20,
-			IsTreasureVault: false,
-			ArgentTroops:    Troops{Infantry: 12, Archer: 10, Cavalry: 8},
-			PlayerDeployed:  map[string]Troops{},
-			IntelNote:       "东线枢纽",
-		},
-		{
-			NodeID:          "node_east_base",
-			Name:            "白银大本营",
-			Region:          "east",
-			X:               910,
-			Y:               210,
-			OwnerGuild:      GuildArgent,
-			DefenseBonusPct: 25,
-			DailyScore:      15,
-			IsTreasureVault: false,
-			ArgentTroops:    Troops{Infantry: 18, Archer: 14, Cavalry: 12},
-			PlayerDeployed:  map[string]Troops{},
-			IntelNote:       "白银大本营",
-		},
-	}
-}
-
-func DefaultWarEdges() []WarEdge {
-	return []WarEdge{
-		{FromNode: "node_west_base", ToNode: "node_west_outpost"},
-		{FromNode: "node_west_outpost", ToNode: "node_north_fort"},
-		{FromNode: "node_west_outpost", ToNode: "node_south_ferry"},
-		{FromNode: "node_north_fort", ToNode: "node_south_ferry"},
-		{FromNode: "node_north_fort", ToNode: "node_center_vault"},
-		{FromNode: "node_south_ferry", ToNode: "node_center_vault"},
-		{FromNode: "node_center_vault", ToNode: "node_east_fort"},
-		{FromNode: "node_south_ferry", ToNode: "node_east_outpost"},
-		{FromNode: "node_east_fort", ToNode: "node_east_outpost"},
-		{FromNode: "node_east_outpost", ToNode: "node_east_base"},
 	}
 }
 
@@ -566,15 +368,15 @@ func DeployWarTroops(w *WorldState, p *PlayerState, nodeID string, infDelta, arc
 		targetNode.ObsidianTroops.Cavalry += cavDelta
 	}
 
-	contribGain := int64(totalAdd) * 15
+	contribGain := int64(totalAdd) * MacroBalance.WarDeployContribPerUnit
 	p.GuildContribution += contribGain
-	addGuildXP(guild, int64(totalAdd)*10)
+	addGuildXP(guild, int64(totalAdd)*MacroBalance.WarDeployGuildXPPerUnit)
 	addOrUpdateGuildMember(guild, p.Handle, "成员", contribGain, totalAdd)
 
 	rallyMsg := ""
 	if guild.RallyNodeID == nodeID {
-		p.ActivityPoints += 5
-		rallyMsg = "（命中公会集结令目标，额外获得 +5 活动积分）"
+		p.ActivityPoints += MacroBalance.WarDeployRallyBonusPts
+		rallyMsg = fmt.Sprintf("（命中公会集结令目标，额外获得 +%d 活动积分）", MacroBalance.WarDeployRallyBonusPts)
 	}
 
 	AppendLog(p, now, "WAR", fmt.Sprintf("代表公会【%s】向【%s】部署军团：步兵 +%d / 弓兵 +%d / 骑兵 +%d（公会贡献 +%d，今日预算 %d/%d）%s。",
@@ -588,17 +390,13 @@ func ComputeWeightedPower(side Troops, opp Troops, defenseBonusPct int32) int64 
 		return 0
 	}
 	totalOpp := opp.Total()
-	kBps := [3][3]int64{
-		{10000, 11500, 9000},
-		{9000, 10000, 11500},
-		{11500, 9000, 10000},
-	}
+	kBps := MacroBalance.WarCounterMatrixBps
 	sArr := [3]int64{int64(side.Infantry), int64(side.Archer), int64(side.Cavalry)}
 	oArr := [3]int64{int64(opp.Infantry), int64(opp.Archer), int64(opp.Cavalry)}
 
 	var weightedMilli int64
 	if totalOpp <= 0 {
-		weightedMilli = int64(totalSide) * 1000
+		weightedMilli = int64(totalSide) * ResourceScale
 	} else {
 		var numer int64
 		for i := 0; i < 3; i++ {
@@ -632,22 +430,18 @@ func ApplyAttrition(t Troops, lossPct int32) Troops {
 func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 	for i := range w.WarNodes {
 		n := &w.WarNodes[i]
-		switch n.NodeID {
-		case "node_north_fort":
-			n.ObsidianTroops.Cavalry += 4
-			n.ArgentTroops.Archer += 3
-		case "node_south_ferry":
-			n.ObsidianTroops.Infantry += 4
-			n.ArgentTroops.Cavalry += 4
-		case "node_center_vault":
-			n.ObsidianTroops.Infantry += 5
-			n.ObsidianTroops.Archer += 4
-			n.ArgentTroops.Infantry += 4
-			n.ArgentTroops.Cavalry += 5
-		case "node_east_fort":
-			n.ArgentTroops.Archer += 5
+		if reinf, ok := WarDailyNPCReinforcements[n.NodeID]; ok {
+			n.ObsidianTroops.Infantry += reinf.Obsidian.Infantry
+			n.ObsidianTroops.Archer += reinf.Obsidian.Archer
+			n.ObsidianTroops.Cavalry += reinf.Obsidian.Cavalry
+			n.ArgentTroops.Infantry += reinf.Argent.Infantry
+			n.ArgentTroops.Archer += reinf.Argent.Archer
+			n.ArgentTroops.Cavalry += reinf.Argent.Cavalry
 		}
 	}
+
+	winLoss := MacroBalance.WarWinAttritionPct
+	loseLoss := MacroBalance.WarLoseAttritionPct
 
 	reports := make([]WarBattleNodeReport, 0, len(w.WarNodes))
 	var obsDelta, argDelta int32
@@ -670,14 +464,14 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 				defMilli = ComputeWeightedPower(obs, arg, n.DefenseBonusPct)
 				if atkMilli > defMilli {
 					winner = GuildArgent
-					n.ArgentTroops = ApplyAttrition(arg, 20)
-					n.ObsidianTroops = ApplyAttrition(obs, 40)
-					casualtyText = "白银同盟攻破城防（胜方战损 20%，守军战损 40%）"
+					n.ArgentTroops = ApplyAttrition(arg, winLoss)
+					n.ObsidianTroops = ApplyAttrition(obs, loseLoss)
+					casualtyText = fmt.Sprintf("白银同盟攻破城防（胜方战损 %d%%，守军战损 %d%%）", winLoss, loseLoss)
 				} else {
 					winner = GuildObsidian
-					n.ObsidianTroops = ApplyAttrition(obs, 20)
-					n.ArgentTroops = ApplyAttrition(arg, 40)
-					casualtyText = fmt.Sprintf("黑曜商会依托 +%d%% 城防成功守住节点（守军战损 20%%，攻方战损 40%%）", n.DefenseBonusPct)
+					n.ObsidianTroops = ApplyAttrition(obs, winLoss)
+					n.ArgentTroops = ApplyAttrition(arg, loseLoss)
+					casualtyText = fmt.Sprintf("黑曜商会依托 +%d%% 城防成功守住节点（守军战损 %d%%，攻方战损 %d%%）", n.DefenseBonusPct, winLoss, loseLoss)
 				}
 			} else {
 				defMilli = ComputeWeightedPower(obs, Troops{}, n.DefenseBonusPct)
@@ -689,14 +483,14 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 				defMilli = ComputeWeightedPower(arg, obs, n.DefenseBonusPct)
 				if atkMilli > defMilli {
 					winner = GuildObsidian
-					n.ObsidianTroops = ApplyAttrition(obs, 20)
-					n.ArgentTroops = ApplyAttrition(arg, 40)
-					casualtyText = "黑曜商会攻克城池（胜方战损 20%，守军战损 40%）"
+					n.ObsidianTroops = ApplyAttrition(obs, winLoss)
+					n.ArgentTroops = ApplyAttrition(arg, loseLoss)
+					casualtyText = fmt.Sprintf("黑曜商会攻克城池（胜方战损 %d%%，守军战损 %d%%）", winLoss, loseLoss)
 				} else {
 					winner = GuildArgent
-					n.ArgentTroops = ApplyAttrition(arg, 20)
-					n.ObsidianTroops = ApplyAttrition(obs, 40)
-					casualtyText = fmt.Sprintf("白银同盟依托 +%d%% 城防击退进攻（守军战损 20%%，攻方战损 40%%）", n.DefenseBonusPct)
+					n.ArgentTroops = ApplyAttrition(arg, winLoss)
+					n.ObsidianTroops = ApplyAttrition(obs, loseLoss)
+					casualtyText = fmt.Sprintf("白银同盟依托 +%d%% 城防击退进攻（守军战损 %d%%，攻方战损 %d%%）", n.DefenseBonusPct, winLoss, loseLoss)
 				}
 			} else {
 				defMilli = ComputeWeightedPower(arg, Troops{}, n.DefenseBonusPct)
@@ -715,29 +509,29 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 				atkMilli = obsAtk
 				if obsAtk > neuDef && obs.Total() > 0 {
 					winner = GuildObsidian
-					n.ObsidianTroops = ApplyAttrition(obs, 20)
-					n.ArgentTroops = ApplyAttrition(arg, 40)
+					n.ObsidianTroops = ApplyAttrition(obs, winLoss)
+					n.ArgentTroops = ApplyAttrition(arg, loseLoss)
 					n.NeutralGarrison = Troops{}
 					casualtyText = "黑曜商会击败中立守军与竞争者，夺取城池控制权"
 				} else if obs.Total() > 0 || arg.Total() > 0 {
-					n.ObsidianTroops = ApplyAttrition(obs, 40)
-					n.ArgentTroops = ApplyAttrition(arg, 40)
-					n.NeutralGarrison = ApplyAttrition(neu, 20)
-					casualtyText = "进攻火力未突破中立城防（+25%），双方部队受创撤退"
+					n.ObsidianTroops = ApplyAttrition(obs, loseLoss)
+					n.ArgentTroops = ApplyAttrition(arg, loseLoss)
+					n.NeutralGarrison = ApplyAttrition(neu, winLoss)
+					casualtyText = fmt.Sprintf("进攻火力未突破中立城防（+%d%%），双方部队受创撤退", n.DefenseBonusPct)
 				}
 			} else {
 				atkMilli = argAtk
 				if argAtk > neuDef && arg.Total() > 0 {
 					winner = GuildArgent
-					n.ArgentTroops = ApplyAttrition(arg, 20)
-					n.ObsidianTroops = ApplyAttrition(obs, 40)
+					n.ArgentTroops = ApplyAttrition(arg, winLoss)
+					n.ObsidianTroops = ApplyAttrition(obs, loseLoss)
 					n.NeutralGarrison = Troops{}
 					casualtyText = "白银同盟击败中立守军与竞争者，夺取城池控制权"
 				} else {
-					n.ObsidianTroops = ApplyAttrition(obs, 40)
-					n.ArgentTroops = ApplyAttrition(arg, 40)
-					n.NeutralGarrison = ApplyAttrition(neu, 20)
-					casualtyText = "进攻火力未突破中立城防（+25%），双方部队受创撤退"
+					n.ObsidianTroops = ApplyAttrition(obs, loseLoss)
+					n.ArgentTroops = ApplyAttrition(arg, loseLoss)
+					n.NeutralGarrison = ApplyAttrition(neu, winLoss)
+					casualtyText = fmt.Sprintf("进攻火力未突破中立城防（+%d%%），双方部队受创撤退", n.DefenseBonusPct)
 				}
 			}
 		}
@@ -773,15 +567,15 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 	var activeEarned int32
 	activeSubmitted := activePlayer.DailyWarBudgetUsed
 	for _, p := range w.Players {
-		basePts := int32(45)
+		basePts := MacroBalance.WarLoserBasePts
 		if (p.GuildCode == GuildObsidian && obsDelta >= argDelta) || (p.GuildCode == GuildArgent && argDelta > obsDelta) {
-			basePts = 75
+			basePts = MacroBalance.WarWinnerBasePts
 		}
-		contribPts := p.DailyWarBudgetUsed * 3
+		contribPts := p.DailyWarBudgetUsed * MacroBalance.WarPtsPerUnitDeployed
 		earned := basePts + contribPts
 		p.ActivityPoints += earned
 
-		stipend := int64(80+p.DailyWarBudgetUsed*4) * GoldScale
+		stipend := (MacroBalance.WarBaseStipendGold + int64(p.DailyWarBudgetUsed)*MacroBalance.WarStipendGoldPerUnit) * GoldScale
 		if w.TreasuryHeldBasis >= stipend {
 			w.TreasuryHeldBasis -= stipend
 			p.GoldBasis += stipend
@@ -802,8 +596,8 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 		NodeReports:           reports,
 	}
 	w.WarHistory = append([]WarDaySettlement{settlement}, w.WarHistory...)
-	if len(w.WarHistory) > 14 {
-		w.WarHistory = w.WarHistory[:14]
+	if len(w.WarHistory) > MacroBalance.MaxWarHistoryEntries {
+		w.WarHistory = w.WarHistory[:MacroBalance.MaxWarHistoryEntries]
 	}
 
 	AppendLog(activePlayer, now, "WAR", fmt.Sprintf("★ 第 D%d 晚 20:00 商会战争结算完成！黑曜 +%d 分 / 白银 +%d 分，你获得 +%d 活动点数与财政军饷补贴。",

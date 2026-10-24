@@ -15,6 +15,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { ICON } from "./icons";
+import { SETTLEMENT_UI_CONFIG } from "./config/gameConfig";
 import { applyTheme, getInitialTheme, type ThemeMode } from "./theme";
 import { formatETA, formatGold, formatRate, formatResource } from "./format";
 import { CivilizationSilhouetteSVG } from "./RaidSpritesSVG";
@@ -138,7 +139,7 @@ export function App() {
           applyServerState(res);
         })
         .catch(() => {});
-    }, 2000);
+    }, SETTLEMENT_UI_CONFIG.syncPollIntervalMs);
     return () => window.clearInterval(timer);
   }, [hasState, hasActivePopulation, activeHandle, applyServerState]);
 
@@ -146,7 +147,7 @@ export function App() {
     if (!hasState || !hasActivePopulation) return;
     const id = window.setInterval(() => {
       setNowTickMs(Date.now());
-    }, 150);
+    }, SETTLEMENT_UI_CONFIG.interpTickMs);
     return () => window.clearInterval(id);
   }, [hasState, hasActivePopulation]);
 
@@ -228,7 +229,10 @@ export function App() {
   const interpSeconds = useMemo(() => {
     if (!state) return 0;
     const elapsedSec = Math.max(0, (nowTickMs - lastSyncAtMs) / 1000);
-    return Math.min(2.5, elapsedSec) * state.player.speedMultiplier;
+    return (
+      Math.min(SETTLEMENT_UI_CONFIG.maxInterpSec, elapsedSec) *
+      state.player.speedMultiplier
+    );
   }, [state, nowTickMs, lastSyncAtMs]);
 
   if (loading) {
@@ -412,7 +416,9 @@ export function App() {
   const treasureUnlocked =
     blueprints.find((b) => b.code === "mystery_treasure")?.unlocked ?? false;
 
-  const perClickWaterMilli = firstResBpUnlocked ? 2000 : 1000;
+  const perClickWaterMilli = firstResBpUnlocked
+    ? SETTLEMENT_UI_CONFIG.upgradedGatherClickMilli
+    : SETTLEMENT_UI_CONFIG.baseGatherClickMilli;
   const rawLiveWaterMilli =
     waterRes.amountMilli +
     inFlightClicks * perClickWaterMilli +
@@ -464,10 +470,14 @@ export function App() {
     !treasureUnlocked;
 
   const hasAnyWaterYet = liveWaterMilli > 0 || totalClicks > 0;
-  const canSeeFirstRecruit = liveWaterMilli >= 10000 || totalClicks >= 10;
+  const canSeeFirstRecruit =
+    liveWaterMilli >= SETTLEMENT_UI_CONFIG.firstRecruitWaterMilli ||
+    totalClicks >= SETTLEMENT_UI_CONFIG.firstRecruitClickTarget;
   const firstTenProgressPct = Math.min(
     100,
-    Math.floor((liveWaterMilli / 10000) * 100),
+    Math.floor(
+      (liveWaterMilli / SETTLEMENT_UI_CONFIG.firstRecruitWaterMilli) * 100,
+    ),
   );
 
   const openingStory = !hasAnyWaterYet

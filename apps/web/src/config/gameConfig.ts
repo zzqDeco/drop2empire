@@ -1,3 +1,13 @@
+export const SETTLEMENT_UI_CONFIG = {
+  baseGatherClickMilli: 1000,
+  upgradedGatherClickMilli: 2000,
+  firstRecruitWaterMilli: 10000,
+  firstRecruitClickTarget: 10,
+  syncPollIntervalMs: 2000,
+  interpTickMs: 150,
+  maxInterpSec: 2.5,
+} as const;
+
 export const CHEST_CHANNEL_BASE_MS: Record<string, number> = {
   chest_wood: 1100,
   chest_iron: 2200,
@@ -14,7 +24,7 @@ export const CHEST_CHANNEL_LABELS: Record<string, string> = {
   chest_abyss: "正在开启深渊黑曜秘宝库",
 };
 
-export const EARLY_EXTRACT_CUTOFF_MS = 80000;
+export const EARLY_EXTRACT_CUTOFF_MS = 60000;
 
 export function computeChestChannelMs(
   kind: string,

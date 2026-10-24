@@ -33,6 +33,8 @@ var SettlementBalance = struct {
 	MaxClicksPerRequest        int32
 	MaxHumanClicksPerSecond    int64
 	MinGatherIntervalMs        int64
+	GatherBurstAllowanceMs     int64
+	MaxRecruitBatchCount       int32
 }{
 	EarlyPopThreshold: 40,
 	EarlyBaseCost:     10.0,
@@ -58,6 +60,8 @@ var SettlementBalance = struct {
 	MaxClicksPerRequest:      10,
 	MaxHumanClicksPerSecond:  12,
 	MinGatherIntervalMs:      45,
+	GatherBurstAllowanceMs:   500,
+	MaxRecruitBatchCount:     50,
 }
 
 // JobSpec defines the declarative input/output & unlock specification for a settlement worker job.

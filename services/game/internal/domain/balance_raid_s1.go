@@ -2,61 +2,88 @@ package domain
 
 // RaidBalance centralizes all numerical parameters for the 2D Wasteland Extraction Roguelite.
 var RaidBalance = struct {
-	BaseMaxHP              int32
-	BaseAtk                int32
-	BaseDef                int32
-	BaseMoveCooldownMs     int32
-	MinMoveCooldownMs      int32
-	GalePotionCooldownMs   int32
-	MaxBuffSpeedPct        int32
-	BaseDurationSec        int32
-	BaseBackpackCap        int32
-	BaseSafeSlots          int32
-	VisionRadius           int32
-	MaxEquippedBuffCards   int
-	MaxEquippedPotions     int
-	MoveCooldownJitterPct  int32 // 65% server tolerance for network jitter on step intervals
+	BaseMaxHP                 int32
+	BaseAtk                   int32
+	BaseDef                   int32
+	BaseMoveCooldownMs        int32
+	MinMoveCooldownMs         int32
+	GalePotionCooldownMs      int32
+	MaxBuffSpeedPct           int32
+	BaseDurationSec           int32
+	BaseBackpackCap           int32
+	BaseSafeSlots             int32
+	VisionRadius              int32
+	MaxEquippedBuffCards      int
+	MaxEquippedPotions        int
+	MoveCooldownJitterPct     int32 // Server tolerance percentage on step intervals
+	MoveBurstAllowanceMs      int64 // Leaky-bucket burst window for rapid WASD/test steps
+	ChannelJitterTolerancePct int32 // Server tolerance percentage on chest channeling duration
+	EarlyExtractCutoffSec     int32 // Early extraction beacon closes when < 60s remain
+	EarlyExtractGraceSec      int32 // Network jitter grace seconds for early extraction
+
+	// Combat floor & revive parameters:
+	CombatMinPlayerDmg int32
+	CombatMinEnemyDmg  int32
+	CheatDeathReviveHP int32
 
 	// Oasis & Caravan parameters:
-	OasisHealHP            int32
-	OasisBonusSec          int32
-	CaravanHealHP          int32
-	CaravanBonusSec        int32
+	OasisHealHP     int32
+	OasisBonusSec   int32
+	CaravanHealHP   int32
+	CaravanBonusSec int32
 
 	// Potion numerical effects:
 	PotionHealSalveHP      int32
+	PotionHealSpringHP     int32
+	PotionHealSpringBonusS int32
 	PotionGaleDurationSec  int32
+	PotionGaleStrideSec    int32
 	PotionScavDurationSec  int32
+	PotionScavElixirSec    int32
+	PotionScavSpeedPct     int32
 	PotionScavBonusSec     int32
 	PotionBerserkAtkBonus  int32
 	PotionBerserkDefBonus  int32
 }{
-	BaseMaxHP:             100,
-	BaseAtk:               12,
-	BaseDef:               2,
-	BaseMoveCooldownMs:    360,
-	MinMoveCooldownMs:     110,
-	GalePotionCooldownMs:  105,
-	MaxBuffSpeedPct:       45,
-	BaseDurationSec:       180,
-	BaseBackpackCap:       6,
-	BaseSafeSlots:         1,
-	VisionRadius:          2,
-	MaxEquippedBuffCards:  4,
-	MaxEquippedPotions:    3,
-	MoveCooldownJitterPct: 50,
+	BaseMaxHP:                 100,
+	BaseAtk:                   12,
+	BaseDef:                   2,
+	BaseMoveCooldownMs:        360,
+	MinMoveCooldownMs:         110,
+	GalePotionCooldownMs:      105,
+	MaxBuffSpeedPct:           45,
+	BaseDurationSec:           180,
+	BaseBackpackCap:           6,
+	BaseSafeSlots:             1,
+	VisionRadius:              2,
+	MaxEquippedBuffCards:      4,
+	MaxEquippedPotions:        3,
+	MoveCooldownJitterPct:     50,
+	MoveBurstAllowanceMs:      1000,
+	ChannelJitterTolerancePct: 65,
+	EarlyExtractCutoffSec:     60,
+	EarlyExtractGraceSec:      5,
+
+	CombatMinPlayerDmg: 6,
+	CombatMinEnemyDmg:  2,
+	CheatDeathReviveHP: 35,
 
 	OasisHealHP:     45,
 	OasisBonusSec:   25,
 	CaravanHealHP:   65,
 	CaravanBonusSec: 30,
 
-	PotionHealSalveHP:     65,
-	PotionGaleDurationSec: 35,
-	PotionScavDurationSec: 45,
-	PotionScavBonusSec:    15,
-	PotionBerserkAtkBonus: 25,
-	PotionBerserkDefBonus: 12,
+	PotionHealSalveHP:      65,
+	PotionHealSpringHP:     55,
+	PotionHealSpringBonusS: 15,
+	PotionGaleDurationSec:  35,
+	PotionGaleStrideSec:    25,
+	PotionScavDurationSec:  45,
+	PotionScavElixirSec:    35,
+	PotionScavSpeedPct:     50,
+	PotionScavBonusSec:     15,
+	PotionBerserkAtkBonus:  25,
+	PotionBerserkDefBonus:  12,
 }
 
 // RaidChannelDurationMs maps tile kinds to their base channeling duration in milliseconds.
@@ -83,6 +110,122 @@ var RaidEnemyCatalog = map[string]RaidEnemySpec{
 	"worm":   {Kind: "enemy_worm", Name: "岩甲沙虫", MaxHP: 65, Atk: 14},
 	"golem":  {Kind: "enemy_worm", Name: "黑曜巡逻傀儡", MaxHP: 78, Atk: 16},
 	"boss":   {Kind: "enemy_boss", Name: "★墨械圣殿重装巨像", MaxHP: 135, Atk: 22},
+}
+
+// RaidFixedTileSpec defines a deterministic landmark, portal, or boss placement in a Raid zone.
+type RaidFixedTileSpec struct {
+	X                int32
+	Y                int32
+	Kind             string
+	PortalTargetZone int32
+	PortalTargetX    int32
+	PortalTargetY    int32
+	PortalLabel      string
+	EnemyArchetype   string
+}
+
+// RaidProcSpawnRule defines a cumulative probability threshold for procedural tile generation.
+type RaidProcSpawnRule struct {
+	MaxRoll        float64
+	Kind           string
+	EnemyArchetype string
+	WallClearRowY  int32
+	WallClearColX  int32
+	WallClearX     int32
+	WallClearY     int32
+}
+
+// RaidZoneTemplateSpec defines the declarative geometry and spawn rules of a 2D Raid zone.
+type RaidZoneTemplateSpec struct {
+	ID        int32
+	Name      string
+	Subtitle  string
+	Width     int32
+	Height    int32
+	Fixed     []RaidFixedTileSpec
+	ProcRules []RaidProcSpawnRule
+}
+
+var RaidZoneTemplates = []RaidZoneTemplateSpec{
+	{
+		ID:       0,
+		Name:     "外围 · 沙暴荒原",
+		Subtitle: "11×7 起始裂隙与游商营帐",
+		Width:    11,
+		Height:   7,
+		Fixed: []RaidFixedTileSpec{
+			{X: 1, Y: 3, Kind: "spawn"},
+			{X: 4, Y: 2, Kind: "merchant"},
+			{X: 10, Y: 1, Kind: "extract_early"},
+			{X: 9, Y: 3, Kind: "portal", PortalTargetZone: 1, PortalTargetX: 1, PortalTargetY: 4, PortalLabel: "传送至【断崖古矿坑】"},
+			{X: 5, Y: 6, Kind: "portal", PortalTargetZone: 2, PortalTargetX: 4, PortalTargetY: 1, PortalLabel: "传送至【枯木迷林】"},
+		},
+		ProcRules: []RaidProcSpawnRule{
+			{MaxRoll: 0.13, Kind: "wall", WallClearRowY: 3, WallClearColX: 5, WallClearX: 2, WallClearY: 3},
+			{MaxRoll: 0.25, Kind: "chest_wood"},
+			{MaxRoll: 0.31, Kind: "chest_iron"},
+			{MaxRoll: 0.39, EnemyArchetype: "raider"},
+		},
+	},
+	{
+		ID:       1,
+		Name:     "北境 · 断崖古矿坑",
+		Subtitle: "9×9 矿脉与黑市",
+		Width:    9,
+		Height:   9,
+		Fixed: []RaidFixedTileSpec{
+			{X: 1, Y: 4, Kind: "portal", PortalTargetZone: 0, PortalTargetX: 9, PortalTargetY: 3, PortalLabel: "返回【沙暴荒原】"},
+			{X: 7, Y: 7, Kind: "portal", PortalTargetZone: 3, PortalTargetX: 1, PortalTargetY: 3, PortalLabel: "深潜【沉没黑曜圣殿】"},
+			{X: 4, Y: 2, Kind: "merchant"},
+		},
+		ProcRules: []RaidProcSpawnRule{
+			{MaxRoll: 0.15, Kind: "wall", WallClearRowY: 4, WallClearColX: 7, WallClearX: -1, WallClearY: -1},
+			{MaxRoll: 0.24, Kind: "chest_iron"},
+			{MaxRoll: 0.31, Kind: "chest_coffin"},
+			{MaxRoll: 0.41, EnemyArchetype: "worm"},
+		},
+	},
+	{
+		ID:       2,
+		Name:     "南境 · 枯木迷林",
+		Subtitle: "10×8 密林撤离区",
+		Width:    10,
+		Height:   8,
+		Fixed: []RaidFixedTileSpec{
+			{X: 4, Y: 1, Kind: "portal", PortalTargetZone: 0, PortalTargetX: 5, PortalTargetY: 6, PortalLabel: "返回【沙暴荒原】"},
+			{X: 8, Y: 6, Kind: "extract_deep"},
+			{X: 2, Y: 5, Kind: "oasis"},
+			{X: 8, Y: 2, Kind: "portal", PortalTargetZone: 3, PortalTargetX: 6, PortalTargetY: 6, PortalLabel: "深潜【沉没黑曜圣殿】"},
+		},
+		ProcRules: []RaidProcSpawnRule{
+			{MaxRoll: 0.14, Kind: "wall", WallClearRowY: 6, WallClearColX: 4, WallClearX: -1, WallClearY: -1},
+			{MaxRoll: 0.24, Kind: "chest_wood"},
+			{MaxRoll: 0.32, Kind: "chest_iron"},
+			{MaxRoll: 0.36, Kind: "chest_coffin"},
+			{MaxRoll: 0.44, EnemyArchetype: "hunter"},
+		},
+	},
+	{
+		ID:       3,
+		Name:     "核心 · 沉没黑曜圣殿",
+		Subtitle: "8×8 高危深渊禁区",
+		Width:    8,
+		Height:   8,
+		Fixed: []RaidFixedTileSpec{
+			{X: 1, Y: 3, Kind: "portal", PortalTargetZone: 1, PortalTargetX: 7, PortalTargetY: 7, PortalLabel: "返回【断崖古矿坑】"},
+			{X: 6, Y: 6, Kind: "portal", PortalTargetZone: 2, PortalTargetX: 8, PortalTargetY: 2, PortalLabel: "返回【枯木迷林】"},
+			{X: 4, Y: 3, EnemyArchetype: "boss"},
+			{X: 4, Y: 1, Kind: "chest_abyss"},
+			{X: 6, Y: 2, Kind: "chest_abyss"},
+			{X: 2, Y: 6, Kind: "chest_coffin"},
+			{X: 7, Y: 1, Kind: "extract_deep"},
+		},
+		ProcRules: []RaidProcSpawnRule{
+			{MaxRoll: 0.12, Kind: "wall", WallClearRowY: 3, WallClearColX: 6, WallClearX: -1, WallClearY: -1},
+			{MaxRoll: 0.24, Kind: "chest_coffin"},
+			{MaxRoll: 0.34, EnemyArchetype: "golem"},
+		},
+	},
 }
 
 // RaidLootCatalogMeta defines metadata for every item that can drop inside a 2D Raid.
@@ -147,7 +290,71 @@ var (
 		ResCosThunderStaff,
 		ResCosAetherDrake,
 	}
+	RaidMerchantMysteryPool = []string{
+		ResBPCrossbow,
+		ResBPCarapaceArmor,
+		ResBPSpringBoots,
+		ResBPCipherSafe,
+		ResBPTitanHammer,
+		ResCosGoggles,
+		ResCosSteamCrown,
+	}
 )
+
+// RaidSecondaryDropBand defines a cumulative probability threshold (out of 10,000) for blueprint/cosmetic drops.
+type RaidSecondaryDropBand struct {
+	MaxRoll10000 int
+	Pool         []string
+}
+
+// RaidChestLootSpec defines the declarative drop table for a chest archetype.
+type RaidChestLootSpec struct {
+	Title             string
+	GuaranteedItemKey string
+	BonusItemKey      string
+	BonusChance1000   int
+	SecondaryBands    []RaidSecondaryDropBand
+}
+
+var RaidChestLootTables = map[string]RaidChestLootSpec{
+	"chest_wood": {
+		Title:             "开启破旧木箱",
+		GuaranteedItemKey: ResFlint,
+		BonusItemKey:      ResAncientShard,
+		BonusChance1000:   250,
+	},
+	"chest_iron": {
+		Title:             "撬开铁皮军需箱",
+		GuaranteedItemKey: ResFlint,
+		BonusItemKey:      ResAncientShard,
+		BonusChance1000:   350,
+		SecondaryBands: []RaidSecondaryDropBand{
+			{MaxRoll10000: 80, Pool: RaidRareCosmetics},
+			{MaxRoll10000: 520, Pool: RaidTier2Blueprints},
+		},
+	},
+	"chest_coffin": {
+		Title:             "破译远古机关石棺",
+		GuaranteedItemKey: ResAncientShard,
+		BonusItemKey:      ResMeteorOre,
+		BonusChance1000:   220,
+		SecondaryBands: []RaidSecondaryDropBand{
+			{MaxRoll10000: 45, Pool: RaidEpicCosmetics},
+			{MaxRoll10000: 750, Pool: RaidTier2Blueprints},
+		},
+	},
+	"chest_abyss": {
+		Title:             "开启深渊黑曜秘宝库",
+		GuaranteedItemKey: ResAncientShard,
+		BonusItemKey:      ResMeteorOre,
+		BonusChance1000:   420,
+		SecondaryBands: []RaidSecondaryDropBand{
+			{MaxRoll10000: 20, Pool: RaidLegendaryCosmetics},
+			{MaxRoll10000: 95, Pool: RaidEpicCosmetics},
+			{MaxRoll10000: 1050, Pool: RaidTier3Blueprints},
+		},
+	},
+}
 
 var RaidRerollCostsMilli = map[string]int64{
 	ResWater: 240 * ResourceScale,
@@ -171,12 +378,12 @@ var RaidBuffCardCatalog = []RaidBuffCardSpec{
 	{CardCode: "buff_vis_01", Name: "松脂高明火把", Category: "vision", Rarity: "COMMON", EffectSummary: "战争迷雾视野 +1 格，攻击 +3", CostsMilli: map[string]int64{ResWood: 250 * ResourceScale, ResCharcoal: 65 * ResourceScale}, AtkBonus: 3},
 	{CardCode: "buff_vis_02", Name: "单筒铜望远镜", Category: "vision", Rarity: "COMMON", EffectSummary: "迷雾视野 +1 格，倒计时 +15 秒", CostsMilli: map[string]int64{ResWood: 230 * ResourceScale, ResStone: 150 * ResourceScale}, DurationBonus: 15},
 	{CardCode: "buff_vis_03", Name: "斥候风向标", Category: "vision", Rarity: "COMMON", EffectSummary: "移速加快 10%，更容易定位区块传送门", CostsMilli: map[string]int64{ResWood: 290 * ResourceScale}, MoveSpeedPct: 10},
-	{CardCode: "buff_vis_04", Name: "信标谐振器", Category: "vision", Rarity: "RARE", EffectSummary: "开局自动破译撤离点方位，倒计时 +25 秒", CostsMilli: map[string]int64{ResStone: 360 * ResourceScale, ResCharcoal: 140 * ResourceScale}, DurationBonus: 25},
+	{CardCode: "buff_vis_04", Name: "信标谐振器", Category: "vision", Rarity: "RARE", EffectSummary: "开局自动破译撤离点方位，倒计时 +25 秒", CostsMilli: map[string]int64{ResStone: 360 * ResourceScale, ResCharcoal: 140 * ResourceScale}, DurationBonus: 25, RevealBeacons: true},
 	{CardCode: "buff_vis_05", Name: "商队铜驼铃", Category: "vision", Rarity: "RARE", EffectSummary: "感知游商营帐气息，背囊容量 +2 格", CostsMilli: map[string]int64{ResWood: 450 * ResourceScale, ResFlint: 3 * ResourceScale}, BagBonus: 2},
 	{CardCode: "buff_vis_06", Name: "夜视石英镜", Category: "vision", Rarity: "RARE", EffectSummary: "迷雾视野扩大，移速加快 12%，攻击 +5", CostsMilli: map[string]int64{ResStone: 410 * ResourceScale, ResFlint: 3 * ResourceScale}, MoveSpeedPct: 12, AtkBonus: 5},
-	{CardCode: "buff_vis_07", Name: "星象测绘仪", Category: "vision", Rarity: "EPIC", EffectSummary: "全图传送门感应，倒计时 +45 秒，移速 +15%", CostsMilli: map[string]int64{ResWood: 780 * ResourceScale, ResStone: 620 * ResourceScale, ResFlint: 6 * ResourceScale}, DurationBonus: 45, MoveSpeedPct: 15},
+	{CardCode: "buff_vis_07", Name: "星象测绘仪", Category: "vision", Rarity: "EPIC", EffectSummary: "全图传送门感应，倒计时 +45 秒，移速 +15%", CostsMilli: map[string]int64{ResWood: 780 * ResourceScale, ResStone: 620 * ResourceScale, ResFlint: 6 * ResourceScale}, DurationBonus: 45, MoveSpeedPct: 15, RevealBeacons: true},
 	{CardCode: "buff_vis_08", Name: "地脉听音筒", Category: "vision", Rarity: "EPIC", EffectSummary: "精确定位深渊石棺，背囊 +3 格，护甲 +5", CostsMilli: map[string]int64{ResStone: 740 * ResourceScale, ResCharcoal: 260 * ResourceScale, ResFlint: 5 * ResourceScale}, BagBonus: 3, DefBonus: 5},
-	{CardCode: "buff_vis_09", Name: "全息墨械目镜", Category: "vision", Rarity: "EPIC", EffectSummary: "视野最大化，攻击 +10，移速 +15%", CostsMilli: map[string]int64{ResCharcoal: 320 * ResourceScale, ResStone: 680 * ResourceScale, ResFlint: 7 * ResourceScale}, AtkBonus: 10, MoveSpeedPct: 15},
+	{CardCode: "buff_vis_09", Name: "全息墨械目镜", Category: "vision", Rarity: "EPIC", EffectSummary: "视野最大化，攻击 +10，移速 +15%", CostsMilli: map[string]int64{ResCharcoal: 320 * ResourceScale, ResStone: 680 * ResourceScale, ResFlint: 7 * ResourceScale}, AtkBonus: 10, MoveSpeedPct: 15, RevealBeacons: true},
 
 	// ==================== Category 3: Scavenge & Backpack (极速摸金与背囊系 · 9 cards) ====================
 	{CardCode: "buff_scav_01", Name: "亚麻副背袋", Category: "scavenge", Rarity: "COMMON", EffectSummary: "本局背囊容量 +2 格", CostsMilli: map[string]int64{ResWater: 240 * ResourceScale, ResWood: 240 * ResourceScale}, BagBonus: 2},
@@ -554,4 +761,55 @@ var RaidGearCatalog = []RaidGearSpec{
 		StatSummary:   "局内饮用：攻击 +25、护甲 +12，并获得 1 次致命免死护盾",
 		CostsMilli:    map[string]int64{ResWater: 1100 * ResourceScale, ResCharcoal: 280 * ResourceScale, ResFlint: 6 * ResourceScale, ResAncientShard: 1 * ResourceScale},
 	},
+}
+
+// SeasonRelicAttrSpec defines a procedural relic model, texture, or palette entry for Season 1 chests.
+type SeasonRelicAttrSpec struct {
+	ID   string
+	Name string
+}
+
+var (
+	SeasonRelicModels = []SeasonRelicAttrSpec{
+		{ID: "relic_chalice", Name: "滴水圣杯 · 原初容器"},
+		{ID: "astrolabe_gear", Name: "阿基米德星盘 · 差分轮"},
+		{ID: "alch_retort", Name: "赫尔墨斯曲颈瓶 · 永动釜"},
+		{ID: "arcane_obelisk", Name: "黑曜方尖碑 · 纪元碑"},
+	}
+	SeasonRelicTextures = []SeasonRelicAttrSpec{
+		{ID: "topo_contour", Name: "等高线水文拓扑"},
+		{ID: "bauhaus_grid", Name: "包豪斯黄金正交网格"},
+		{ID: "moire_wave", Name: "双心莫尔干涉波纹"},
+		{ID: "fractal_lattice", Name: "泰坦晶格蚀刻线"},
+	}
+	SeasonRelicPalettes = []SeasonRelicAttrSpec{
+		{ID: "ink_monolith", Name: "纯墨原稿 · 炭黑象牙"},
+		{ID: "cinnabar_seal", Name: "朱砂官印 · 矿物红点缀"},
+		{ID: "oxidized_verdigris", Name: "青铜绿锈 · 古典蚀刻"},
+		{ID: "gilded_obsidian", Name: "黑曜描金 · 暗金墨线"},
+	}
+)
+
+var SeasonChestBalance = struct {
+	MaxRedeemBatchCount int32
+	LegendaryRollMin    int
+	EpicRollMin         int
+	RareRollMin         int
+	UVScaleBase         int32
+	UVScaleSpan         uint64
+	CenterLockMin       int32
+	CenterLockMax       int32
+	MicroEtchScaleMin   int32
+	MacroMinScaleMax    int32
+}{
+	MaxRedeemBatchCount: 10,
+	LegendaryRollMin:    98,
+	EpicRollMin:         88,
+	RareRollMin:         60,
+	UVScaleBase:         650,
+	UVScaleSpan:         1150,
+	CenterLockMin:       460,
+	CenterLockMax:       540,
+	MicroEtchScaleMin:   1550,
+	MacroMinScaleMax:    750,
 }

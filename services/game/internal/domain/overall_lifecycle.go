@@ -35,7 +35,7 @@ func CreateInvite(w *WorldState, now time.Time) (RegistrationInvite, string) {
 		CodeHash:    HashInviteCode(plain),
 		CodePreview: preview,
 		CreatedAt:   now.UTC().Format(time.RFC3339),
-		ExpiresAt:   now.UTC().Add(7 * 24 * time.Hour).Format(time.RFC3339),
+		ExpiresAt:   now.UTC().Add(time.Duration(OverallBalance.InviteExpireDays) * 24 * time.Hour).Format(time.RFC3339),
 	}
 	w.Invites = append([]RegistrationInvite{inv}, w.Invites...)
 	return inv, plain
@@ -163,10 +163,9 @@ func NewDefaultWorld(now time.Time) *WorldState {
 		openPrices[r.Key] = r.InitPriceBasis
 	}
 
-	// Monetary supply bootstrap:
-	// Central treasury holds 5,000,000.0000 Gold; NPC market makers hold 2,000,000.0000 Gold.
-	treasuryInit := int64(5_000_000) * GoldScale
-	npcInit := int64(2_000_000) * GoldScale
+	// Monetary supply bootstrap driven by OverallBalance:
+	treasuryInit := OverallBalance.TreasuryInitialGoldBasis
+	npcInit := OverallBalance.NPCInitialGoldBasis
 
 	w := &WorldState{
 		ActiveHandle:           "pioneer",
@@ -210,40 +209,22 @@ func NewDefaultWorld(now time.Time) *WorldState {
 	admin.PasswordHash = HashPassword("admin", "admin123456")
 	w.Players["admin"] = admin
 
-	// Pre-seeded veteran account so user can also test multi-account trading immediately if desired.
+	// Pre-seeded veteran account driven by OverallBalance.
 	veteran := NewBlankPlayer("archon_demo", now)
 	veteran.PasswordHash = HashPassword("archon_demo", "demo123456")
-	veteran.PopulationTotal = 45
-	veteran.Workers[JobWater] = 18
-	veteran.Workers[JobWood] = 12
-	veteran.Workers[JobStone] = 8
-	veteran.Workers[JobSmeltIron] = 4
-	veteran.Workers[JobPrepRation] = 3
+	veteran.PopulationTotal = OverallBalance.VeteranPopulationTotal
+	for jobKey, cnt := range OverallBalance.VeteranWorkers {
+		veteran.Workers[jobKey] = cnt
+	}
 	for _, bp := range BlueprintCatalog {
 		veteran.UnlockedBlueprints[bp.Code] = true
 	}
-	veteran.Phase = 3
+	veteran.Phase = OverallBalance.VeteranPhase
 	veteran.Profession = ProfScientist
 	veteran.ArtifactName = "阿基米德水力核"
-	veteran.ResourcesMilli[ResWater] = 12500 * ResourceScale
-	veteran.ResourcesMilli[ResWood] = 4800 * ResourceScale
-	veteran.ResourcesMilli[ResStone] = 2100 * ResourceScale
-	veteran.ResourcesMilli[ResIronIngot] = 28 * ResourceScale
-	veteran.ResourcesMilli[ResRation] = 36 * ResourceScale
-	veteran.ResourcesMilli[ResAutoPump] = 3 * ResourceScale
-	veteran.ResourcesMilli[ResInfantryKit] = 16 * ResourceScale
-	veteran.ResourcesMilli[ResArcherKit] = 12 * ResourceScale
-	veteran.ResourcesMilli[ResCavalryKit] = 10 * ResourceScale
-	veteran.ResourcesMilli[ResSeasonChest] = 2 * ResourceScale
-	veteran.ResourcesMilli[ResFlint] = 14 * ResourceScale
-	veteran.ResourcesMilli[ResAncientShard] = 5 * ResourceScale
-	veteran.ResourcesMilli[ResMeteorOre] = 2 * ResourceScale
-	veteran.ResourcesMilli[ResBPCrossbow] = 1 * ResourceScale
-	veteran.ResourcesMilli[ResBPSpringBoots] = 1 * ResourceScale
-	veteran.ResourcesMilli[ResCosSteamCrown] = 1 * ResourceScale
-	veteran.ResourcesMilli[ResCosHydroWings] = 1 * ResourceScale
-	veteran.ResourcesMilli[ResCosAlchLantern] = 1 * ResourceScale
-	veteran.ResourcesMilli[ResCosMechOwl] = 1 * ResourceScale
+	for resKey, units := range OverallBalance.VeteranResourcesUnits {
+		veteran.ResourcesMilli[resKey] = units * ResourceScale
+	}
 	veteran.EquippedCosmetics = map[string]string{
 		"headgear":   ResCosSteamCrown,
 		"mantle":     ResCosHydroWings,
@@ -251,13 +232,14 @@ func NewDefaultWorld(now time.Time) *WorldState {
 		"companion":  ResCosMechOwl,
 	}
 	EnsureRaidState(veteran)
-	veteran.InstalledEquipments[ResAutoPump] = 2
-	veteran.InstalledEquipments[ResAlchCatalyst] = 1
-	veteran.ActivityPoints = 260
-	veteranGrant := int64(1850) * GoldScale
+	for eqKey, stacks := range OverallBalance.VeteranInstalledEquips {
+		veteran.InstalledEquipments[eqKey] = stacks
+	}
+	veteran.ActivityPoints = OverallBalance.VeteranActivityPoints
+	veteranGrant := OverallBalance.VeteranGrantGoldBasis
 	w.TreasuryHeldBasis -= veteranGrant
 	veteran.GoldBasis = veteranGrant
-	veteran.SimulatedElapsedSeconds = 2400
+	veteran.SimulatedElapsedSeconds = OverallBalance.VeteranSimElapsedSec
 	AppendLog(veteran, now, "PROFESSION", "账号 archon_demo 已预置完成第一阶段并就职【科学家】，可直接体验跨职业制造、现货挂单、商会城池战与宝箱铸造。")
 	w.Players["archon_demo"] = veteran
 
@@ -312,7 +294,7 @@ func AppendLog(p *PlayerState, now time.Time, category, msg string) {
 		Message:   msg,
 	}
 	p.EventLogs = append([]EventEntry{entry}, p.EventLogs...)
-	if len(p.EventLogs) > 40 {
-		p.EventLogs = p.EventLogs[:40]
+	if len(p.EventLogs) > OverallBalance.MaxEventLogEntries {
+		p.EventLogs = p.EventLogs[:OverallBalance.MaxEventLogEntries]
 	}
 }

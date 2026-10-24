@@ -401,3 +401,77 @@ func TestGuildSystemAndRallyBonus(t *testing.T) {
 	}
 	assertMacroLedgerIdentity(t, w)
 }
+
+func TestRaidServerAntiCheatCooldownChannelingAndEarlyExtract(t *testing.T) {
+	now := time.Date(2026, 10, 24, 4, 0, 0, 0, time.UTC)
+	w := NewDefaultWorld(now)
+	p := w.Players["pioneer"]
+	p.PopulationTotal = 12
+	p.UnlockedBlueprints[BPFirstResident] = true
+	p.UnlockedBlueprints[BPColonyEdicts] = true
+	p.UnlockedBlueprints[BPScoutCamp] = true
+
+	if err := StartRaid(p, now); err != nil {
+		t.Fatal(err)
+	}
+	sess := p.RaidLoadout.ActiveSession
+	if sess == nil {
+		t.Fatal("expected active raid session")
+	}
+
+	// 1. Place a chest at (2, 3), step onto it at t=now+500ms, and attempt to open_chest 50ms later (before channeling completes)
+	z0 := &sess.Zones[0]
+	z0.Tiles[3*int(z0.Width)+2].Kind = "chest_abyss"
+	z0.Tiles[3*int(z0.Width)+2].Looted = false
+
+	tStep := now.Add(500 * time.Millisecond)
+	if err := PerformRaidAction(p, "move", 1, 0, "", "", "", "", tStep); err != nil {
+		t.Fatalf("expected move onto chest to succeed, got %v", err)
+	}
+	// Attempting to open chest_abyss (5400ms base, 3510ms server tolerance) only 50ms after stepping on it must be rejected
+	if err := PerformRaidAction(p, "open_chest", 0, 0, "", "", "", "", tStep.Add(50*time.Millisecond)); err == nil {
+		t.Fatal("expected unchanneled open_chest after 50ms to be rejected by server channeling check")
+	}
+	// After 4000ms of channeling, open_chest succeeds
+	if err := PerformRaidAction(p, "open_chest", 0, 0, "", "", "", "", tStep.Add(4000*time.Millisecond)); err != nil {
+		t.Fatalf("expected open_chest after 4000ms channeling to succeed, got %v", err)
+	}
+
+	// 2. Speed-hack script spamming 15 moves within 10ms must hit move_cooldown rate limit
+	tSpam := tStep.Add(5 * time.Second)
+	rateLimited := false
+	for i := 0; i < 15; i++ {
+		dx := int32(1)
+		if i%2 == 1 {
+			dx = -1
+		}
+		err := PerformRaidAction(p, "move", dx, 0, "", "", "", "", tSpam.Add(time.Duration(i)*time.Millisecond))
+		if err != nil {
+			rateLimited = true
+			break
+		}
+	}
+	if !rateLimited {
+		t.Fatal("expected speed-hack script spamming 15 moves in 15ms to be rate-limited by move_cooldown")
+	}
+
+	// 3. Early extraction cutoff check: when < 55s remain on the sandstorm countdown, extract_early is closed
+	sess.PlayerX = 10
+	sess.PlayerY = 1 // (10, 1) is extract_early in Zone 0
+	tLate := sess.ExpiresAt.Add(-30 * time.Second) // Only 30s remaining (< 60s cutoff)
+	if err := PerformRaidAction(p, "interact", 0, 0, "", "", "", "", tLate); err == nil {
+		t.Fatal("expected interact on extract_early with 30s remaining to be rejected as early_extract_closed")
+	}
+	// And if client calls FinishRaid("EXTRACTED") while at closed extract_early, server forces MIA!
+	sess.Backpack = []RaidLootItem{{ID: "late_bp_1", Key: ResAncientShard, Name: "古文明残片", Rarity: "RARE", Category: "material"}}
+	prevShards := p.ResourcesMilli[ResAncientShard]
+	if err := FinishRaid(p, "EXTRACTED", tLate); err != nil {
+		t.Fatal(err)
+	}
+	if p.RaidLoadout.LastSettlementReport == nil || p.RaidLoadout.LastSettlementReport.Status != "MIA" {
+		t.Fatalf("expected FinishRaid at closed extract_early to force MIA, got %+v", p.RaidLoadout.LastSettlementReport)
+	}
+	if p.ResourcesMilli[ResAncientShard] != prevShards {
+		t.Fatal("expected backpack loot to be lost when extracting at closed extract_early")
+	}
+}

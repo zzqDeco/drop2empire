@@ -5,23 +5,6 @@ import (
 	"time"
 )
 
-const (
-	// ResourceScale represents 1.000 physical resource unit = 1,000 milli-units.
-	ResourceScale int64 = 1000
-	// GoldScale represents 1.0000 Gold unit = 10,000 basis-units.
-	GoldScale int64 = 10000
-	// OfflineCapSeconds caps a single offline production catch-up at 8 hours.
-	OfflineCapSeconds int64 = 8 * 3600
-	// DailyWarBudgetCap is the per-member daily armament deployment cap.
-	DailyWarBudgetCap int32 = 100
-	// MarketTaxBps is 1.00% (100 bps) on spot trades: 0.50% burned, 0.50% to public treasury.
-	MarketTaxBps int64 = 100
-	// MarketBurnShareBps is 50 bps (half of the 100 bps tax).
-	MarketBurnShareBps int64 = 50
-	// ChestRedeemCostPoints is the Activity Points required to redeem 1 Season Chest.
-	ChestRedeemCostPoints int32 = 100
-)
-
 // Resource keys.
 const (
 	ResWater         = "water"
@@ -274,6 +257,7 @@ type RaidBuffCardSpec struct {
 	DefBonus      int32
 	MoveSpeedPct  int32
 	BagBonus      int32
+	RevealBeacons bool
 }
 
 type RaidLootItem struct {
@@ -325,6 +309,7 @@ type ActiveRaidSession struct {
 	StartedAt            time.Time       `json:"startedAt"`
 	ExpiresAt            time.Time       `json:"expiresAt"`
 	LastMoveAt           time.Time       `json:"lastMoveAt"`
+	SteppedOnTileAt      time.Time       `json:"steppedOnTileAt"`
 	CurrentZoneID        int32           `json:"currentZoneId"`
 	PlayerX              int32           `json:"playerX"`
 	PlayerY              int32           `json:"playerY"`

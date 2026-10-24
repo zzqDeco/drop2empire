@@ -211,7 +211,7 @@ func ManageRaidGear(p *PlayerState, action, itemKey string, now time.Time) error
 		case "boots":
 			p.RaidLoadout.BootsKey = itemKey
 		case "safe_box":
-			curSlots := int32(1)
+			curSlots := RaidBalance.BaseSafeSlots
 			if curSpec, exists := FindRaidGearSpec(p.RaidLoadout.SafeBoxKey); exists {
 				curSlots = curSpec.SafeSlots
 			}
@@ -376,7 +376,7 @@ func computeRaidVisionRadius(p *PlayerState) (radius int32, revealBeacons bool) 
 	for _, code := range p.RaidLoadout.EquippedBuffCards {
 		if spec, ok := FindRaidBuffCardSpec(code); ok && spec.Category == "vision" {
 			radius = RaidBalance.VisionRadius + 1
-			if code == "buff_vis_04" || code == "buff_vis_07" || code == "buff_vis_09" {
+			if spec.RevealBeacons {
 				revealBeacons = true
 			}
 		}
@@ -415,10 +415,11 @@ func buildServerRaidZones(seed int64) []RaidZoneState {
 		return float64(t^(t>>14)) / 4294967296.0
 	}
 
-	buildZone := func(id int32, name, subtitle string, width, height int32) RaidZoneState {
-		tiles := make([]RaidTileState, 0, int(width*height))
-		for y := int32(0); y < height; y++ {
-			for x := int32(0); x < width; x++ {
+	zones := make([]RaidZoneState, 0, len(RaidZoneTemplates))
+	for _, tmpl := range RaidZoneTemplates {
+		tiles := make([]RaidTileState, 0, int(tmpl.Width*tmpl.Height))
+		for y := int32(0); y < tmpl.Height; y++ {
+			for x := int32(0); x < tmpl.Width; x++ {
 				tiles = append(tiles, RaidTileState{
 					X:                x,
 					Y:                y,
@@ -427,197 +428,73 @@ func buildServerRaidZones(seed int64) []RaidZoneState {
 				})
 			}
 		}
-		return RaidZoneState{
-			ID:       id,
-			Name:     name,
-			Subtitle: subtitle,
-			Width:    width,
-			Height:   height,
-			Visited:  id == 0,
+		z := RaidZoneState{
+			ID:       tmpl.ID,
+			Name:     tmpl.Name,
+			Subtitle: tmpl.Subtitle,
+			Width:    tmpl.Width,
+			Height:   tmpl.Height,
+			Visited:  tmpl.ID == 0,
 			Tiles:    tiles,
 		}
-	}
-
-	z0 := buildZone(0, "外围 · 沙暴荒原", "11×7 起始裂隙与游商营帐", 11, 7)
-	z1 := buildZone(1, "北境 · 断崖古矿坑", "9×9 矿脉与黑市", 9, 9)
-	z2 := buildZone(2, "南境 · 枯木迷林", "10×8 密林撤离区", 10, 8)
-	z3 := buildZone(3, "核心 · 沉没黑曜圣殿", "8×8 高危深渊禁区", 8, 8)
-
-	tileAt := func(z *RaidZoneState, x, y int32) *RaidTileState {
-		if x < 0 || x >= z.Width || y < 0 || y >= z.Height {
-			return nil
+		for _, fix := range tmpl.Fixed {
+			if fix.X < 0 || fix.X >= z.Width || fix.Y < 0 || fix.Y >= z.Height {
+				continue
+			}
+			tile := &z.Tiles[int(fix.Y*z.Width+fix.X)]
+			if fix.EnemyArchetype != "" {
+				if spec, ok := RaidEnemyCatalog[fix.EnemyArchetype]; ok {
+					tile.Kind = spec.Kind
+					tile.EnemyName = spec.Name
+					tile.EnemyHP = spec.MaxHP
+					tile.EnemyMaxHP = spec.MaxHP
+					tile.EnemyAtk = spec.Atk
+				}
+				continue
+			}
+			tile.Kind = fix.Kind
+			if fix.Kind == "portal" {
+				tile.PortalTargetZone = fix.PortalTargetZone
+				tile.PortalTargetX = fix.PortalTargetX
+				tile.PortalTargetY = fix.PortalTargetY
+				tile.PortalLabel = fix.PortalLabel
+			}
 		}
-		return &z.Tiles[int(y*z.Width+x)]
-	}
-
-	// Zone 0 setup (11x7)
-	tileAt(&z0, 1, 3).Kind = "spawn"
-	tileAt(&z0, 4, 2).Kind = "merchant"
-	tileAt(&z0, 10, 1).Kind = "extract_early"
-	if p := tileAt(&z0, 9, 3); p != nil {
-		p.Kind = "portal"
-		p.PortalTargetZone = 1
-		p.PortalTargetX = 1
-		p.PortalTargetY = 4
-		p.PortalLabel = "传送至【断崖古矿坑】"
-	}
-	if p := tileAt(&z0, 5, 6); p != nil {
-		p.Kind = "portal"
-		p.PortalTargetZone = 2
-		p.PortalTargetX = 4
-		p.PortalTargetY = 1
-		p.PortalLabel = "传送至【枯木迷林】"
-	}
-	for i := range z0.Tiles {
-		t := &z0.Tiles[i]
-		if t.Kind != "empty" {
-			continue
+		for i := range z.Tiles {
+			t := &z.Tiles[i]
+			if t.Kind != "empty" {
+				continue
+			}
+			r := nextRand()
+			for _, rule := range tmpl.ProcRules {
+				if r < rule.MaxRoll {
+					if rule.Kind == "wall" {
+						if (rule.WallClearRowY >= 0 && t.Y == rule.WallClearRowY) ||
+							(rule.WallClearColX >= 0 && t.X == rule.WallClearColX) ||
+							(rule.WallClearX >= 0 && rule.WallClearY >= 0 && t.X == rule.WallClearX && t.Y == rule.WallClearY) {
+							continue
+						}
+						t.Kind = "wall"
+						break
+					}
+					if rule.EnemyArchetype != "" {
+						if spec, ok := RaidEnemyCatalog[rule.EnemyArchetype]; ok {
+							t.Kind = spec.Kind
+							t.EnemyName = spec.Name
+							t.EnemyHP = spec.MaxHP
+							t.EnemyMaxHP = spec.MaxHP
+							t.EnemyAtk = spec.Atk
+						}
+						break
+					}
+					t.Kind = rule.Kind
+					break
+				}
+			}
 		}
-		r := nextRand()
-		// Keep row y=3 and col x=5 clear of walls so portals/extract are always reachable
-		if r < 0.13 && t.Y != 3 && t.X != 5 && !(t.X == 2 && t.Y == 3) {
-			t.Kind = "wall"
-		} else if r < 0.25 {
-			t.Kind = "chest_wood"
-		} else if r < 0.31 {
-			t.Kind = "chest_iron"
-		} else if r < 0.39 {
-			spec := RaidEnemyCatalog["raider"]
-			t.Kind = spec.Kind
-			t.EnemyName = spec.Name
-			t.EnemyHP = spec.MaxHP
-			t.EnemyMaxHP = spec.MaxHP
-			t.EnemyAtk = spec.Atk
-		}
+		zones = append(zones, z)
 	}
-
-	// Zone 1 setup (9x9)
-	if p := tileAt(&z1, 1, 4); p != nil {
-		p.Kind = "portal"
-		p.PortalTargetZone = 0
-		p.PortalTargetX = 9
-		p.PortalTargetY = 3
-		p.PortalLabel = "返回【沙暴荒原】"
-	}
-	if p := tileAt(&z1, 7, 7); p != nil {
-		p.Kind = "portal"
-		p.PortalTargetZone = 3
-		p.PortalTargetX = 1
-		p.PortalTargetY = 3
-		p.PortalLabel = "深潜【沉没黑曜圣殿】"
-	}
-	tileAt(&z1, 4, 2).Kind = "merchant"
-	for i := range z1.Tiles {
-		t := &z1.Tiles[i]
-		if t.Kind != "empty" {
-			continue
-		}
-		r := nextRand()
-		if r < 0.15 && t.Y != 4 && t.X != 7 {
-			t.Kind = "wall"
-		} else if r < 0.24 {
-			t.Kind = "chest_iron"
-		} else if r < 0.31 {
-			t.Kind = "chest_coffin"
-		} else if r < 0.41 {
-			spec := RaidEnemyCatalog["worm"]
-			t.Kind = spec.Kind
-			t.EnemyName = spec.Name
-			t.EnemyHP = spec.MaxHP
-			t.EnemyMaxHP = spec.MaxHP
-			t.EnemyAtk = spec.Atk
-		}
-	}
-
-	// Zone 2 setup (10x8)
-	if p := tileAt(&z2, 4, 1); p != nil {
-		p.Kind = "portal"
-		p.PortalTargetZone = 0
-		p.PortalTargetX = 5
-		p.PortalTargetY = 6
-		p.PortalLabel = "返回【沙暴荒原】"
-	}
-	tileAt(&z2, 8, 6).Kind = "extract_deep"
-	tileAt(&z2, 2, 5).Kind = "oasis"
-	if p := tileAt(&z2, 8, 2); p != nil {
-		p.Kind = "portal"
-		p.PortalTargetZone = 3
-		p.PortalTargetX = 6
-		p.PortalTargetY = 6
-		p.PortalLabel = "深潜【沉没黑曜圣殿】"
-	}
-	for i := range z2.Tiles {
-		t := &z2.Tiles[i]
-		if t.Kind != "empty" {
-			continue
-		}
-		r := nextRand()
-		if r < 0.14 && t.X != 4 && t.Y != 6 {
-			t.Kind = "wall"
-		} else if r < 0.24 {
-			t.Kind = "chest_wood"
-		} else if r < 0.32 {
-			t.Kind = "chest_iron"
-		} else if r < 0.36 {
-			t.Kind = "chest_coffin"
-		} else if r < 0.44 {
-			spec := RaidEnemyCatalog["hunter"]
-			t.Kind = spec.Kind
-			t.EnemyName = spec.Name
-			t.EnemyHP = spec.MaxHP
-			t.EnemyMaxHP = spec.MaxHP
-			t.EnemyAtk = spec.Atk
-		}
-	}
-
-	// Zone 3 setup (8x8)
-	if p := tileAt(&z3, 1, 3); p != nil {
-		p.Kind = "portal"
-		p.PortalTargetZone = 1
-		p.PortalTargetX = 7
-		p.PortalTargetY = 7
-		p.PortalLabel = "返回【断崖古矿坑】"
-	}
-	if p := tileAt(&z3, 6, 6); p != nil {
-		p.Kind = "portal"
-		p.PortalTargetZone = 2
-		p.PortalTargetX = 8
-		p.PortalTargetY = 2
-		p.PortalLabel = "返回【枯木迷林】"
-	}
-	if boss := tileAt(&z3, 4, 3); boss != nil {
-		spec := RaidEnemyCatalog["boss"]
-		boss.Kind = spec.Kind
-		boss.EnemyName = spec.Name
-		boss.EnemyHP = spec.MaxHP
-		boss.EnemyMaxHP = spec.MaxHP
-		boss.EnemyAtk = spec.Atk
-	}
-	tileAt(&z3, 4, 1).Kind = "chest_abyss"
-	tileAt(&z3, 6, 2).Kind = "chest_abyss"
-	tileAt(&z3, 2, 6).Kind = "chest_coffin"
-	tileAt(&z3, 7, 1).Kind = "extract_deep"
-	for i := range z3.Tiles {
-		t := &z3.Tiles[i]
-		if t.Kind != "empty" {
-			continue
-		}
-		r := nextRand()
-		if r < 0.12 && t.Y != 3 && t.X != 6 {
-			t.Kind = "wall"
-		} else if r < 0.24 {
-			t.Kind = "chest_coffin"
-		} else if r < 0.34 {
-			spec := RaidEnemyCatalog["golem"]
-			t.Kind = spec.Kind
-			t.EnemyName = spec.Name
-			t.EnemyHP = spec.MaxHP
-			t.EnemyMaxHP = spec.MaxHP
-			t.EnemyAtk = spec.Atk
-		}
-	}
-
-	return []RaidZoneState{z0, z1, z2, z3}
+	return zones
 }
 
 func makeServerLootItem(itemKey string, seq *int32) RaidLootItem {
@@ -636,56 +513,27 @@ func makeServerLootItem(itemKey string, seq *int32) RaidLootItem {
 }
 
 func rollServerChestDrops(chestKind string, seed uint64, seq *int32) []RaidLootItem {
+	spec, ok := RaidChestLootTables[chestKind]
+	if !ok {
+		return nil
+	}
 	drops := make([]RaidLootItem, 0, 3)
 	r1 := serverNextCryptoUint64(seed + uint64(*seq)*997 + 13)
 	r2 := serverNextCryptoUint64(seed + uint64(*seq)*1337 + 29)
-	p1 := int(r1 % 1000)   // 0..999
-	p2 := int(r2 % 10000)  // 0..9999
+	p1 := int(r1 % 1000)  // 0..999
+	p2 := int(r2 % 10000) // 0..9999
 
-	switch chestKind {
-	case "chest_wood":
-		drops = append(drops, makeServerLootItem(ResFlint, seq))
-		if p1 < 250 {
-			drops = append(drops, makeServerLootItem(ResAncientShard, seq))
-		}
-	case "chest_iron":
-		drops = append(drops, makeServerLootItem(ResFlint, seq))
-		if p1 < 350 {
-			drops = append(drops, makeServerLootItem(ResAncientShard, seq))
-		}
-		if p2 < 80 { // 0.8% rare cosmetic
-			pick := RaidRareCosmetics[int((r2>>16)%uint64(len(RaidRareCosmetics)))]
+	if spec.GuaranteedItemKey != "" {
+		drops = append(drops, makeServerLootItem(spec.GuaranteedItemKey, seq))
+	}
+	if spec.BonusItemKey != "" && p1 < spec.BonusChance1000 {
+		drops = append(drops, makeServerLootItem(spec.BonusItemKey, seq))
+	}
+	for _, band := range spec.SecondaryBands {
+		if p2 < band.MaxRoll10000 && len(band.Pool) > 0 {
+			pick := band.Pool[int((r2>>16)%uint64(len(band.Pool)))]
 			drops = append(drops, makeServerLootItem(pick, seq))
-		} else if p2 < 520 {
-			pick := RaidTier2Blueprints[int((r2>>16)%uint64(len(RaidTier2Blueprints)))]
-			drops = append(drops, makeServerLootItem(pick, seq))
-		}
-	case "chest_coffin":
-		drops = append(drops, makeServerLootItem(ResAncientShard, seq))
-		if p1 < 220 {
-			drops = append(drops, makeServerLootItem(ResMeteorOre, seq))
-		}
-		if p2 < 45 { // 0.45% epic cosmetic
-			pick := RaidEpicCosmetics[int((r2>>16)%uint64(len(RaidEpicCosmetics)))]
-			drops = append(drops, makeServerLootItem(pick, seq))
-		} else if p2 < 750 {
-			pick := RaidTier2Blueprints[int((r2>>16)%uint64(len(RaidTier2Blueprints)))]
-			drops = append(drops, makeServerLootItem(pick, seq))
-		}
-	case "chest_abyss":
-		drops = append(drops, makeServerLootItem(ResAncientShard, seq))
-		if p1 < 420 {
-			drops = append(drops, makeServerLootItem(ResMeteorOre, seq))
-		}
-		if p2 < 20 { // 0.20% legendary cosmetic (ultra-low drop rate, never 100%)
-			pick := RaidLegendaryCosmetics[int((r2>>16)%uint64(len(RaidLegendaryCosmetics)))]
-			drops = append(drops, makeServerLootItem(pick, seq))
-		} else if p2 < 95 { // 0.75% epic cosmetic
-			pick := RaidEpicCosmetics[int((r2>>16)%uint64(len(RaidEpicCosmetics)))]
-			drops = append(drops, makeServerLootItem(pick, seq))
-		} else if p2 < 1050 {
-			pick := RaidTier3Blueprints[int((r2>>16)%uint64(len(RaidTier3Blueprints)))]
-			drops = append(drops, makeServerLootItem(pick, seq))
+			break
 		}
 	}
 	return drops
@@ -718,6 +566,7 @@ func StartRaid(p *PlayerState, now time.Time) error {
 		Seed:                 seed,
 		StartedAt:            now,
 		ExpiresAt:            now.Add(time.Duration(durationSec) * time.Second),
+		SteppedOnTileAt:      now,
 		CurrentZoneID:        0,
 		PlayerX:              1,
 		PlayerY:              3,
@@ -739,32 +588,14 @@ func StartRaid(p *PlayerState, now time.Time) error {
 	return nil
 }
 
-var allowedRaidLootKeys = map[string]bool{
-	ResFlint:            true,
-	ResAncientShard:     true,
-	ResMeteorOre:        true,
-	ResBPCrossbow:       true,
-	ResBPTitanHammer:    true,
-	ResBPCarapaceArmor:  true,
-	ResBPHydroArmor:     true,
-	ResBPSpringBoots:    true,
-	ResBPHermesBoots:    true,
-	ResBPCipherSafe:     true,
-	ResBPAetherSafe:     true,
-	ResBPScavengeElixir: true,
-	ResBPBerserkElixir:  true,
-	ResCosGoggles:       true,
-	ResCosSteamCrown:    true,
-	ResCosObsidianCrown: true,
-	ResCosSandCloak:     true,
-	ResCosHydroWings:    true,
-	ResCosAstralWings:   true,
-	ResCosCompass:       true,
-	ResCosAlchLantern:   true,
-	ResCosThunderStaff:  true,
-	ResCosWoodFrog:      true,
-	ResCosMechOwl:       true,
-	ResCosAetherDrake:   true,
+func isAllowedRaidLootKey(key string) bool {
+	_, ok := RaidLootCatalogMeta[key]
+	return ok
+}
+
+func isEarlyExtractionOpen(sess *ActiveRaidSession, now time.Time) bool {
+	minRemaining := time.Duration(RaidBalance.EarlyExtractCutoffSec-RaidBalance.EarlyExtractGraceSec) * time.Second
+	return sess.ExpiresAt.Sub(now) >= minRemaining
 }
 
 func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, fromContainer, toContainer, itemKey string, now time.Time) error {
@@ -799,6 +630,26 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 		if absDx+absDy != 1 {
 			return ErrInvalidInput("单步移动仅允许正交相邻 1 格")
 		}
+
+		// Server-side leaky-bucket move cooldown check (prevents speed-hack scripts while tolerating rapid WASD bursts)
+		effMoveCdMs := int64(sess.BaseMoveCooldownMs)
+		if effMoveCdMs <= 0 {
+			effMoveCdMs = int64(RaidBalance.BaseMoveCooldownMs)
+		}
+		if now.Before(sess.GaleEndsAt) && int64(RaidBalance.GalePotionCooldownMs) < effMoveCdMs {
+			effMoveCdMs = int64(RaidBalance.GalePotionCooldownMs)
+		}
+		stepInterval := time.Duration((effMoveCdMs*int64(RaidBalance.MoveCooldownJitterPct))/100) * time.Millisecond
+		burstWindow := time.Duration(RaidBalance.MoveBurstAllowanceMs) * time.Millisecond
+		baseTime := sess.LastMoveAt
+		if baseTime.Before(now.Add(-burstWindow)) {
+			baseTime = now.Add(-burstWindow)
+		}
+		nextAllowed := baseTime.Add(stepInterval)
+		if now.Before(nextAllowed) {
+			return ErrPrecondition("move_cooldown", "移动频率过快，请等待步伐冷却")
+		}
+
 		if dx < 0 {
 			sess.Facing = "left"
 		} else if dx > 0 {
@@ -819,7 +670,8 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 			return nil
 		}
 
-		sess.LastMoveAt = now
+		sess.LastMoveAt = nextAllowed
+		sess.SteppedOnTileAt = now
 		sess.ActiveChestDrops = nil
 		sess.PlayerX = nx
 		sess.PlayerY = ny
@@ -828,20 +680,20 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 		if (dest.Kind == "enemy_raider" || dest.Kind == "enemy_worm" || dest.Kind == "enemy_boss") && !dest.Looted {
 			eHp := dest.EnemyHP
 			if eHp <= 0 {
-				eHp = 50
+				eHp = RaidEnemyCatalog["raider"].MaxHP
 			}
 			eAtk := dest.EnemyAtk
 			if eAtk <= 0 {
-				eAtk = 12
+				eAtk = RaidEnemyCatalog["raider"].Atk
 			}
 			playerDmg := sess.Atk
-			if playerDmg < 6 {
-				playerDmg = 6
+			if playerDmg < RaidBalance.CombatMinPlayerDmg {
+				playerDmg = RaidBalance.CombatMinPlayerDmg
 			}
 			rounds := (eHp + playerDmg - 1) / playerDmg
 			dmgPerRound := eAtk - sess.Def
-			if dmgPerRound < 2 {
-				dmgPerRound = 2
+			if dmgPerRound < RaidBalance.CombatMinEnemyDmg {
+				dmgPerRound = RaidBalance.CombatMinEnemyDmg
 			}
 			totalTaken := (rounds - 1) * dmgPerRound
 			if totalTaken < 0 {
@@ -855,7 +707,7 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 			}
 			if nextHp <= 0 && sess.CheatDeathActive {
 				sess.CheatDeathActive = false
-				sess.HP = 35
+				sess.HP = RaidBalance.CheatDeathReviveHP
 				prependRaidLog(sess, fmt.Sprintf("免死圣水触发！抵挡了【%s】致命一击并反杀对手！", dest.EnemyName))
 			} else {
 				sess.HP = nextHp
@@ -898,25 +750,38 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 		if curTile.Kind == "portal" {
 			return PerformRaidAction(p, "use_portal", 0, 0, "", "", "", "", now)
 		}
-		if curTile.Kind == "extract_early" || curTile.Kind == "extract_deep" {
+		if curTile.Kind == "extract_early" {
+			if !isEarlyExtractionOpen(sess, now) {
+				return ErrPrecondition("early_extract_closed", "外围撤离信标已在沙暴前 60 秒关闭，请前往深渊信标撤离")
+			}
 			return FinishRaid(p, "EXTRACTED", now)
 		}
-		if curTile.Kind != "chest_wood" && curTile.Kind != "chest_iron" && curTile.Kind != "chest_coffin" && curTile.Kind != "chest_abyss" {
+		if curTile.Kind == "extract_deep" {
+			return FinishRaid(p, "EXTRACTED", now)
+		}
+		chestSpec, isChest := RaidChestLootTables[curTile.Kind]
+		if !isChest {
 			return nil
 		}
 		if curTile.Looted {
 			return nil
 		}
+		// Server-side chest channeling duration verification when real wall-clock time advances between move and open_chest
+		if baseChannelMs, ok := RaidChannelDurationMs[curTile.Kind]; ok && !sess.SteppedOnTileAt.IsZero() && now.After(sess.SteppedOnTileAt) {
+			reqMs := int64(baseChannelMs)
+			if now.Before(sess.ScavEndsAt) {
+				reqMs = (reqMs * int64(100-RaidBalance.PotionScavSpeedPct)) / 100
+			}
+			minElapsedMs := (reqMs * int64(RaidBalance.ChannelJitterTolerancePct)) / 100
+			if now.Sub(sess.SteppedOnTileAt) < time.Duration(minElapsedMs)*time.Millisecond {
+				return ErrPrecondition("channeling_incomplete", "宝箱搜索读条尚未完成")
+			}
+		}
+
 		curTile.Looted = true
 		sess.ChestsOpenedCount++
 		rolled := rollServerChestDrops(curTile.Kind, uint64(sess.Seed), &sess.NextLootSeq)
-		titleMap := map[string]string{
-			"chest_wood":   "开启破旧木箱",
-			"chest_iron":   "撬开铁皮军需箱",
-			"chest_coffin": "破译远古机关石棺",
-			"chest_abyss":  "开启深渊黑曜秘宝库",
-		}
-		sess.ActiveContainerTitle = titleMap[curTile.Kind]
+		sess.ActiveContainerTitle = chestSpec.Title
 		sess.ActiveChestDrops = rolled
 		if len(rolled) == 0 {
 			prependRaidLog(sess, "开启了容器，内部空无一物。")
@@ -940,6 +805,7 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 		sess.CurrentZoneID = tz
 		sess.PlayerX = tx
 		sess.PlayerY = ty
+		sess.SteppedOnTileAt = now
 		sess.ActiveChestDrops = nil
 		if !sess.Zones[tz].Visited {
 			sess.Zones[tz].Visited = true
@@ -1057,23 +923,23 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 
 		switch itemKey {
 		case "pot_heal_spring", "pot_heal_salve":
-			sess.HP += 55
+			sess.HP += RaidBalance.PotionHealSpringHP
 			if sess.HP > sess.MaxHP {
 				sess.HP = sess.MaxHP
 			}
-			sess.ExpiresAt = sess.ExpiresAt.Add(15 * time.Second)
-			prependRaidLog(sess, "饮用【清泉止血露】：生命 +55，时间 +15s！")
+			sess.ExpiresAt = sess.ExpiresAt.Add(time.Duration(RaidBalance.PotionHealSpringBonusS) * time.Second)
+			prependRaidLog(sess, fmt.Sprintf("饮用【清泉止血露】：生命 +%d，时间 +%ds！", RaidBalance.PotionHealSpringHP, RaidBalance.PotionHealSpringBonusS))
 		case "pot_gale_stride", "pot_gale_draught":
-			sess.GaleEndsAt = now.Add(25 * time.Second)
-			prependRaidLog(sess, "饮用【轻身疾行散】：25秒内移动冷却缩短 35%！")
+			sess.GaleEndsAt = now.Add(time.Duration(RaidBalance.PotionGaleStrideSec) * time.Second)
+			prependRaidLog(sess, fmt.Sprintf("饮用【轻身疾行散】：%d秒内移动冷却缩短 35%%！", RaidBalance.PotionGaleStrideSec))
 		case "pot_scavenge_elixir":
-			sess.ScavEndsAt = now.Add(35 * time.Second)
-			prependRaidLog(sess, "饮用【巧手速搜合剂】：35秒内搜索宝箱读条缩短 50%！")
+			sess.ScavEndsAt = now.Add(time.Duration(RaidBalance.PotionScavElixirSec) * time.Second)
+			prependRaidLog(sess, fmt.Sprintf("饮用【巧手速搜合剂】：%d秒内搜索宝箱读条缩短 %d%%！", RaidBalance.PotionScavElixirSec, RaidBalance.PotionScavSpeedPct))
 		case "pot_berserk_elixir":
 			sess.Atk += RaidBalance.PotionBerserkAtkBonus
 			sess.Def += RaidBalance.PotionBerserkDefBonus
 			sess.CheatDeathActive = true
-			prependRaidLog(sess, "饮用【泰坦狂暴圣水】：攻击+25、护甲+12，并激活 1 次致命免死护盾！")
+			prependRaidLog(sess, fmt.Sprintf("饮用【泰坦狂暴圣水】：攻击+%d、护甲+%d，并激活 1 次致命免死护盾！", RaidBalance.PotionBerserkAtkBonus, RaidBalance.PotionBerserkDefBonus))
 		}
 		return nil
 
@@ -1113,17 +979,8 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 			return ErrPrecondition("missing_shard", "随身背囊中没有古文明残片")
 		}
 		sess.Backpack = append(sess.Backpack[:shardIdx], sess.Backpack[shardIdx+1:]...)
-		pool := []string{
-			ResBPCrossbow,
-			ResBPCarapaceArmor,
-			ResBPSpringBoots,
-			ResBPCipherSafe,
-			ResBPTitanHammer,
-			ResCosGoggles,
-			ResCosSteamCrown,
-		}
 		r := serverNextCryptoUint64(uint64(sess.Seed) + uint64(sess.NextLootSeq)*313)
-		pick := pool[int(r%uint64(len(pool)))]
+		pick := RaidMerchantMysteryPool[int(r%uint64(len(RaidMerchantMysteryPool)))]
 		drop := makeServerLootItem(pick, &sess.NextLootSeq)
 		sess.Backpack = append(sess.Backpack, drop)
 		prependRaidLog(sess, fmt.Sprintf("游商盲盒开启：获得【%s】！", drop.Name))
@@ -1134,24 +991,28 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 	}
 }
 
-func isAtOrNearExtractionTile(sess *ActiveRaidSession) bool {
+func isAtOrNearExtractionTile(sess *ActiveRaidSession, now time.Time) bool {
 	if sess == nil || int(sess.CurrentZoneID) < 0 || int(sess.CurrentZoneID) >= len(sess.Zones) {
 		return false
 	}
 	zone := &sess.Zones[sess.CurrentZoneID]
 	for _, t := range zone.Tiles {
-		if t.Kind == "extract_early" || t.Kind == "extract_deep" {
-			dx := t.X - sess.PlayerX
-			if dx < 0 {
-				dx = -dx
-			}
-			dy := t.Y - sess.PlayerY
-			if dy < 0 {
-				dy = -dy
-			}
-			if dx+dy <= 1 {
-				return true
-			}
+		if t.Kind != "extract_early" && t.Kind != "extract_deep" {
+			continue
+		}
+		if t.Kind == "extract_early" && !isEarlyExtractionOpen(sess, now) {
+			continue
+		}
+		dx := t.X - sess.PlayerX
+		if dx < 0 {
+			dx = -dx
+		}
+		dy := t.Y - sess.PlayerY
+		if dy < 0 {
+			dy = -dy
+		}
+		if dx+dy <= 1 {
+			return true
 		}
 	}
 	return false
@@ -1168,7 +1029,7 @@ func FinishRaid(p *PlayerState, status string, now time.Time) error {
 	// Enforce server-side timer expiration and physical extraction beacon position check
 	if now.After(sess.ExpiresAt) || sess.HP <= 0 {
 		status = "MIA"
-	} else if status == "EXTRACTED" && !isAtOrNearExtractionTile(sess) {
+	} else if status == "EXTRACTED" && !isAtOrNearExtractionTile(sess, now) {
 		status = "MIA"
 	}
 
@@ -1183,7 +1044,7 @@ func FinishRaid(p *PlayerState, status string, now time.Time) error {
 		if int32(i) >= safeSlots {
 			break
 		}
-		if allowedRaidLootKeys[item.Key] {
+		if isAllowedRaidLootKey(item.Key) {
 			addResourceWithCap(p, item.Key, ResourceScale)
 			awardedCounts[item.Key]++
 			safeBoxAwarded = append(safeBoxAwarded, item)
@@ -1201,7 +1062,7 @@ func FinishRaid(p *PlayerState, status string, now time.Time) error {
 			if int32(i) >= bagCap {
 				break
 			}
-			if allowedRaidLootKeys[item.Key] {
+			if isAllowedRaidLootKey(item.Key) {
 				addResourceWithCap(p, item.Key, ResourceScale)
 				awardedCounts[item.Key]++
 				backpackAwarded = append(backpackAwarded, item)

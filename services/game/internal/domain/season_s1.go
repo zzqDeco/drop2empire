@@ -11,8 +11,8 @@ func RedeemSeasonChest(p *PlayerState, count int32, now time.Time) error {
 	if count <= 0 {
 		count = 1
 	}
-	if count > 10 {
-		count = 10
+	if count > SeasonChestBalance.MaxRedeemBatchCount {
+		count = SeasonChestBalance.MaxRedeemBatchCount
 	}
 	costPts := count * ChestRedeemCostPoints
 	if p.ActivityPoints < costPts {
@@ -52,52 +52,34 @@ func OpenSeasonChest(w *WorldState, p *PlayerState, _ int64, now time.Time) erro
 		patternSeed += 100000
 	}
 
-	models := []struct{ id, name string }{
-		{"relic_chalice", "滴水圣杯 · 原初容器"},
-		{"astrolabe_gear", "阿基米德星盘 · 差分轮"},
-		{"alch_retort", "赫尔墨斯曲颈瓶 · 永动釜"},
-		{"arcane_obelisk", "黑曜方尖碑 · 纪元碑"},
-	}
-	textures := []struct{ id, name string }{
-		{"topo_contour", "等高线水文拓扑"},
-		{"bauhaus_grid", "包豪斯黄金正交网格"},
-		{"moire_wave", "双心莫尔干涉波纹"},
-		{"fractal_lattice", "泰坦晶格蚀刻线"},
-	}
-	palettes := []struct{ id, name string }{
-		{"ink_monolith", "纯墨原稿 · 炭黑象牙"},
-		{"cinnabar_seal", "朱砂官印 · 矿物红点缀"},
-		{"oxidized_verdigris", "青铜绿锈 · 古典蚀刻"},
-		{"gilded_obsidian", "黑曜描金 · 暗金墨线"},
-	}
-
-	m := models[int(rawSeed%uint64(len(models)))]
-	tex := textures[int((rawSeed>>8)%uint64(len(textures)))]
-	pal := palettes[int((rawSeed>>16)%uint64(len(palettes)))]
+	m := SeasonRelicModels[int(rawSeed%uint64(len(SeasonRelicModels)))]
+	tex := SeasonRelicTextures[int((rawSeed>>8)%uint64(len(SeasonRelicTextures)))]
+	pal := SeasonRelicPalettes[int((rawSeed>>16)%uint64(len(SeasonRelicPalettes)))]
 
 	uvOffsetX := int32((rawSeed >> 20) % 1000)
 	uvOffsetY := int32((rawSeed >> 30) % 1000)
-	uvScale := int32(650 + ((rawSeed >> 40) % 1150))
+	uvScale := SeasonChestBalance.UVScaleBase + int32((rawSeed>>40)%SeasonChestBalance.UVScaleSpan)
 	uvRotation := int32((rawSeed >> 50) % 360)
 
 	roll := int((rawSeed >> 12) % 100)
 	rarity := "COMMON"
-	if roll >= 98 {
+	if roll >= SeasonChestBalance.LegendaryRollMin {
 		rarity = "LEGENDARY"
-	} else if roll >= 88 {
+	} else if roll >= SeasonChestBalance.EpicRollMin {
 		rarity = "EPIC"
-	} else if roll >= 60 {
+	} else if roll >= SeasonChestBalance.RareRollMin {
 		rarity = "RARE"
 	}
 
 	specialTag := "标准采样花纹"
-	if uvOffsetX >= 460 && uvOffsetX <= 540 && uvOffsetY >= 460 && uvOffsetY <= 540 {
+	if uvOffsetX >= SeasonChestBalance.CenterLockMin && uvOffsetX <= SeasonChestBalance.CenterLockMax &&
+		uvOffsetY >= SeasonChestBalance.CenterLockMin && uvOffsetY <= SeasonChestBalance.CenterLockMax {
 		specialTag = "★ 居中同心核 (Center-Axis Lock)"
 	} else if uvRotation == 0 || uvRotation == 45 || uvRotation == 90 || uvRotation == 135 || uvRotation == 180 {
 		specialTag = "★ 正交工程角 (Orthogonal Angle)"
-	} else if uvScale >= 1550 {
+	} else if uvScale >= SeasonChestBalance.MicroEtchScaleMin {
 		specialTag = "★ 高密微雕纹 (Micro-Etch High Density)"
-	} else if uvScale <= 750 {
+	} else if uvScale <= SeasonChestBalance.MacroMinScaleMax {
 		specialTag = "★ 极简巨构纹 (Macro-Minimalist)"
 	}
 
@@ -106,18 +88,18 @@ func OpenSeasonChest(w *WorldState, p *PlayerState, _ int64, now time.Time) erro
 		SerialNumber:  serial,
 		SeasonID:      w.SeasonCode,
 		CollectionID:  fmt.Sprintf("COL-S%d-GENESIS", w.SeasonNumber),
-		Name:          fmt.Sprintf("%s | %s #%03d", m.name, tex.name, serial),
-		BaseModelID:   m.id,
-		BaseModelName: m.name,
-		TextureID:     tex.id,
-		TextureName:   tex.name,
+		Name:          fmt.Sprintf("%s | %s #%03d", m.Name, tex.Name, serial),
+		BaseModelID:   m.ID,
+		BaseModelName: m.Name,
+		TextureID:     tex.ID,
+		TextureName:   tex.Name,
 		PatternSeed:   patternSeed,
 		UVOffsetX:     uvOffsetX,
 		UVOffsetY:     uvOffsetY,
 		UVScale:       uvScale,
 		UVRotation:    uvRotation,
-		PaletteID:     pal.id,
-		PaletteName:   pal.name,
+		PaletteID:     pal.ID,
+		PaletteName:   pal.Name,
 		RarityTier:    rarity,
 		SpecialTag:    specialTag,
 		MintedAt:      now.UTC().Format("2006-01-02 15:04:05"),

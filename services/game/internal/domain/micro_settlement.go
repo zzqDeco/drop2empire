@@ -393,8 +393,8 @@ func GatherWater(p *PlayerState, clicks int32, now time.Time) error {
 	if clicks > SettlementBalance.MaxClicksPerRequest {
 		return ErrPrecondition("gather_rate_limited", fmt.Sprintf("单次手动打水请求不得超过 %d 次", SettlementBalance.MaxClicksPerRequest))
 	}
-	// Leaky-bucket rate limiter with a 500ms burst window to absorb TCP jitter while blocking sustained >22 clicks/sec macros
-	const burstWindow = 500 * time.Millisecond
+	// Leaky-bucket rate limiter with a burst window to absorb TCP jitter while blocking sustained macros
+	burstWindow := time.Duration(SettlementBalance.GatherBurstAllowanceMs) * time.Millisecond
 	stepCost := time.Duration(clicks) * time.Duration(SettlementBalance.MinGatherIntervalMs) * time.Millisecond
 	floorTime := now.Add(-burstWindow)
 	baseTime := p.LastGatherWaterAt
@@ -434,8 +434,8 @@ func RecruitResident(p *PlayerState, count int32, now time.Time) error {
 	if count <= 0 {
 		count = 1
 	}
-	if count > 50 {
-		count = 50
+	if count > SettlementBalance.MaxRecruitBatchCount {
+		count = SettlementBalance.MaxRecruitBatchCount
 	}
 	recruited := int32(0)
 	var totalSpentMilli int64
