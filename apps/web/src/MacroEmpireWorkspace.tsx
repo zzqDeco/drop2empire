@@ -21,7 +21,10 @@ import { ICON } from "./icons";
 import { formatGold, formatResource } from "./format";
 import { ProceduralRelicSVG } from "./ProceduralRelicSVG";
 import { WarGraphMapSVG } from "./WarGraphMapSVG";
+import { CivilizationSilhouetteSVG } from "./RaidSpritesSVG";
 import type { ThemeMode } from "./theme";
+
+export type WorldZoneKey = "settlement" | "scout" | "market" | "war" | "lord";
 
 interface SceneProps {
   state: DashboardStateResp;
@@ -1047,109 +1050,93 @@ export function SeasonRelicVaultPanel({ state, runAction }: SceneProps) {
 }
 
 /**
- * Settings, Season Notices, Monetary Ledger Audit & Chronicle Modal (收敛到设置中的纪事与赛季动向)
+ * Imperial Announcement Modal (帝国公告 · 赛季动向与宏观账本 — 由管理员发布节奏控制)
  */
-export function SettingsChronicleModal({
+export function ImperialAnnouncementModal({
   state,
-  theme,
-  onToggleTheme,
-  onLogout,
   onClose,
 }: {
   state: DashboardStateResp;
-  theme: ThemeMode;
-  onToggleTheme: () => void;
-  onLogout: () => void;
   onClose: () => void;
 }) {
-  const { player, macroLedger, currentSeason } = state;
+  const { macroLedger, currentSeason } = state;
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="设置与聚落纪事">
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="帝国枢密院公告与赛季动向"
+    >
       <div className="modal-sheet">
         <div className="modal-header">
           <div>
-            <h2>设置 · 赛季动向与聚落编年纪事</h2>
+            <h2>帝国枢密院公告 · 赛季动向与跨季契约</h2>
             <p>
-              领主账号：{player.handle}（{player.professionName}） · 当前赛季：{currentSeason?.title ?? "S1 · 黑曜苏醒"}
+              当前赛季：{currentSeason?.title ?? "S1 · 黑曜苏醒"} · 共{" "}
+              {state.seasonNotices.length} 份昭告
             </p>
           </div>
-          <div className="toolbar-actions">
-            <button
-              type="button"
-              className="btn-outline"
-              data-pop={theme === "light" ? "曜石夜间" : "纸墨日间"}
-              onClick={onToggleTheme}
-            >
-              {theme === "light" ? (
-                <Moon size={ICON.xs} />
-              ) : (
-                <Sun size={ICON.xs} />
-              )}
-              <span>{theme === "light" ? "切换曜石夜间" : "切换纸墨日间"}</span>
-            </button>
-            <button
-              type="button"
-              className="btn-outline"
-              onClick={onLogout}
-            >
-              <LogOut size={ICON.xs} />
-              <span>退出登录</span>
-            </button>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={onClose}
-            >
-              关闭
-            </button>
-          </div>
+          <button type="button" className="btn-primary" onClick={onClose}>
+            关闭公告
+          </button>
         </div>
 
         <div className="tab-body split-2col">
-          {/* Left Column: Season Notices, Cross-Season Rules & Monetary Ledger Audit */}
           <div className="subpanel">
             <div className="subpanel-head">
               <h3>
                 <Scale size={ICON.sm} />
-                <span>赛季动向 · 跨季规则与宏观账本</span>
+                <span>帝国官方公告与赛季物价动向</span>
               </h3>
             </div>
-
             <div className="notice-stack">
               {state.seasonNotices.map((sn) => (
                 <article key={sn.seasonId} className="season-notice-card">
                   <div className="bp-top">
                     <strong>{sn.title}</strong>
-                    <span className="tag-badge">{sn.effectiveIn}</span>
+                    <span className="tag-badge tag-warning">
+                      {sn.effectiveIn}
+                    </span>
                   </div>
                   <p>{sn.summary}</p>
-                  <ul>
-                    {sn.demandShifts.map((ds) => (
-                      <li key={ds}>{ds}</li>
-                    ))}
-                  </ul>
+                  {sn.demandShifts.length > 0 && (
+                    <ul>
+                      {sn.demandShifts.map((ds) => (
+                        <li key={ds}>{ds}</li>
+                      ))}
+                    </ul>
+                  )}
                 </article>
               ))}
-
-              {currentSeason && (
-                <article className="season-notice-card">
-                  <div className="bp-top">
-                    <strong>跨赛季继承与重置规则</strong>
-                    <span className="tag-badge tag-success">永久契约</span>
-                  </div>
-                  <p>{currentSeason.subtitle}</p>
-                  <ul>
-                    {currentSeason.retentionRules.map((r) => (
-                      <li key={r}>✓ 永久保留：{r}</li>
-                    ))}
-                    {currentSeason.resetRules.map((r) => (
-                      <li key={r}>↻ 赛季重置：{r}</li>
-                    ))}
-                  </ul>
-                </article>
-              )}
             </div>
+          </div>
+
+          <div className="subpanel">
+            <div className="subpanel-head">
+              <h3>
+                <Award size={ICON.sm} />
+                <span>跨季契约与帝国央行账本</span>
+              </h3>
+            </div>
+
+            {currentSeason && (
+              <article className="season-notice-card">
+                <div className="bp-top">
+                  <strong>跨赛季继承与重置规则</strong>
+                  <span className="tag-badge tag-success">永久契约</span>
+                </div>
+                <p>{currentSeason.subtitle}</p>
+                <ul>
+                  {currentSeason.retentionRules.map((r) => (
+                    <li key={r}>✓ 永久保留：{r}</li>
+                  ))}
+                  {currentSeason.resetRules.map((r) => (
+                    <li key={r}>↻ 赛季重置：{r}</li>
+                  ))}
+                </ul>
+              </article>
+            )}
 
             <div className="ledger-audit-box mono-num">
               <div className="ledger-row">
@@ -1180,6 +1167,115 @@ export function SettingsChronicleModal({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Settings, Civilization Chapter Guide & Chronicle Modal (收敛到设置中的主题切换、退出、当前章节剪影与聚落编年纪事)
+ */
+export function SettingsChronicleModal({
+  state,
+  theme,
+  storyChapter,
+  civEra,
+  onToggleTheme,
+  onLogout,
+  onClose,
+}: {
+  state: DashboardStateResp;
+  theme: ThemeMode;
+  storyChapter: { key: string; tag: string; text: string };
+  civEra: "stone" | "colony" | "workshop" | "empire";
+  onToggleTheme: () => void;
+  onLogout: () => void;
+  onClose: () => void;
+}) {
+  const { player, currentSeason } = state;
+
+  return (
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="设置与聚落纪事"
+    >
+      <div className="modal-sheet">
+        <div className="modal-header">
+          <div>
+            <h2>系统设置 · 文明演进与聚落编年纪事</h2>
+            <p>
+              领主账号：{player.handle}（{player.professionName}） · 当前赛季：
+              {currentSeason?.title ?? "S1 · 黑曜苏醒"}
+            </p>
+          </div>
+          <div className="toolbar-actions">
+            <button
+              type="button"
+              className="btn-outline"
+              data-pop={theme === "light" ? "曜石夜间" : "纸墨日间"}
+              onClick={onToggleTheme}
+            >
+              {theme === "light" ? (
+                <Moon size={ICON.xs} />
+              ) : (
+                <Sun size={ICON.xs} />
+              )}
+              <span>{theme === "light" ? "切换曜石夜间" : "切换纸墨日间"}</span>
+            </button>
+            <button type="button" className="btn-outline" onClick={onLogout}>
+              <LogOut size={ICON.xs} />
+              <span>退出登录</span>
+            </button>
+            <button type="button" className="btn-primary" onClick={onClose}>
+              关闭
+            </button>
+          </div>
+        </div>
+
+        <div className="tab-body split-2col">
+          {/* Left Column: Current Civilization Chapter Silhouette & Preferences */}
+          <div className="subpanel">
+            <div className="subpanel-head">
+              <h3>
+                <Compass size={ICON.sm} />
+                <span>当前文明演进章节（{storyChapter.tag}）</span>
+              </h3>
+            </div>
+
+            <div className="civ-popup-silhouette-wrap">
+              <CivilizationSilhouetteSVG era={civEra} />
+            </div>
+
+            <article className="season-notice-card">
+              <div className="bp-top">
+                <strong>{storyChapter.tag}</strong>
+                <span className="tag-badge tag-warning">当前章节</span>
+              </div>
+              <p>{storyChapter.text}</p>
+            </article>
+
+            <div className="ledger-audit-box">
+              <div className="ledger-row">
+                <span>界面主题模式</span>
+                <strong>
+                  {theme === "light"
+                    ? "纸墨日间 (Blueprint Light)"
+                    : "曜石夜间 (Obsidian Dark)"}
+                </strong>
+              </div>
+              <div className="ledger-row mono-num">
+                <span>累计手动打水次数</span>
+                <strong>{player.totalManualClicks} 次</strong>
+              </div>
+              <div className="ledger-row mono-num">
+                <span>操作快捷键</span>
+                <span>[M] 世界舆图 · [B/Tab] 局内背囊 · [WASD] 移动</span>
+              </div>
+            </div>
+          </div>
 
           {/* Right Column: Settlement & Empire Chronicle */}
           <div className="subpanel">
@@ -1196,6 +1292,374 @@ export function SettingsChronicleModal({
               ))}
             </ul>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * World Map Compass Modal (右下角【世界舆图】点击展开的帝国疆域导航图)
+ */
+export function WorldMapCompassModal({
+  state,
+  activeScene,
+  showScoutScene,
+  showAdvancedWorld,
+  showLordScene,
+  onSelectZone,
+  onClose,
+}: {
+  state: DashboardStateResp;
+  activeScene: WorldZoneKey;
+  showScoutScene: boolean;
+  showAdvancedWorld: boolean;
+  showLordScene: boolean;
+  onSelectZone: (zone: WorldZoneKey) => void;
+  onClose: () => void;
+}) {
+  const zones: Array<{
+    key: WorldZoneKey;
+    title: string;
+    subtitle: string;
+    coord: string;
+    unlocked: boolean;
+    lockHint: string;
+    badge: string;
+  }> = [
+    {
+      key: "settlement",
+      title: "领主主城 · 聚落与个人档案",
+      subtitle:
+        "完整个人视角：领主立体形象衣橱、汲水与资源总账、居民调配与文明蓝图研发。",
+      coord: "N 00° · E 00° (中央主城)",
+      unlocked: true,
+      lockHint: "",
+      badge: `人口 ${state.player.populationTotal}`,
+    },
+    {
+      key: "scout",
+      title: "荒原裂隙斥候营",
+      subtitle:
+        "三幕式探索撤离：行前整备与保险箱 → 3D 蚀刻增益卡抽取 → 全屏 2D 裂隙搜打撤与局内游商帐篷。",
+      coord: "N 18° · W 42° (西北裂隙)",
+      unlocked: showScoutScene,
+      lockHint: "需在主城达到 5 人口并解锁【荒原斥候营】蓝图",
+      badge: showScoutScene ? "可出征" : "未解锁",
+    },
+    {
+      key: "market",
+      title: "皇家工坊与全球交易所",
+      subtitle:
+        "跨职业增产设备装槽、四大职业独占配方制造，以及全服中央限价订单簿 (CLOB) 现货与外观交易。",
+      coord: "S 12° · E 28° (东南商埠)",
+      unlocked: showAdvancedWorld,
+      lockHint: "需开启【神秘的宝藏】并择定终身职业后开放",
+      badge: `${state.openOrders.length} 笔挂单`,
+    },
+    {
+      key: "war",
+      title: "公会驻地与八城战区",
+      subtitle:
+        "创立或加入全服公会、捐献军需集结目标，并在 8 节点战略沙盘上派兵参与每晚 20:00 城池会战。",
+      coord: "N 34° · E 36° (东北前线)",
+      unlocked: showAdvancedWorld,
+      lockHint: "需开启【神秘的宝藏】并择定终身职业后开放",
+      badge: `战役日 D${state.war.currentDay}/7`,
+    },
+    {
+      key: "lord",
+      title: "墨械唯一秘宝陈列馆",
+      subtitle:
+        "消耗战争活动积分兑换并开启赛季典藏宝箱，铸造全服唯一编号与随机 UV 纹样的永久秘宝。",
+      coord: "S 24° · W 19° (西南秘苑)",
+      unlocked: showLordScene,
+      lockHint: "需解锁荒原斥候营或获得首件藏品后开放",
+      badge: `藏品 ${state.collectibles.length} 件`,
+    },
+  ];
+
+  return (
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="世界舆图导航"
+    >
+      <div className="modal-sheet world-map-modal-sheet">
+        <div className="modal-header">
+          <div>
+            <h2>帝国疆域世界舆图 · 场景前往</h2>
+            <p>
+              选择舆图上的疆域据点即可立即前往对应功能区（快捷键：M）
+            </p>
+          </div>
+          <button type="button" className="btn-outline" onClick={onClose}>
+            收起舆图
+          </button>
+        </div>
+
+        {/* Interactive Blueprint & Ink World Map SVG */}
+        <div className="world-map-svg-wrap">
+          <svg
+            viewBox="0 0 760 220"
+            className="world-map-svg"
+            role="img"
+            aria-label="帝国疆域蓝图航线"
+          >
+            <defs>
+              <pattern
+                id="wm-grid"
+                width="24"
+                height="24"
+                patternUnits="userSpaceOnUse"
+              >
+                <path
+                  d="M 24 0 L 0 0 0 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="0.6"
+                  opacity="0.14"
+                />
+              </pattern>
+            </defs>
+            <rect width="760" height="220" fill="url(#wm-grid)" />
+            {/* Compass rose */}
+            <g transform="translate(695, 48)" opacity="0.55">
+              <circle
+                r="26"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1"
+                strokeDasharray="3 2"
+              />
+              <polygon points="0,-24 5,-5 0,-10 -5,-5" fill="#C89B3C" />
+              <polygon
+                points="0,24 4,5 0,10 -4,5"
+                fill="currentColor"
+                opacity="0.45"
+              />
+              <line
+                x1="-22"
+                y1="0"
+                x2="22"
+                y2="0"
+                stroke="currentColor"
+                strokeWidth="1"
+              />
+            </g>
+            {/* Route lines from Central Citadel (380, 112) */}
+            <g
+              stroke="#C89B3C"
+              strokeWidth="1.8"
+              strokeDasharray="5 4"
+              opacity="0.75"
+            >
+              <line x1="380" y1="112" x2="145" y2="56" />
+              <line x1="380" y1="112" x2="595" y2="56" />
+              <line x1="380" y1="112" x2="165" y2="172" />
+              <line x1="380" y1="112" x2="585" y2="170" />
+            </g>
+            {/* Node 1: Scout Camp (NW) */}
+            <g
+              transform="translate(145, 56)"
+              style={{ cursor: showScoutScene ? "pointer" : "not-allowed" }}
+              onClick={() => {
+                if (showScoutScene) {
+                  onSelectZone("scout");
+                  onClose();
+                }
+              }}
+            >
+              <circle
+                r="22"
+                fill={activeScene === "scout" ? "#C89B3C" : "#162436"}
+                stroke="#C89B3C"
+                strokeWidth="2"
+              />
+              <polygon
+                points="0,-10 10,8 -10,8"
+                fill={activeScene === "scout" ? "#162436" : "#F3EFE6"}
+              />
+              <text
+                y="35"
+                textAnchor="middle"
+                fill="currentColor"
+                fontSize="12"
+                fontWeight="700"
+              >
+                荒原斥候营
+              </text>
+            </g>
+            {/* Node 2: Guild & War Zone (NE) */}
+            <g
+              transform="translate(595, 56)"
+              style={{ cursor: showAdvancedWorld ? "pointer" : "not-allowed" }}
+              onClick={() => {
+                if (showAdvancedWorld) {
+                  onSelectZone("war");
+                  onClose();
+                }
+              }}
+            >
+              <circle
+                r="22"
+                fill={activeScene === "war" ? "#C89B3C" : "#162436"}
+                stroke="#C89B3C"
+                strokeWidth="2"
+              />
+              <rect
+                x="-8"
+                y="-8"
+                width="16"
+                height="16"
+                fill={activeScene === "war" ? "#162436" : "#F3EFE6"}
+              />
+              <text
+                y="35"
+                textAnchor="middle"
+                fill="currentColor"
+                fontSize="12"
+                fontWeight="700"
+              >
+                公会与战区
+              </text>
+            </g>
+            {/* Node 3: Central Settlement & Personal Profile (Center) */}
+            <g
+              transform="translate(380, 112)"
+              style={{ cursor: "pointer" }}
+              onClick={() => {
+                onSelectZone("settlement");
+                onClose();
+              }}
+            >
+              <circle
+                r="28"
+                fill={activeScene === "settlement" ? "#C89B3C" : "#1D4E89"}
+                stroke="#F3EFE6"
+                strokeWidth="2.5"
+              />
+              <polygon
+                points="0,-14 12,-2 8,-2 8,11 -8,11 -8,-2 -12,-2"
+                fill="#F3EFE6"
+              />
+              <text
+                y="43"
+                textAnchor="middle"
+                fill="currentColor"
+                fontSize="13"
+                fontWeight="700"
+              >
+                ★ 领主主城 (个人与生产)
+              </text>
+            </g>
+            {/* Node 4: Relic Vault (SW) */}
+            <g
+              transform="translate(165, 172)"
+              style={{ cursor: showLordScene ? "pointer" : "not-allowed" }}
+              onClick={() => {
+                if (showLordScene) {
+                  onSelectZone("lord");
+                  onClose();
+                }
+              }}
+            >
+              <circle
+                r="20"
+                fill={activeScene === "lord" ? "#C89B3C" : "#162436"}
+                stroke="#C89B3C"
+                strokeWidth="2"
+              />
+              <polygon
+                points="0,-10 9,0 0,10 -9,0"
+                fill={activeScene === "lord" ? "#162436" : "#F3EFE6"}
+              />
+              <text
+                y="33"
+                textAnchor="middle"
+                fill="currentColor"
+                fontSize="12"
+                fontWeight="700"
+              >
+                墨械秘宝馆
+              </text>
+            </g>
+            {/* Node 5: Workshop & Spot Market (SE) */}
+            <g
+              transform="translate(585, 170)"
+              style={{ cursor: showAdvancedWorld ? "pointer" : "not-allowed" }}
+              onClick={() => {
+                if (showAdvancedWorld) {
+                  onSelectZone("market");
+                  onClose();
+                }
+              }}
+            >
+              <circle
+                r="22"
+                fill={activeScene === "market" ? "#C89B3C" : "#162436"}
+                stroke="#C89B3C"
+                strokeWidth="2"
+              />
+              <circle
+                r="7"
+                fill={activeScene === "market" ? "#162436" : "#F3EFE6"}
+              />
+              <text
+                y="35"
+                textAnchor="middle"
+                fill="currentColor"
+                fontSize="12"
+                fontWeight="700"
+              >
+                工坊与交易所
+              </text>
+            </g>
+          </svg>
+        </div>
+
+        <div className="world-map-zone-grid">
+          {zones.map((z) => {
+            const isCurrent = activeScene === z.key;
+            return (
+              <article
+                key={z.key}
+                className={`world-map-zone-card ${isCurrent ? "zone-active" : ""} ${!z.unlocked ? "zone-locked" : ""}`}
+              >
+                <div className="bp-top">
+                  <div>
+                    <strong>{z.title}</strong>
+                    <span className="bp-pop-req mono-num">{z.coord}</span>
+                  </div>
+                  <span
+                    className={`tag-badge mono-num ${isCurrent ? "tag-warning" : z.unlocked ? "tag-success" : ""}`}
+                  >
+                    {isCurrent ? "当前驻留" : z.unlocked ? z.badge : "未解锁"}
+                  </span>
+                </div>
+                <p className="bp-desc">
+                  {z.unlocked ? z.subtitle : `🔒 ${z.lockHint}`}
+                </p>
+                <div className="bp-footer">
+                  <span className="cost-chip mono-num">{z.badge}</span>
+                  <button
+                    type="button"
+                    className={isCurrent ? "btn-outline btn-sm" : "btn-primary btn-sm"}
+                    data-pop={`前往 ${z.title.split(" ")[0]}`}
+                    disabled={!z.unlocked}
+                    onClick={() => {
+                      onSelectZone(z.key);
+                      onClose();
+                    }}
+                  >
+                    <Compass size={ICON.xs} />
+                    <span>{isCurrent ? "继续驻留" : "立即前往"}</span>
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </div>

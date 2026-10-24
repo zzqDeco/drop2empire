@@ -125,7 +125,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintName: "基础免图纸",
 		StatSummary:   "攻击 +6 · 局内阵亡会损毁掉落",
 		AtkBonus:      6,
-		CostsMilli:    map[string]int64{ResWood: 35 * ResourceScale, ResWater: 20 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWood: 320 * ResourceScale, ResWater: 260 * ResourceScale},
 	},
 	{
 		ItemKey:       "gear_flint_bow",
@@ -136,7 +136,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintName: "基础免图纸",
 		StatSummary:   "攻击 +11 · 远距离先手 · 阵亡掉落",
 		AtkBonus:      11,
-		CostsMilli:    map[string]int64{ResWood: 55 * ResourceScale, ResStone: 25 * ResourceScale, ResFlint: 1 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWood: 520 * ResourceScale, ResStone: 280 * ResourceScale, ResFlint: 4 * ResourceScale},
 	},
 	{
 		ItemKey:       "gear_repeat_crossbow",
@@ -147,7 +147,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintName: "★图纸：墨械连发手弩",
 		StatSummary:   "攻击 +20 · 暴击率 +15% · 阵亡掉落",
 		AtkBonus:      20,
-		CostsMilli:    map[string]int64{ResWood: 90 * ResourceScale, ResCharcoal: 20 * ResourceScale, ResFlint: 2 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWood: 1100 * ResourceScale, ResStone: 650 * ResourceScale, ResCharcoal: 240 * ResourceScale, ResFlint: 8 * ResourceScale},
 	},
 	{
 		ItemKey:       "gear_titan_hammer",
@@ -158,7 +158,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintName: "★★图纸：泰坦裂地重锤",
 		StatSummary:   "攻击 +36 · 破甲重击首领 · 阵亡掉落",
 		AtkBonus:      36,
-		CostsMilli:    map[string]int64{ResStone: 140 * ResourceScale, ResCharcoal: 35 * ResourceScale, ResFlint: 4 * ResourceScale, ResMeteorOre: 1 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 2200 * ResourceScale, ResStone: 1800 * ResourceScale, ResCharcoal: 520 * ResourceScale, ResFlint: 16 * ResourceScale, ResMeteorOre: 2 * ResourceScale},
 	},
 
 	// Armors (护甲)
@@ -172,7 +172,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		StatSummary:   "生命 +30 · 护甲 +3 · 阵亡掉落",
 		HpBonus:       30,
 		DefBonus:      3,
-		CostsMilli:    map[string]int64{ResWater: 40 * ResourceScale, ResWood: 30 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 380 * ResourceScale, ResWood: 280 * ResourceScale},
 	},
 	{
 		ItemKey:       "gear_splint_mail",
@@ -184,7 +184,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		StatSummary:   "生命 +55 · 护甲 +6 · 阵亡掉落",
 		HpBonus:       55,
 		DefBonus:      6,
-		CostsMilli:    map[string]int64{ResWood: 70 * ResourceScale, ResStone: 35 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWood: 640 * ResourceScale, ResStone: 360 * ResourceScale, ResCharcoal: 90 * ResourceScale},
 	},
 	{
 		ItemKey:       "gear_carapace_armor",
@@ -196,7 +196,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		StatSummary:   "生命 +100 · 护甲 +13 · 阵亡掉落",
 		HpBonus:       100,
 		DefBonus:      13,
-		CostsMilli:    map[string]int64{ResStone: 95 * ResourceScale, ResCharcoal: 20 * ResourceScale, ResFlint: 2 * ResourceScale},
+		CostsMilli:    map[string]int64{ResStone: 1200 * ResourceScale, ResWood: 750 * ResourceScale, ResCharcoal: 260 * ResourceScale, ResFlint: 8 * ResourceScale},
 	},
 	{
 		ItemKey:       "gear_hydro_armor",
@@ -208,7 +208,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		StatSummary:   "生命 +180 · 护甲 +24 · 背囊 +3格 · 阵亡掉落",
 		HpBonus:       180,
 		DefBonus:      24,
-		CostsMilli:    map[string]int64{ResWater: 260 * ResourceScale, ResStone: 150 * ResourceScale, ResCharcoal: 40 * ResourceScale, ResMeteorOre: 1 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 2800 * ResourceScale, ResStone: 1950 * ResourceScale, ResCharcoal: 580 * ResourceScale, ResFlint: 18 * ResourceScale, ResMeteorOre: 2 * ResourceScale},
 	},
 
 	// Boots (战靴 — 控制 2D 地图移动冷却间隔)
@@ -221,7 +221,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintName:  "基础免图纸",
 		StatSummary:    "移速间隔缩短至 310ms/格 · 阵亡掉落",
 		MoveCooldownMs: 310,
-		CostsMilli:     map[string]int64{ResWater: 30 * ResourceScale, ResWood: 25 * ResourceScale},
+		CostsMilli:     map[string]int64{ResWater: 300 * ResourceScale, ResWood: 240 * ResourceScale},
 	},
 	{
 		ItemKey:        "gear_hide_boots",
@@ -233,7 +233,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		StatSummary:    "移速间隔缩短至 265ms/格 · 护甲 +2 · 阵亡掉落",
 		DefBonus:       2,
 		MoveCooldownMs: 265,
-		CostsMilli:     map[string]int64{ResWood: 50 * ResourceScale, ResStone: 25 * ResourceScale, ResFlint: 1 * ResourceScale},
+		CostsMilli:     map[string]int64{ResWood: 480 * ResourceScale, ResStone: 260 * ResourceScale, ResFlint: 3 * ResourceScale},
 	},
 	{
 		ItemKey:        "gear_spring_boots",
@@ -245,7 +245,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		StatSummary:    "移速间隔缩短至 210ms/格 · 护甲 +4 · 阵亡掉落",
 		DefBonus:       4,
 		MoveCooldownMs: 210,
-		CostsMilli:     map[string]int64{ResWood: 80 * ResourceScale, ResCharcoal: 22 * ResourceScale, ResFlint: 2 * ResourceScale},
+		CostsMilli:     map[string]int64{ResWood: 980 * ResourceScale, ResStone: 580 * ResourceScale, ResCharcoal: 220 * ResourceScale, ResFlint: 6 * ResourceScale},
 	},
 	{
 		ItemKey:        "gear_hermes_boots",
@@ -257,7 +257,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		StatSummary:    "极速移动 155ms/格 · 闪避 +20% · 阵亡掉落",
 		DefBonus:       7,
 		MoveCooldownMs: 155,
-		CostsMilli:     map[string]int64{ResWater: 220 * ResourceScale, ResCharcoal: 35 * ResourceScale, ResAncientShard: 1 * ResourceScale, ResMeteorOre: 1 * ResourceScale},
+		CostsMilli:     map[string]int64{ResWater: 2400 * ResourceScale, ResWood: 1500 * ResourceScale, ResCharcoal: 460 * ResourceScale, ResAncientShard: 3 * ResourceScale, ResMeteorOre: 2 * ResourceScale},
 	},
 
 	// Safe Containers (本赛季安全保险箱 — 阵亡绝不掉落，本赛季永久生效)
@@ -270,7 +270,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintName: "基础免图纸",
 		StatSummary:   "本赛季安全保险箱扩至 2 格（阵亡绝不遗失）",
 		SafeSlots:     2,
-		CostsMilli:    map[string]int64{ResWater: 180 * ResourceScale, ResWood: 110 * ResourceScale, ResStone: 50 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 950 * ResourceScale, ResWood: 680 * ResourceScale, ResStone: 420 * ResourceScale, ResFlint: 6 * ResourceScale},
 	},
 	{
 		ItemKey:       "safe_cipher_3",
@@ -281,7 +281,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintName: "★图纸：墨械密码保险箱",
 		StatSummary:   "本赛季安全保险箱扩至 3 格（阵亡绝不遗失）",
 		SafeSlots:     3,
-		CostsMilli:    map[string]int64{ResStone: 140 * ResourceScale, ResCharcoal: 30 * ResourceScale, ResFlint: 4 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 1800 * ResourceScale, ResStone: 1350 * ResourceScale, ResCharcoal: 380 * ResourceScale, ResFlint: 14 * ResourceScale, ResAncientShard: 2 * ResourceScale},
 	},
 	{
 		ItemKey:       "safe_aether_5",
@@ -292,7 +292,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintName: "★★图纸：泰坦次元保险箱",
 		StatSummary:   "本赛季终极安全保险箱扩至 5 格（阵亡绝不遗失）",
 		SafeSlots:     5,
-		CostsMilli:    map[string]int64{ResStone: 260 * ResourceScale, ResCharcoal: 60 * ResourceScale, ResAncientShard: 2 * ResourceScale, ResMeteorOre: 2 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 3600 * ResourceScale, ResStone: 2600 * ResourceScale, ResCharcoal: 800 * ResourceScale, ResAncientShard: 5 * ResourceScale, ResMeteorOre: 4 * ResourceScale},
 	},
 
 	// Tactical Potions (战术药水 — 局内随时饮用生效)
@@ -304,7 +304,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintKey:  "",
 		BlueprintName: "基础免图纸",
 		StatSummary:   "局内饮用：瞬间恢复 +55 生命值与 +15秒 探索时间",
-		CostsMilli:    map[string]int64{ResWater: 45 * ResourceScale, ResWood: 15 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 360 * ResourceScale, ResWood: 160 * ResourceScale},
 	},
 	{
 		ItemKey:       "pot_gale_stride",
@@ -314,7 +314,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintKey:  "",
 		BlueprintName: "基础免图纸",
 		StatSummary:   "局内饮用：25秒内移动冷却缩短 35%（风驰电掣）",
-		CostsMilli:    map[string]int64{ResWater: 50 * ResourceScale, ResCharcoal: 8 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 420 * ResourceScale, ResCharcoal: 85 * ResourceScale},
 	},
 	{
 		ItemKey:       "pot_scavenge_elixir",
@@ -324,7 +324,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintKey:  ResBPScavengeElixir,
 		BlueprintName: "★图纸：速搜合剂配方",
 		StatSummary:   "局内饮用：35秒内搜索所有宝箱读条时间缩短 50%",
-		CostsMilli:    map[string]int64{ResWater: 75 * ResourceScale, ResCharcoal: 14 * ResourceScale, ResFlint: 1 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 680 * ResourceScale, ResCharcoal: 160 * ResourceScale, ResFlint: 4 * ResourceScale},
 	},
 	{
 		ItemKey:       "pot_berserk_elixir",
@@ -334,7 +334,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintKey:  ResBPBerserkElixir,
 		BlueprintName: "★★图纸：狂暴圣水配方",
 		StatSummary:   "局内饮用：攻击 +25、护甲 +12，并获得 1 次致命免死护盾",
-		CostsMilli:    map[string]int64{ResWater: 120 * ResourceScale, ResCharcoal: 25 * ResourceScale, ResFlint: 2 * ResourceScale, ResAncientShard: 1 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 1100 * ResourceScale, ResCharcoal: 280 * ResourceScale, ResFlint: 6 * ResourceScale, ResAncientShard: 1 * ResourceScale},
 	},
 }
 

@@ -561,6 +561,13 @@ struct RolloverSeasonReq {
   1: optional string nextTitle (api.body="nextTitle")
 }
 
+struct PublishNoticeReq {
+  1: required string title (api.body="title")
+  2: required string effectiveIn (api.body="effectiveIn")
+  3: required string summary (api.body="summary")
+  4: optional list<string> demandShifts (api.body="demandShifts")
+}
+
 struct FinishRaidReq {
   1: required string status (api.body="status")
   2: optional list<string> backpackLootKeys (api.body="backpackLootKeys")
@@ -694,4 +701,5 @@ service EmpireService {
   DashboardStateResp StartRaid(1: StartRaidReq req) (api.post="/api/v1/empire/colony/raid/start")
   DashboardStateResp FinishRaid(1: FinishRaidReq req) (api.post="/api/v1/empire/colony/raid/finish")
   DashboardStateResp RolloverSeason(1: RolloverSeasonReq req) (api.post="/api/v1/empire/admin/season/rollover")
+  DashboardStateResp PublishNotice(1: PublishNoticeReq req) (api.post="/api/v1/empire/admin/notices")
 }

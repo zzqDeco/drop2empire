@@ -604,27 +604,16 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		})
 	}
 
-	noticesDTO := []*empire.SeasonNoticeDTO{
-		{
-			SeasonId:    "S1-CURRENT",
-			Title:       "第一赛季 · 墨械纪元",
-			EffectiveIn: "进行中",
-			Summary:     "要塞驻防战力 +25%，铁锭、抽水机与步兵军备需求旺盛。",
-			DemandShifts: []string{
-				"自动抽水机（科学家）",
-				"泰坦精锻工具组 & 重步兵军备（工匠）",
-			},
-		},
-		{
-			SeasonId:    "S2-PREVIEW-T7D",
-			Title:       "第二赛季预告 · 秘法狂潮",
-			EffectiveIn: "7 天后",
-			Summary:     "新增酸雾沼泽与以太裂隙，催化剂与附魔卷轴需求上升。",
-			DemandShifts: []string{
-				"赫尔墨斯催化剂（炼金术士）",
-				"星界附魔卷轴（魔法师）",
-			},
-		},
+	domain.EnsureSeasonState(w, time.Now().UTC())
+	noticesDTO := make([]*empire.SeasonNoticeDTO, 0, len(w.Announcements))
+	for _, an := range w.Announcements {
+		noticesDTO = append(noticesDTO, &empire.SeasonNoticeDTO{
+			SeasonId:     an.SeasonID,
+			Title:        an.Title,
+			EffectiveIn:  an.EffectiveIn,
+			Summary:      an.Summary,
+			DemandShifts: append([]string{}, an.DemandShifts...),
+		})
 	}
 
 	logsDTO := make([]*empire.EventLogDTO, 0, len(p.EventLogs))
@@ -1003,6 +992,14 @@ func (s *Server) RolloverSeason(ctx context.Context, req *empire.RolloverSeasonR
 		nextTitle = *req.NextTitle
 	}
 	w, err := s.svc.RolloverSeason(ctx, nextTitle)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) PublishNotice(ctx context.Context, req *empire.PublishNoticeReq) (*empire.DashboardStateResp, error) {
+	w, err := s.svc.PublishNotice(ctx, req.Title, req.EffectiveIn, req.Summary, req.DemandShifts)
 	if err != nil {
 		return nil, err
 	}

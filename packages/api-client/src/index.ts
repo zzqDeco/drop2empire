@@ -29,6 +29,7 @@ import {
   type DraftRaidBuffReq,
   type FinishRaidReq,
   type RolloverSeasonReq,
+  type PublishNoticeReq,
   type UnlockBlueprintReq,
 } from "./generated";
 
@@ -357,6 +358,12 @@ export class EmpireClient {
   rolloverSeason = (req: RolloverSeasonReq = {}) =>
     this.#request<DashboardStateResp>(IDL_ROUTES.RolloverSeason.clientPath, {
       method: IDL_ROUTES.RolloverSeason.method,
+      body: JSON.stringify(req),
+    });
+
+  publishNotice = (req: PublishNoticeReq) =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.PublishNotice.clientPath, {
+      method: IDL_ROUTES.PublishNotice.method,
       body: JSON.stringify(req),
     });
 }
