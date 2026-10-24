@@ -1,8 +1,22 @@
 # 宏观设计 III：双商会 7 日图结构领土战争 (Macro Chamber Territory War)
 
-> **层级定位**：`02-macro`（宏观设计层 · 全服阵营对抗与终局资源消耗）  
-> **职责边界**：定义黑曜商会 (`obsidian`) 与白银商会 (`argent`) 的 8 节点图拓扑地图、补给线连通性校验、三兵种加权克制矩阵、每日 20:00 权威战争结算与国库津贴分配模型。  
-> **代码映射**：[`services/game/internal/domain/engine.go`](../../../services/game/internal/domain/engine.go)、[`apps/web/src/WarGraphMapSVG.tsx`](../../../apps/web/src/WarGraphMapSVG.tsx)
+> **层级定位**：`02-macro`（宏观设计层 · 公会协同组织、全服阵营对抗与终局资源消耗）  
+> **职责边界**：定义黑曜商会 (`OBSIDIAN`) 与白银同盟 (`ARGENT`) 麾下的玩家公会系统 (`GuildState`)、公会后勤/军费捐献、集结令战术标定、8 节点图拓扑地图、补给线连通性校验、三兵种加权克制矩阵与每日 20:00 权威战争结算。  
+> **代码映射**：[`services/game/internal/domain/macro_war.go`](../../../services/game/internal/domain/macro_war.go)、[`apps/web/src/MacroEmpireWorkspace.tsx`](../../../apps/web/src/MacroEmpireWorkspace.tsx)、[`apps/web/src/WarGraphMapSVG.tsx`](../../../apps/web/src/WarGraphMapSVG.tsx)
+
+---
+
+## 0. 公会大厅与集结协同体系 (`GuildState` & `PerformGuildAction`)
+
+战区城池争夺以**公会 (`Guild`)** 为基本作战建制。领主完成圣坛择业后，须在【公会与战区】场景中加入现有公会或创立新公会，方可代表所属商会向战区派兵：
+
+| 公会机制 | 规则与数值说明 |
+| :--- | :--- |
+| **四大常驻初始公会** | 黑曜商会麾下：**`[INK] 墨械先驱团`**、**`[IRON] 黑曜铁卫公会`**；白银同盟麾下：**`[ASTR] 白银星界议会`**、**`[ALCH] 赫尔墨斯炼金会`**。 |
+| **创立新公会 (`create`)** | 消耗驻地建材（`清水 100 + 木材 60 + 石料 30`），自定义 `2~16` 字公会名、`2~4` 位徽标简称 (`Tag`) 与效忠商会 (`OBSIDIAN` / `ARGENT`)。 |
+| **后勤物资捐献 (`donate_supplies`)** | 消耗 `清水 80 + 木材 50 + 石料 25` $\rightarrow$ 公会经验 `+120 XP`、个人公会贡献 `+100`、活动积分 `+15`。 |
+| **金库军费捐献 (`donate_gold`)** | 消耗 `50.0000 Gold`（等额划入中央/公会金库 $M_{\text{treasury}}$，严格保持宏观货币恒等式守恒）$\rightarrow$ 公会经验 `+200 XP`、个人公会贡献 `+180`、活动积分 `+25`。 |
+| **公会集结令 (`set_rally`)** | 标定 8 节点沙盘上的优先攻坚城池（`rallyNodeId`）。公会成员向集结目标城池派兵时，立即额外获得 **`+5` 活动积分**与公会战旗加成。 |
 
 ---
 

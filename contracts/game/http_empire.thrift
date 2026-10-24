@@ -310,6 +310,32 @@ struct WarDaySettlementDTO {
   7: required list<WarBattleNodeReportDTO> nodeReports (api.body="nodeReports")
 }
 
+struct GuildMemberDTO {
+  1: required string handle (api.body="handle")
+  2: required string role (api.body="role")
+  3: required i64 contribution (api.body="contribution")
+  4: required i32 warDeployed (api.body="warDeployed")
+}
+
+struct GuildDTO {
+  1: required string guildId (api.body="guildId")
+  2: required string name (api.body="name")
+  3: required string tag (api.body="tag")
+  4: required string faction (api.body="faction")
+  5: required string factionName (api.body="factionName")
+  6: required string leaderHandle (api.body="leaderHandle")
+  7: required i32 level (api.body="level")
+  8: required i64 xp (api.body="xp")
+  9: required i64 nextLevelXp (api.body="nextLevelXp")
+  10: required i32 memberCount (api.body="memberCount")
+  11: required i64 treasuryGoldBasis (api.body="treasuryGoldBasis")
+  12: required string rallyNodeId (api.body="rallyNodeId")
+  13: required string rallyNodeName (api.body="rallyNodeName")
+  14: required string announcement (api.body="announcement")
+  15: required string bonusSummary (api.body="bonusSummary")
+  16: required list<GuildMemberDTO> members (api.body="members")
+}
+
 struct WarStateDTO {
   1: required string seasonCode (api.body="seasonCode")
   2: required string seasonName (api.body="seasonName")
@@ -325,6 +351,9 @@ struct WarStateDTO {
   12: required list<WarNodeDTO> nodes (api.body="nodes")
   13: required list<WarEdgeDTO> edges (api.body="edges")
   14: required list<WarDaySettlementDTO> settlementHistory (api.body="settlementHistory")
+  15: required string joinedGuildId (api.body="joinedGuildId")
+  16: required i64 playerGuildContribution (api.body="playerGuildContribution")
+  17: required list<GuildDTO> guilds (api.body="guilds")
 }
 
 struct CollectibleItemDTO {
@@ -571,6 +600,15 @@ struct SwitchGuildReq {
   1: required string guildCode (api.body="guildCode")
 }
 
+struct GuildActionReq {
+  1: required string action (api.body="action")
+  2: optional string guildId (api.body="guildId")
+  3: optional string name (api.body="name")
+  4: optional string tag (api.body="tag")
+  5: optional string faction (api.body="faction")
+  6: optional string rallyNodeId (api.body="rallyNodeId")
+}
+
 struct DeployWarTroopsReq {
   1: required string nodeId (api.body="nodeId")
   2: required i32 infantryDelta (api.body="infantryDelta")
@@ -636,6 +674,7 @@ service EmpireService {
   DashboardStateResp PlaceMarketOrder(1: PlaceMarketOrderReq req) (api.post="/api/v1/empire/market/orders")
   DashboardStateResp CancelMarketOrder(1: CancelMarketOrderReq req) (api.post="/api/v1/empire/market/orders/:id/cancel")
   DashboardStateResp SwitchGuild(1: SwitchGuildReq req) (api.post="/api/v1/empire/war/guild")
+  DashboardStateResp GuildAction(1: GuildActionReq req) (api.post="/api/v1/empire/war/guild-action")
   DashboardStateResp DeployWarTroops(1: DeployWarTroopsReq req) (api.post="/api/v1/empire/war/deploy")
   DashboardStateResp TriggerWarSettlement(1: TriggerWarSettlementReq req) (api.post="/api/v1/empire/war/settle")
   DashboardStateResp RedeemSeasonChest(1: RedeemSeasonChestReq req) (api.post="/api/v1/empire/season/redeem-chest")

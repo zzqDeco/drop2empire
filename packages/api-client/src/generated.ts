@@ -310,6 +310,32 @@ export interface WarDaySettlementDTO {
   nodeReports: WarBattleNodeReportDTO[];
 }
 
+export interface GuildMemberDTO {
+  handle: string;
+  role: string;
+  contribution: number;
+  warDeployed: number;
+}
+
+export interface GuildDTO {
+  guildId: string;
+  name: string;
+  tag: string;
+  faction: string;
+  factionName: string;
+  leaderHandle: string;
+  level: number;
+  xp: number;
+  nextLevelXp: number;
+  memberCount: number;
+  treasuryGoldBasis: number;
+  rallyNodeId: string;
+  rallyNodeName: string;
+  announcement: string;
+  bonusSummary: string;
+  members: GuildMemberDTO[];
+}
+
 export interface WarStateDTO {
   seasonCode: string;
   seasonName: string;
@@ -325,6 +351,9 @@ export interface WarStateDTO {
   nodes: WarNodeDTO[];
   edges: WarEdgeDTO[];
   settlementHistory: WarDaySettlementDTO[];
+  joinedGuildId: string;
+  playerGuildContribution: number;
+  guilds: GuildDTO[];
 }
 
 export interface CollectibleItemDTO {
@@ -571,6 +600,15 @@ export interface SwitchGuildReq {
   guildCode: string;
 }
 
+export interface GuildActionReq {
+  action: string;
+  guildId?: string;
+  name?: string;
+  tag?: string;
+  faction?: string;
+  rallyNodeId?: string;
+}
+
 export interface DeployWarTroopsReq {
   nodeId: string;
   infantryDelta: number;
@@ -766,6 +804,15 @@ export const IDL_ROUTES = {
     path: "/api/v1/empire/war/guild",
     clientPath: "/empire/war/guild",
     requestType: "SwitchGuildReq",
+    responseType: "DashboardStateResp",
+  },
+  GuildAction: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/war/guild-action",
+    clientPath: "/empire/war/guild-action",
+    requestType: "GuildActionReq",
     responseType: "DashboardStateResp",
   },
   DeployWarTroops: {

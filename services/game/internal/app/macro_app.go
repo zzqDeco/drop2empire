@@ -53,6 +53,12 @@ func (s *Service) SwitchGuild(ctx context.Context, guildCode string) (*domain.Wo
 	})
 }
 
+func (s *Service) GuildAction(ctx context.Context, action, guildID, name, tag, faction, rallyNodeID string) (*domain.WorldState, error) {
+	return s.mutate(ctx, func(w *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+		return domain.PerformGuildAction(w, p, action, guildID, name, tag, faction, rallyNodeID, now)
+	})
+}
+
 func (s *Service) DeployWarTroops(ctx context.Context, nodeID string, infDelta, arcDelta, cavDelta int32) (*domain.WorldState, error) {
 	return s.mutate(ctx, func(w *domain.WorldState, p *domain.PlayerState, now time.Time) error {
 		return domain.DeployWarTroops(w, p, nodeID, infDelta, arcDelta, cavDelta, now)

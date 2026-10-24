@@ -3,12 +3,17 @@ import { api, type DashboardStateResp } from "@drop2empire/api-client";
 import {
   Award,
   Box,
+  Compass,
   Cpu,
   FlaskConical,
   Layers,
+  LogOut,
+  Moon,
+  Plus,
   Scale,
   Shield,
   Sparkles,
+  Sun,
   Swords,
   TrendingUp,
 } from "lucide-react";
@@ -16,797 +21,1101 @@ import { ICON } from "./icons";
 import { formatGold, formatResource } from "./format";
 import { ProceduralRelicSVG } from "./ProceduralRelicSVG";
 import { WarGraphMapSVG } from "./WarGraphMapSVG";
+import type { ThemeMode } from "./theme";
 
-type BottomTab = "craft" | "market" | "war" | "collectibles" | "chronicle";
-
-export function MacroEmpireWorkspace({
-  state,
-  busy,
-  runAction,
-}: {
+interface SceneProps {
   state: DashboardStateResp;
-  busy: boolean;
+  busy?: boolean;
   runAction: (
     fn: () => Promise<DashboardStateResp>,
     successMsg?: string,
   ) => Promise<void>;
-}) {
-  const [activeTab, setActiveTab] = useState<BottomTab>("craft");
+}
+
+/**
+ * Scene III: Workshop Crafting, Cross-Profession Equipment Rack & Global CLOB Spot Market
+ */
+export function MarketSceneView({ state, runAction }: SceneProps) {
   const [selectedMarketItem, setSelectedMarketItem] = useState("auto_pump");
   const [orderSide, setOrderSide] = useState<"BID" | "ASK">("BID");
   const [orderPriceGold, setOrderPriceGold] = useState("19.20");
   const [orderQtyUnits, setOrderQtyUnits] = useState("1");
-  const [selectedNodeId, setSelectedNodeId] = useState("node_north_fort");
-  const [deployInf, setDeployInf] = useState(2);
-  const [deployArc, setDeployArc] = useState(2);
-  const [deployCav, setDeployCav] = useState(2);
 
-  const { player, resources } = state;
-  const selectedWarNode =
-    state.war.nodes.find((n) => n.nodeId === selectedNodeId) ??
-    state.war.nodes[0];
   const selectedMarketMeta =
     state.marketSummaries.find((m) => m.itemKey === selectedMarketItem) ??
     state.marketSummaries[0];
 
   return (
-    <section className="lower-workspace" aria-label="帝国系统">
-      <div className="tabs-header">
-        <div className="tab-buttons" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "craft"}
-            className={`tab-btn ${activeTab === "craft" ? "active" : ""}`}
-            onClick={() => setActiveTab("craft")}
-          >
-            <Cpu size={ICON.sm} />
-            <span>工坊</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "market"}
-            className={`tab-btn ${activeTab === "market" ? "active" : ""}`}
-            onClick={() => setActiveTab("market")}
-          >
-            <TrendingUp size={ICON.sm} />
-            <span>市场</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "war"}
-            className={`tab-btn ${activeTab === "war" ? "active" : ""}`}
-            onClick={() => setActiveTab("war")}
-          >
-            <Swords size={ICON.sm} />
-            <span>战区 (D{state.war.currentDay})</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "collectibles"}
-            className={`tab-btn ${activeTab === "collectibles" ? "active" : ""}`}
-            onClick={() => setActiveTab("collectibles")}
-          >
-            <Award size={ICON.sm} />
-            <span>藏品 ({state.collectibles.length})</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "chronicle"}
-            className={`tab-btn ${activeTab === "chronicle" ? "active" : ""}`}
-            onClick={() => setActiveTab("chronicle")}
-          >
-            <Scale size={ICON.sm} />
-            <span>纪事</span>
-          </button>
+    <div className="lower-workspace" aria-label="工坊制造与全球现货市场">
+      {/* Upper Section: Workshop Equipment Rack & Profession Recipes */}
+      <div className="tab-body split-2col">
+        <div className="subpanel">
+          <div className="subpanel-head">
+            <h3>
+              <Layers size={ICON.sm} />
+              <span>跨职业增产设备装槽</span>
+            </h3>
+          </div>
+          <div className="equip-slot-list">
+            {state.installedEquipments.map((eq) => (
+              <div key={eq.itemKey} className="equip-card">
+                <div className="equip-main">
+                  <div className="equip-title-row">
+                    <strong>{eq.name}</strong>
+                    <span className="tag-badge mono-num">
+                      {eq.installedCount}/{eq.maxStack} · 库存{" "}
+                      {eq.inventoryUnits}
+                    </span>
+                  </div>
+                  <p>{eq.bonusSummary}</p>
+                </div>
+                <div className="equip-actions">
+                  <button
+                    type="button"
+                    className="btn-outline mono-num"
+                    data-pop={`-1 ${eq.name}`}
+                    disabled={eq.installedCount <= 0}
+                    onClick={() =>
+                      void runAction(() =>
+                        api.installEquipment({
+                          itemKey: eq.itemKey,
+                          delta: -1,
+                        }),
+                      )
+                    }
+                  >
+                    -1
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary mono-num"
+                    data-pop={`+1 ${eq.name}`}
+                    disabled={
+                      eq.inventoryUnits <= 0 || eq.installedCount >= eq.maxStack
+                    }
+                    onClick={() =>
+                      void runAction(() =>
+                        api.installEquipment({
+                          itemKey: eq.itemKey,
+                          delta: 1,
+                        }),
+                      )
+                    }
+                  >
+                    +1
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="subpanel">
+          <div className="subpanel-head">
+            <h3>
+              <FlaskConical size={ICON.sm} />
+              <span>职业专属工坊配方（{state.player.professionName}）</span>
+            </h3>
+          </div>
+          <div className="recipe-grid">
+            {state.recipes.map((rc) => (
+              <article
+                key={rc.recipeCode}
+                className={`recipe-card ${!rc.professionMatched ? "recipe-other-prof" : ""}`}
+              >
+                <div className="recipe-head">
+                  <div>
+                    <strong>{rc.name}</strong>
+                    <span
+                      className={`tag-badge ${rc.professionMatched ? "tag-success" : ""}`}
+                    >
+                      {rc.professionReqName}
+                    </span>
+                  </div>
+                  <span className="mono-num">
+                    +{formatResource(rc.outputAmountMilli, 0)}
+                  </span>
+                </div>
+                <p className="recipe-desc">{rc.effectSummary}</p>
+                <div className="recipe-footer">
+                  <div className="bp-costs">
+                    {rc.costs.map((c) => (
+                      <span
+                        key={c.resourceKey}
+                        className={`cost-chip mono-num ${c.currentMilli >= c.requiredMilli ? "cost-ok" : "cost-lack"}`}
+                      >
+                        {c.resourceName} {formatResource(c.currentMilli, 0)}/
+                        {formatResource(c.requiredMilli, 0)}
+                      </span>
+                    ))}
+                    {rc.goldCostBasis > 0 && (
+                      <span
+                        className={`cost-chip mono-num ${state.player.goldBasis >= rc.goldCostBasis ? "cost-ok" : "cost-lack"}`}
+                      >
+                        {formatGold(rc.goldCostBasis)} G
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    data-pop={`+${formatResource(rc.outputAmountMilli, 0)} ${rc.outputName}`}
+                    disabled={!rc.canCraft}
+                    onClick={() =>
+                      void runAction(() =>
+                        api.craftItem({
+                          recipeCode: rc.recipeCode,
+                          batches: 1,
+                        }),
+                      )
+                    }
+                  >
+                    {rc.professionMatched ? (
+                      <>
+                        <Cpu size={ICON.xs} />
+                        <span>制造</span>
+                      </>
+                    ) : (
+                      <span className="lock-pill">仅限对应职业</span>
+                    )}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* TAB 1: Workshop */}
-      {activeTab === "craft" && (
-        <div className="tab-body split-2col">
-          <div className="subpanel">
-            <div className="subpanel-head">
-              <h3>
-                <Layers size={ICON.sm} />
-                <span>设备装槽</span>
-              </h3>
-            </div>
-            <div className="equip-slot-list">
-              {state.installedEquipments.map((eq) => (
-                <div key={eq.itemKey} className="equip-card">
-                  <div className="equip-main">
-                    <div className="equip-title-row">
-                      <strong>{eq.name}</strong>
-                      <span className="tag-badge mono-num">
-                        {eq.installedCount}/{eq.maxStack} · 库存{" "}
-                        {eq.inventoryUnits}
-                      </span>
-                    </div>
-                    <p>{eq.bonusSummary}</p>
-                  </div>
-                  <div className="equip-actions">
-                    <button
-                      type="button"
-                      className="btn-outline mono-num"
-                      disabled={eq.installedCount <= 0 || busy}
-                      onClick={() =>
-                        void runAction(() =>
-                          api.installEquipment({
-                            itemKey: eq.itemKey,
-                            delta: -1,
-                          }),
-                        )
-                      }
-                    >
-                      -1
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-primary mono-num"
-                      disabled={
-                        eq.inventoryUnits <= 0 ||
-                        eq.installedCount >= eq.maxStack ||
-                        busy
-                      }
-                      onClick={() =>
-                        void runAction(() =>
-                          api.installEquipment({
-                            itemKey: eq.itemKey,
-                            delta: 1,
-                          }),
-                        )
-                      }
-                    >
-                      +1
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {/* Lower Section: Global CLOB Spot Market */}
+      <div className="tab-body split-3col">
+        <div className="subpanel">
+          <div className="subpanel-head">
+            <h3>
+              <TrendingUp size={ICON.sm} />
+              <span>全球现货行情（含荒原蓝图与外观）</span>
+            </h3>
           </div>
-
-          <div className="subpanel">
-            <div className="subpanel-head">
-              <h3>
-                <FlaskConical size={ICON.sm} />
-                <span>制造配方</span>
-              </h3>
-            </div>
-            <div className="recipe-grid">
-              {state.recipes.map((rc) => (
-                <article
-                  key={rc.recipeCode}
-                  className={`recipe-card ${!rc.professionMatched ? "recipe-other-prof" : ""}`}
-                >
-                  <div className="recipe-head">
-                    <div>
-                      <strong>{rc.name}</strong>
-                      <span
-                        className={`tag-badge ${rc.professionMatched ? "tag-success" : ""}`}
-                      >
-                        {rc.professionReqName}
-                      </span>
-                    </div>
-                    <span className="mono-num">
-                      +{formatResource(rc.outputAmountMilli, 0)}
-                    </span>
-                  </div>
-                  <p className="recipe-desc">{rc.effectSummary}</p>
-                  <div className="recipe-footer">
-                    <div className="bp-costs">
-                      {rc.costs.map((c) => (
-                        <span
-                          key={c.resourceKey}
-                          className={`cost-chip mono-num ${c.currentMilli >= c.requiredMilli ? "cost-ok" : "cost-lack"}`}
-                        >
-                          {c.resourceName} {formatResource(c.currentMilli, 0)}/
-                          {formatResource(c.requiredMilli, 0)}
-                        </span>
-                      ))}
-                      {rc.goldCostBasis > 0 && (
-                        <span className="cost-chip mono-num">
-                          {formatGold(rc.goldCostBasis)} G
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      disabled={!rc.canCraft || busy}
-                      onClick={() =>
-                        void runAction(() =>
-                          api.craftItem({
-                            recipeCode: rc.recipeCode,
-                            batches: 1,
-                          }),
-                        )
-                      }
-                    >
-                      {rc.professionMatched ? (
-                        "制造"
-                      ) : (
-                        <span className="lock-pill">仅限对应职业</span>
-                      )}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
+          <div className="table-wrap">
+            <table className="ink-table clickable-rows">
+              <thead>
+                <tr>
+                  <th>商品</th>
+                  <th className="num-col">现价</th>
+                  <th className="num-col">买 / 卖</th>
+                  <th className="num-col">量</th>
+                </tr>
+              </thead>
+              <tbody>
+                {state.marketSummaries.map((m) => (
+                  <tr
+                    key={m.itemKey}
+                    className={
+                      m.itemKey === selectedMarketItem ? "row-selected" : ""
+                    }
+                    onClick={() => {
+                      setSelectedMarketItem(m.itemKey);
+                      const refPrice =
+                        orderSide === "BID" && m.bestAskBasis > 0
+                          ? m.bestAskBasis
+                          : orderSide === "ASK" && m.bestBidBasis > 0
+                            ? m.bestBidBasis
+                            : m.lastPriceBasis;
+                      setOrderPriceGold((refPrice / 10000).toFixed(2));
+                    }}
+                  >
+                    <td>
+                      <strong>{m.itemName}</strong>
+                    </td>
+                    <td className="num-col mono-num">
+                      {formatGold(m.lastPriceBasis)}
+                    </td>
+                    <td className="num-col mono-num">
+                      {m.bestBidBasis > 0 ? formatGold(m.bestBidBasis) : "—"} /{" "}
+                      {m.bestAskBasis > 0 ? formatGold(m.bestAskBasis) : "—"}
+                    </td>
+                    <td className="num-col mono-num">
+                      {formatResource(m.volume24hMilli, 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
 
-      {/* TAB 2: Market */}
-      {activeTab === "market" && (
-        <div className="tab-body split-3col">
-          <div className="subpanel">
-            <div className="subpanel-head">
-              <h3>行情</h3>
-            </div>
-            <div className="table-wrap">
-              <table className="ink-table clickable-rows">
-                <thead>
-                  <tr>
-                    <th>商品</th>
-                    <th className="num-col">现价</th>
-                    <th className="num-col">买 / 卖</th>
-                    <th className="num-col">量</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {state.marketSummaries.map((m) => (
-                    <tr
-                      key={m.itemKey}
-                      className={
-                        m.itemKey === selectedMarketItem ? "row-selected" : ""
-                      }
-                      onClick={() => {
-                        setSelectedMarketItem(m.itemKey);
-                        const refPrice =
-                          orderSide === "BID" && m.bestAskBasis > 0
-                            ? m.bestAskBasis
-                            : orderSide === "ASK" && m.bestBidBasis > 0
-                              ? m.bestBidBasis
-                              : m.lastPriceBasis;
-                        setOrderPriceGold((refPrice / 10000).toFixed(2));
-                      }}
-                    >
-                      <td>
-                        <strong>{m.itemName}</strong>
-                      </td>
-                      <td className="num-col mono-num">
-                        {formatGold(m.lastPriceBasis)}
-                      </td>
-                      <td className="num-col mono-num">
-                        {m.bestBidBasis > 0 ? formatGold(m.bestBidBasis) : "—"}{" "}
-                        /{" "}
-                        {m.bestAskBasis > 0 ? formatGold(m.bestAskBasis) : "—"}
-                      </td>
-                      <td className="num-col mono-num">
-                        {formatResource(m.volume24hMilli, 0)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div className="subpanel">
+          <div className="subpanel-head">
+            <h3>委托挂单 · {selectedMarketMeta.itemName}</h3>
           </div>
 
-          <div className="subpanel">
-            <div className="subpanel-head">
-              <h3>委托 · {selectedMarketMeta.itemName}</h3>
-            </div>
-
-            <form
-              className="order-ticket"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const priceBasis = Math.round(Number(orderPriceGold) * 10000);
-                const quantityMilli = Math.round(Number(orderQtyUnits) * 1000);
-                void runAction(() =>
-                  api.placeMarketOrder({
-                    itemKey: selectedMarketItem,
-                    side: orderSide,
-                    priceBasis,
-                    quantityMilli,
-                  }),
-                );
-              }}
-            >
-              <div className="side-switch">
-                <button
-                  type="button"
-                  className={`side-btn ${orderSide === "BID" ? "active-bid" : ""}`}
-                  onClick={() => setOrderSide("BID")}
-                >
-                  买入
-                </button>
-                <button
-                  type="button"
-                  className={`side-btn ${orderSide === "ASK" ? "active-ask" : ""}`}
-                  onClick={() => setOrderSide("ASK")}
-                >
-                  卖出
-                </button>
-              </div>
-
-              <div className="form-row-2">
-                <label>
-                  <span>单价</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    className="mono-num"
-                    value={orderPriceGold}
-                    onChange={(e) => setOrderPriceGold(e.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>数量</span>
-                  <input
-                    type="number"
-                    step="1"
-                    min="1"
-                    className="mono-num"
-                    value={orderQtyUnits}
-                    onChange={(e) => setOrderQtyUnits(e.target.value)}
-                  />
-                </label>
-              </div>
-
-              <div className="order-summary mono-num">
-                <span>
-                  总额{" "}
-                  {(
-                    Number(orderPriceGold || 0) * Number(orderQtyUnits || 0)
-                  ).toFixed(2)}{" "}
-                  G
-                </span>
-                <span>税率 1%</span>
-              </div>
-
+          <form
+            className="order-ticket"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const priceBasis = Math.round(Number(orderPriceGold) * 10000);
+              const quantityMilli = Math.round(Number(orderQtyUnits) * 1000);
+              void runAction(() =>
+                api.placeMarketOrder({
+                  itemKey: selectedMarketItem,
+                  side: orderSide,
+                  priceBasis,
+                  quantityMilli,
+                }),
+              );
+            }}
+          >
+            <div className="side-switch">
               <button
-                type="submit"
-                className="btn-primary btn-block"
-                disabled={busy}
+                type="button"
+                className={`side-btn ${orderSide === "BID" ? "active-bid" : ""}`}
+                onClick={() => setOrderSide("BID")}
               >
-                {orderSide === "BID" ? "挂买单" : "挂卖单"}
+                买入 (BID)
               </button>
-            </form>
-
-            <div className="orderbook-box">
-              <h4>盘口</h4>
-              <div className="table-wrap">
-                <table className="ink-table">
-                  <thead>
-                    <tr>
-                      <th>方向</th>
-                      <th className="num-col">价格</th>
-                      <th className="num-col">数量</th>
-                      <th>卖家/买家</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {state.openOrders
-                      .filter((o) => o.itemKey === selectedMarketItem)
-                      .map((o) => (
-                        <tr key={o.id}>
-                          <td>
-                            <span
-                              className={`side-pill ${o.side === "BID" ? "pill-bid" : "pill-ask"}`}
-                            >
-                              {o.side}
-                            </span>
-                          </td>
-                          <td className="num-col mono-num">
-                            {formatGold(o.priceBasis)}
-                          </td>
-                          <td className="num-col mono-num">
-                            {formatResource(o.remainingMilli, 0)}
-                          </td>
-                          <td>{o.makerName}</td>
-                          <td>
-                            {o.isOwn ? (
-                              <button
-                                type="button"
-                                className="btn-link"
-                                onClick={() =>
-                                  void runAction(() =>
-                                    api.cancelMarketOrder(o.id),
-                                  )
-                                }
-                              >
-                                撤单
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="btn-link"
-                                onClick={() => {
-                                  setOrderSide(
-                                    o.side === "ASK" ? "BID" : "ASK",
-                                  );
-                                  setOrderPriceGold(
-                                    (o.priceBasis / 10000).toFixed(2),
-                                  );
-                                  setOrderQtyUnits(
-                                    String(
-                                      Math.max(
-                                        1,
-                                        Math.floor(o.remainingMilli / 1000),
-                                      ),
-                                    ),
-                                  );
-                                }}
-                              >
-                                填入
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+              <button
+                type="button"
+                className={`side-btn ${orderSide === "ASK" ? "active-ask" : ""}`}
+                onClick={() => setOrderSide("ASK")}
+              >
+                卖出 (ASK)
+              </button>
             </div>
-          </div>
 
-          <div className="subpanel">
-            <div className="subpanel-head">
-              <h3>最新成交</h3>
+            <div className="form-row-2">
+              <label>
+                <span>单价 (Gold)</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  className="mono-num"
+                  value={orderPriceGold}
+                  onChange={(e) => setOrderPriceGold(e.target.value)}
+                />
+              </label>
+              <label>
+                <span>数量</span>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  className="mono-num"
+                  value={orderQtyUnits}
+                  onChange={(e) => setOrderQtyUnits(e.target.value)}
+                />
+              </label>
             </div>
+
+            <div className="order-summary mono-num">
+              <span>
+                总额{" "}
+                {(
+                  Number(orderPriceGold || 0) * Number(orderQtyUnits || 0)
+                ).toFixed(2)}{" "}
+                G
+              </span>
+              <span>税率 1% (0.5% 销毁 / 0.5% 国库)</span>
+            </div>
+
+            <button
+              type="submit"
+              className="btn-primary btn-block"
+              data-pop={
+                orderSide === "BID"
+                  ? `挂买 ${orderQtyUnits}×${selectedMarketMeta.itemName}`
+                  : `挂卖 ${orderQtyUnits}×${selectedMarketMeta.itemName}`
+              }
+            >
+              {orderSide === "BID" ? "提交买单" : "提交卖单"}
+            </button>
+          </form>
+
+          <div className="orderbook-box">
+            <h4>当前盘口深度</h4>
             <div className="table-wrap">
               <table className="ink-table">
                 <thead>
                   <tr>
-                    <th>时间</th>
-                    <th>商品</th>
+                    <th>方向</th>
                     <th className="num-col">价格</th>
                     <th className="num-col">数量</th>
+                    <th>挂单方</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {state.recentTrades.map((tr) => (
-                    <tr key={tr.id}>
-                      <td className="mono-num">{tr.executedAt}</td>
-                      <td>{tr.itemName}</td>
-                      <td className="num-col mono-num">
-                        {formatGold(tr.priceBasis)}
-                      </td>
-                      <td className="num-col mono-num">
-                        {formatResource(tr.quantityMilli, 0)}
-                      </td>
-                    </tr>
-                  ))}
+                  {state.openOrders
+                    .filter((o) => o.itemKey === selectedMarketItem)
+                    .map((o) => (
+                      <tr key={o.id}>
+                        <td>
+                          <span
+                            className={`side-pill ${o.side === "BID" ? "pill-bid" : "pill-ask"}`}
+                          >
+                            {o.side}
+                          </span>
+                        </td>
+                        <td className="num-col mono-num">
+                          {formatGold(o.priceBasis)}
+                        </td>
+                        <td className="num-col mono-num">
+                          {formatResource(o.remainingMilli, 0)}
+                        </td>
+                        <td>{o.makerName}</td>
+                        <td>
+                          {o.isOwn ? (
+                            <button
+                              type="button"
+                              className="btn-link"
+                              data-pop="✓ 撤单解冻"
+                              onClick={() =>
+                                void runAction(() =>
+                                  api.cancelMarketOrder(o.id),
+                                )
+                              }
+                            >
+                              撤单
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-link"
+                              data-pop="填入价格"
+                              onClick={() => {
+                                setOrderSide(o.side === "ASK" ? "BID" : "ASK");
+                                setOrderPriceGold(
+                                  (o.priceBasis / 10000).toFixed(2),
+                                );
+                                setOrderQtyUnits(
+                                  String(
+                                    Math.max(
+                                      1,
+                                      Math.floor(o.remainingMilli / 1000),
+                                    ),
+                                  ),
+                                );
+                              }}
+                            >
+                              填入
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
-      )}
 
-      {/* TAB 3: Chamber War */}
-      {activeTab === "war" && (
-        <div className="tab-body war-layout">
-          <div className="war-main-col">
-            <div className="war-scoreboard">
-              <div className="guild-score-block">
-                <span className="guild-tag">黑曜商会</span>
-                <strong className="mono-num">
-                  {state.war.obsidianTotalScore}
-                </strong>
-              </div>
-              <div className="war-day-banner">
-                <span className="tag-badge">D{state.war.currentDay} / 7</span>
-                <small>每日 20:00 结算</small>
-              </div>
-              <div className="guild-score-block">
-                <span className="guild-tag">白银同盟</span>
-                <strong className="mono-num">
-                  {state.war.argentTotalScore}
-                </strong>
-              </div>
-            </div>
+        <div className="subpanel">
+          <div className="subpanel-head">
+            <h3>最新撮合成交</h3>
+          </div>
+          <div className="table-wrap">
+            <table className="ink-table">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>商品</th>
+                  <th className="num-col">成交价</th>
+                  <th className="num-col">数量</th>
+                </tr>
+              </thead>
+              <tbody>
+                {state.recentTrades.map((tr) => (
+                  <tr key={tr.id}>
+                    <td className="mono-num">{tr.executedAt}</td>
+                    <td>{tr.itemName}</td>
+                    <td className="num-col mono-num">
+                      {formatGold(tr.priceBasis)}
+                    </td>
+                    <td className="num-col mono-num">
+                      {formatResource(tr.quantityMilli, 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-            <WarGraphMapSVG
-              nodes={state.war.nodes}
-              edges={state.war.edges}
-              selectedNodeId={selectedWarNode.nodeId}
-              onSelectNode={(id) => setSelectedNodeId(id)}
-            />
+/**
+ * Scene IV: Guild System (公会大厅) & 8-Node Chamber Territory War (城池争夺战区)
+ */
+export function WarGuildSceneView({ state, runAction }: SceneProps) {
+  const [selectedNodeId, setSelectedNodeId] = useState("node_north_fort");
+  const [deployInf, setDeployInf] = useState(2);
+  const [deployArc, setDeployArc] = useState(2);
+  const [deployCav, setDeployCav] = useState(2);
 
-            <div className="war-history-box">
-              <div className="subpanel-head">
-                <h3>战报</h3>
-              </div>
-              {state.war.settlementHistory.length === 0 ? (
-                <p className="muted-note">暂无战报</p>
-              ) : (
-                <div className="settlement-list">
-                  {state.war.settlementHistory.map((h) => (
-                    <details
-                      key={`${h.dayIndex}-${h.settledAt}`}
-                      className="settlement-item"
-                      open
-                    >
-                      <summary className="mono-num">
-                        D{h.dayIndex} ({h.settledAt}) · 黑曜 +
-                        {h.obsidianScoreDelta} / 白银 +{h.argentScoreDelta}
-                      </summary>
-                      <div className="table-wrap">
-                        <table className="ink-table">
-                          <thead>
-                            <tr>
-                              <th>据点</th>
-                              <th>归属</th>
-                              <th className="num-col">黑曜</th>
-                              <th className="num-col">白银</th>
-                              <th>结果</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {h.nodeReports.map((nr) => (
-                              <tr key={nr.nodeId}>
-                                <td>
-                                  <strong>{nr.nodeName}</strong>
-                                </td>
-                                <td className="mono-num">
-                                  {nr.prevOwner} → {nr.newOwner}
-                                </td>
-                                <td className="num-col mono-num">
-                                  {nr.obsidianInfantry}/{nr.obsidianArcher}/
-                                  {nr.obsidianCavalry}
-                                </td>
-                                <td className="num-col mono-num">
-                                  {nr.argentInfantry}/{nr.argentArcher}/
-                                  {nr.argentCavalry}
-                                </td>
-                                <td>{nr.casualtySummary}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              )}
-            </div>
+  const [newGuildName, setNewGuildName] = useState("");
+  const [newGuildTag, setNewGuildTag] = useState("");
+  const [newGuildFaction, setNewGuildFaction] = useState<"OBSIDIAN" | "ARGENT">(
+    "OBSIDIAN",
+  );
+
+  const { player, resources, war } = state;
+  const guilds = war.guilds ?? [];
+  const joinedGuild =
+    guilds.find((g) => g.guildId === war.joinedGuildId) ?? null;
+
+  const selectedWarNode =
+    war.nodes.find((n) => n.nodeId === selectedNodeId) ?? war.nodes[0];
+
+  const waterMilli =
+    resources.find((r) => r.key === "water")?.amountMilli ?? 0;
+  const woodMilli = resources.find((r) => r.key === "wood")?.amountMilli ?? 0;
+  const stoneMilli =
+    resources.find((r) => r.key === "stone")?.amountMilli ?? 0;
+  const infKitMilli =
+    resources.find((r) => r.key === "infantry_kit")?.amountMilli ?? 0;
+  const arcKitMilli =
+    resources.find((r) => r.key === "archer_kit")?.amountMilli ?? 0;
+  const cavKitMilli =
+    resources.find((r) => r.key === "cavalry_kit")?.amountMilli ?? 0;
+
+  const canDonateSupplies =
+    Boolean(joinedGuild) &&
+    waterMilli >= 80000 &&
+    woodMilli >= 50000 &&
+    stoneMilli >= 25000;
+  const canDonateGold = Boolean(joinedGuild) && player.goldBasis >= 500000;
+  const canCreateGuild =
+    waterMilli >= 100000 && woodMilli >= 60000 && stoneMilli >= 30000;
+
+  const hasEnoughKits =
+    infKitMilli >= deployInf * 1000 &&
+    arcKitMilli >= deployArc * 1000 &&
+    cavKitMilli >= deployCav * 1000 &&
+    deployInf + deployArc + deployCav > 0;
+
+  return (
+    <div className="lower-workspace" aria-label="公会大厅与城池战区">
+      {/* Upper Section: Guild Hall (公会大厅：我的公会 & 全服公会名录/创立公会) */}
+      <div className="tab-body split-2col">
+        {/* Left Subpanel: Active Guild Headquarters */}
+        <div className="subpanel">
+          <div className="subpanel-head">
+            <h3>
+              <Shield size={ICON.sm} />
+              <span>
+                公会大厅 ·{" "}
+                {joinedGuild
+                  ? `[${joinedGuild.tag}] ${joinedGuild.name} (Lv.${joinedGuild.level})`
+                  : "尚未加入公会"}
+              </span>
+            </h3>
           </div>
 
-          <aside className="subpanel war-side-col">
-            <div className="subpanel-head">
-              <h3>
-                <Shield size={ICON.sm} />
-                <span>{selectedWarNode.name}</span>
-              </h3>
+          {!joinedGuild ? (
+            <div className="empty-stage-hint">
+              ⚠️ 战区城池争夺以<strong>公会</strong>为基本建制。请先在右侧名录中<strong>加入一个公会</strong>或<strong>创立新公会</strong>，即可解锁公会集结加成并向战区派兵！
             </div>
-
-            <div className="war-guild-bar">
-              <span>{state.war.playerGuildName}</span>
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() =>
-                  void runAction(() =>
-                    api.switchGuild({
-                      guildCode:
-                        state.war.playerGuild === "OBSIDIAN"
-                          ? "ARGENT"
-                          : "OBSIDIAN",
-                    }),
-                  )
-                }
-              >
-                切换阵营
-              </button>
-            </div>
-
-            <div className="node-intel-card">
-              <div className="intel-row">
-                <span>归属</span>
-                <strong className="mono-num">
-                  {selectedWarNode.ownerGuild}
-                </strong>
+          ) : (
+            <div>
+              <div className="recruit-card">
+                <div className="recruit-meta">
+                  <div className="recruit-head">
+                    <strong>
+                      [{joinedGuild.tag}] {joinedGuild.name}
+                    </strong>
+                    <span className="tag-badge tag-warning mono-num">
+                      Lv.{joinedGuild.level} · {joinedGuild.xp}/
+                      {joinedGuild.nextLevelXp} XP
+                    </span>
+                    <span className="tag-badge">{joinedGuild.factionName}</span>
+                  </div>
+                  <div className="recruit-cost">
+                    {joinedGuild.bonusSummary}
+                  </div>
+                  <div className="recruit-cost mono-num">
+                    🎯 公会集结目标：<strong>{joinedGuild.rallyNodeName}</strong> · 金库储备：{formatGold(joinedGuild.treasuryGoldBasis)} G · 我的贡献：{war.playerGuildContribution}
+                  </div>
+                </div>
               </div>
-              <div className="intel-row">
-                <span>守军 (步/弓/骑)</span>
-                <strong className="mono-num">
-                  {selectedWarNode.infantryCount}/{selectedWarNode.archerCount}/
-                  {selectedWarNode.cavalryCount}
-                </strong>
-              </div>
-              <div className="intel-row">
-                <span>补给线</span>
-                <strong
-                  className={
-                    selectedWarNode.canDeploy ? "rate-pos" : "cost-lack"
+
+              <div className="quick-alloc-bar">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  data-pop="+100 贡献 / +15 积分"
+                  disabled={!canDonateSupplies}
+                  onClick={() =>
+                    void runAction(() =>
+                      api.guildAction({ action: "donate_supplies" }),
+                    )
                   }
                 >
-                  {selectedWarNode.canDeploy ? "已连通" : "未连通"}
-                </strong>
-              </div>
-              <div className="intel-row">
-                <span>今日额度</span>
-                <strong className="mono-num">
-                  {state.war.dailyBudgetUsed} / {state.war.dailyBudgetCap}
-                </strong>
-              </div>
-              <p className="intel-note">{selectedWarNode.intelNote}</p>
-            </div>
+                  <Plus size={ICON.xs} />
+                  <span>后勤捐献 (水80/木50/石25)</span>
+                </button>
 
-            <form
-              className="deploy-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void runAction(() =>
-                  api.deployWarTroops({
-                    nodeId: selectedWarNode.nodeId,
-                    infantryDelta: deployInf,
-                    archerDelta: deployArc,
-                    cavalryDelta: deployCav,
-                  }),
-                );
-              }}
-            >
-              <h4>派兵</h4>
-              <div className="form-row-3">
-                <label>
-                  <span>步兵</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="50"
-                    className="mono-num"
-                    value={deployInf}
-                    onChange={(e) => setDeployInf(Number(e.target.value))}
-                  />
-                </label>
-                <label>
-                  <span>弓兵</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="50"
-                    className="mono-num"
-                    value={deployArc}
-                    onChange={(e) => setDeployArc(Number(e.target.value))}
-                  />
-                </label>
-                <label>
-                  <span>骑兵</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="50"
-                    className="mono-num"
-                    value={deployCav}
-                    onChange={(e) => setDeployCav(Number(e.target.value))}
-                  />
-                </label>
+                <button
+                  type="button"
+                  className="btn-outline"
+                  data-pop="+180 贡献 / +25 积分"
+                  disabled={!canDonateGold}
+                  onClick={() =>
+                    void runAction(() =>
+                      api.guildAction({ action: "donate_gold" }),
+                    )
+                  }
+                >
+                  <Award size={ICON.xs} />
+                  <span>军费捐献 (50 G)</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-outline"
+                  data-pop={`🎯 集结 ${selectedWarNode.name}`}
+                  disabled={joinedGuild.rallyNodeId === selectedWarNode.nodeId}
+                  onClick={() =>
+                    void runAction(() =>
+                      api.guildAction({
+                        action: "set_rally",
+                        rallyNodeId: selectedWarNode.nodeId,
+                      }),
+                    )
+                  }
+                >
+                  <Compass size={ICON.xs} />
+                  <span>集结令指向【{selectedWarNode.name}】</span>
+                </button>
               </div>
 
-              <button
-                type="submit"
-                className="btn-primary btn-block"
-                disabled={!selectedWarNode.canDeploy || busy}
-              >
-                出兵
-              </button>
-            </form>
-          </aside>
-        </div>
-      )}
-
-      {/* TAB 4: Collectibles & Season Rules */}
-      {activeTab === "collectibles" && (
-        <div className="tab-body">
-          <div className="chest-console">
-            <div className="chest-console-info">
-              <h3>
-                <Box size={ICON.sm} />
-                <span>
-                  {state.currentSeason?.title ?? "S1 · 黑曜复苏与墨械纪元"} ·
-                  典藏宝箱
-                </span>
-              </h3>
-              <p>
-                100 积分兑换 1 个宝箱。开启后获得的唯一序列号程序化纹理藏品与{" "}
-                <code>cos_*</code> 赛季动态外观跨赛季永久保留。
-              </p>
-            </div>
-            <div className="chest-console-actions">
-              <button
-                type="button"
-                className="btn-outline mono-num"
-                disabled={player.activityPoints < 100 || busy}
-                onClick={() =>
-                  void runAction(() => api.redeemSeasonChest({ count: 1 }))
-                }
-              >
-                兑换宝箱 (-100 积分)
-              </button>
-              <button
-                type="button"
-                className="btn-primary mono-num"
-                disabled={
-                  (resources.find((r) => r.key === "season_chest")
-                    ?.amountMilli ?? 0) < 1000 || busy
-                }
-                onClick={() =>
-                  void runAction(() =>
-                    api.openSeasonChest({ clientSeedHint: Date.now() }),
-                  )
-                }
-              >
-                <Sparkles size={ICON.sm} />
-                <span>
-                  开箱 (
-                  {Math.floor(
-                    (resources.find((r) => r.key === "season_chest")
-                      ?.amountMilli ?? 0) / 1000,
-                  )}
-                  )
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {state.collectibles.length === 0 ? (
-            <div className="empty-stage-hint">暂无藏品</div>
-          ) : (
-            <div className="collectibles-grid">
-              {state.collectibles.map((item) => (
-                <article key={item.itemId} className="collectible-card">
-                  <ProceduralRelicSVG item={item} />
-                  <div className="collectible-meta">
-                    <div className="collectible-title-row">
-                      <strong>{item.name}</strong>
-                      <span
-                        className={`rarity-badge rarity-${item.rarityTier.toLowerCase()}`}
-                      >
-                        {item.rarityTier}
-                      </span>
-                    </div>
-                    <div className="special-tag-row">{item.specialTag}</div>
-                    <dl className="collectible-kv mono-num">
-                      <div>
-                        <dt>编号</dt>
-                        <dd>#{item.serialNumber}</dd>
-                      </div>
-                      <div>
-                        <dt>纹理</dt>
-                        <dd>
-                          {item.textureName} · {item.paletteName}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>种子</dt>
-                        <dd>{item.patternSeed}</dd>
-                      </div>
-                    </dl>
-                  </div>
-                </article>
-              ))}
+              <div className="table-wrap">
+                <table className="ink-table">
+                  <thead>
+                    <tr>
+                      <th>公会成员</th>
+                      <th>职务</th>
+                      <th className="num-col">累计贡献</th>
+                      <th className="num-col">战区出兵</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {joinedGuild.members.map((m) => (
+                      <tr key={m.handle}>
+                        <td>
+                          <strong>{m.handle}</strong>
+                        </td>
+                        <td>
+                          <span className="tier-pill">{m.role}</span>
+                        </td>
+                        <td className="num-col mono-num">{m.contribution}</td>
+                        <td className="num-col mono-num">
+                          {m.warDeployed} 团
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
-      )}
 
-      {/* TAB 5: Chronicle & Season Notice */}
-      {activeTab === "chronicle" && (
+        {/* Right Subpanel: Guild Directory & Create New Guild */}
+        <div className="subpanel">
+          <div className="subpanel-head">
+            <h3>
+              <Swords size={ICON.sm} />
+              <span>全服公会名录与创立驻地</span>
+            </h3>
+          </div>
+
+          <div className="blueprint-list">
+            {guilds.map((g) => {
+              const isJoined = g.guildId === war.joinedGuildId;
+              return (
+                <article
+                  key={g.guildId}
+                  className={`bp-card ${isJoined ? "bp-ready" : ""}`}
+                >
+                  <div className="bp-top">
+                    <div>
+                      <strong>
+                        [{g.tag}] {g.name}
+                      </strong>
+                      <span className="bp-pop-req mono-num">
+                        Lv.{g.level} · {g.memberCount} 人 · {g.factionName}
+                      </span>
+                    </div>
+                    <span className="tag-badge">
+                      集结：{g.rallyNodeName}
+                    </span>
+                  </div>
+                  <p className="bp-desc">{g.announcement}</p>
+                  <div className="bp-footer">
+                    <span className="cost-chip mono-num">
+                      会长：{g.leaderHandle} · 金库 {formatGold(g.treasuryGoldBasis)} G
+                    </span>
+                    <button
+                      type="button"
+                      className={isJoined ? "btn-outline" : "btn-primary"}
+                      data-pop={`✓ 加入 [${g.tag}]`}
+                      disabled={isJoined}
+                      onClick={() =>
+                        void runAction(() =>
+                          api.guildAction({
+                            action: "join",
+                            guildId: g.guildId,
+                          }),
+                        )
+                      }
+                    >
+                      {isJoined ? "当前所属公会" : "加入公会"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <form
+            className="preset-bar"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!newGuildName.trim() || !newGuildTag.trim()) return;
+              void runAction(() =>
+                api.guildAction({
+                  action: "create",
+                  name: newGuildName.trim(),
+                  tag: newGuildTag.trim().toUpperCase(),
+                  faction: newGuildFaction,
+                }),
+              );
+              setNewGuildName("");
+              setNewGuildTag("");
+            }}
+          >
+            <div className="preset-save-form">
+              <input
+                type="text"
+                placeholder="新公会名 (2-16字)..."
+                value={newGuildName}
+                onChange={(e) => setNewGuildName(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="徽标简称 (如 STAR)"
+                maxLength={4}
+                value={newGuildTag}
+                onChange={(e) => setNewGuildTag(e.target.value)}
+              />
+              <select
+                value={newGuildFaction}
+                onChange={(e) =>
+                  setNewGuildFaction(e.target.value as "OBSIDIAN" | "ARGENT")
+                }
+              >
+                <option value="OBSIDIAN">效忠黑曜商会</option>
+                <option value="ARGENT">效忠白银同盟</option>
+              </select>
+              <button
+                type="submit"
+                className="btn-primary"
+                data-pop="★ 创立新公会"
+                disabled={
+                  !canCreateGuild ||
+                  newGuildName.trim().length < 2 ||
+                  newGuildTag.trim().length < 2
+                }
+              >
+                创立公会 (水100/木60/石30)
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* Lower Section: 8-Node Chamber Territory War Map & Troop Deployment */}
+      <div className="tab-body war-layout">
+        <div className="war-main-col">
+          <div className="war-scoreboard">
+            <div className="guild-score-block">
+              <span className="guild-tag">黑曜商会 (OBSIDIAN)</span>
+              <strong className="mono-num">{war.obsidianTotalScore}</strong>
+            </div>
+            <div className="war-day-banner">
+              <span className="tag-badge">战役日 D{war.currentDay} / 7</span>
+              <small>每日 20:00 锁定快照结算</small>
+            </div>
+            <div className="guild-score-block">
+              <span className="guild-tag">白银同盟 (ARGENT)</span>
+              <strong className="mono-num">{war.argentTotalScore}</strong>
+            </div>
+          </div>
+
+          <WarGraphMapSVG
+            nodes={war.nodes}
+            edges={war.edges}
+            selectedNodeId={selectedWarNode.nodeId}
+            onSelectNode={(id) => setSelectedNodeId(id)}
+          />
+
+          <div className="war-history-box">
+            <div className="subpanel-head">
+              <h3>每日 20:00 城池会战战报</h3>
+            </div>
+            {war.settlementHistory.length === 0 ? (
+              <p className="muted-note">今日 20:00 尚未触发会战结算</p>
+            ) : (
+              <div className="settlement-list">
+                {war.settlementHistory.map((h) => (
+                  <details
+                    key={`${h.dayIndex}-${h.settledAt}`}
+                    className="settlement-item"
+                    open
+                  >
+                    <summary className="mono-num">
+                      D{h.dayIndex} ({h.settledAt}) · 黑曜 +
+                      {h.obsidianScoreDelta} / 白银 +{h.argentScoreDelta}
+                    </summary>
+                    <div className="table-wrap">
+                      <table className="ink-table">
+                        <thead>
+                          <tr>
+                            <th>据点</th>
+                            <th>归属变更</th>
+                            <th className="num-col">黑曜兵力</th>
+                            <th className="num-col">白银兵力</th>
+                            <th>交火结果</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {h.nodeReports.map((nr) => (
+                            <tr key={nr.nodeId}>
+                              <td>
+                                <strong>{nr.nodeName}</strong>
+                              </td>
+                              <td className="mono-num">
+                                {nr.prevOwner} → {nr.newOwner}
+                              </td>
+                              <td className="num-col mono-num">
+                                {nr.obsidianInfantry}/{nr.obsidianArcher}/
+                                {nr.obsidianCavalry}
+                              </td>
+                              <td className="num-col mono-num">
+                                {nr.argentInfantry}/{nr.argentArcher}/
+                                {nr.argentCavalry}
+                              </td>
+                              <td>{nr.casualtySummary}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <aside className="subpanel war-side-col">
+          <div className="subpanel-head">
+            <h3>
+              <Shield size={ICON.sm} />
+              <span>战略据点 · {selectedWarNode.name}</span>
+            </h3>
+          </div>
+
+          <div className="war-guild-bar">
+            <span>{war.playerGuildName}</span>
+            {joinedGuild?.rallyNodeId === selectedWarNode.nodeId && (
+              <span className="tag-badge tag-warning">🎯 公会集结目标 (+5积分)</span>
+            )}
+          </div>
+
+          <div className="node-intel-card">
+            <div className="intel-row">
+              <span>当前占领方</span>
+              <strong className="mono-num">{selectedWarNode.ownerGuild}</strong>
+            </div>
+            <div className="intel-row">
+              <span>驻军 (步 / 弓 / 骑)</span>
+              <strong className="mono-num">
+                {selectedWarNode.infantryCount}/{selectedWarNode.archerCount}/
+                {selectedWarNode.cavalryCount}
+              </strong>
+            </div>
+            <div className="intel-row">
+              <span>军备库存 (步 / 弓 / 骑)</span>
+              <strong className="mono-num">
+                {formatResource(infKitMilli, 0)} /{" "}
+                {formatResource(arcKitMilli, 0)} /{" "}
+                {formatResource(cavKitMilli, 0)}
+              </strong>
+            </div>
+            <div className="intel-row">
+              <span>公会补给线</span>
+              <strong
+                className={
+                  selectedWarNode.canDeploy ? "rate-pos" : "cost-lack"
+                }
+              >
+                {selectedWarNode.canDeploy ? "已连通 (可派兵)" : "未连通"}
+              </strong>
+            </div>
+            <div className="intel-row">
+              <span>今日个人行军额度</span>
+              <strong className="mono-num">
+                {war.dailyBudgetUsed} / {war.dailyBudgetCap}
+              </strong>
+            </div>
+            <p className="intel-note">{selectedWarNode.intelNote}</p>
+          </div>
+
+          <form
+            className="deploy-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void runAction(() =>
+                api.deployWarTroops({
+                  nodeId: selectedWarNode.nodeId,
+                  infantryDelta: deployInf,
+                  archerDelta: deployArc,
+                  cavalryDelta: deployCav,
+                }),
+              );
+            }}
+          >
+            <h4>代表公会派兵出征</h4>
+            <div className="form-row-3">
+              <label>
+                <span>步兵箱</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  className="mono-num"
+                  value={deployInf}
+                  onChange={(e) => setDeployInf(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span>弓兵箱</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  className="mono-num"
+                  value={deployArc}
+                  onChange={(e) => setDeployArc(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span>骑兵箱</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  className="mono-num"
+                  value={deployCav}
+                  onChange={(e) => setDeployCav(Number(e.target.value))}
+                />
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              className="btn-primary btn-block"
+              data-pop={`⚔ 出兵 +${deployInf + deployArc + deployCav} 团`}
+              disabled={
+                !joinedGuild || !selectedWarNode.canDeploy || !hasEnoughKits
+              }
+            >
+              {!joinedGuild
+                ? "请先在上方公会大厅加入公会"
+                : !selectedWarNode.canDeploy
+                  ? "补给线未连通"
+                  : !hasEnoughKits
+                    ? "军备箱库存不足（工坊制造或市场采购）"
+                    : `代表 [${joinedGuild.tag}] 出兵部署`}
+            </button>
+          </form>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Scene V (Lower Panel): Season Chest Console & Procedural UV-Etched Collectibles Gallery
+ */
+export function SeasonRelicVaultPanel({ state, runAction }: SceneProps) {
+  const { player, resources } = state;
+  const chestCount = Math.floor(
+    (resources.find((r) => r.key === "season_chest")?.amountMilli ?? 0) / 1000,
+  );
+
+  return (
+    <section className="lower-workspace" aria-label="墨械典藏宝箱与程序化藏品">
+      <div className="tab-body">
+        <div className="chest-console">
+          <div className="chest-console-info">
+            <h3>
+              <Box size={ICON.sm} />
+              <span>
+                {state.currentSeason?.title ?? "S1 · 黑曜苏醒"} ·
+                墨械唯一编号蚀刻秘宝
+              </span>
+            </h3>
+            <p>
+              消耗 100 战争活动积分可兑换 1 个赛季宝箱。开启后铸造具有全服唯一递增序列号与随机 UV 采样坐标的纸墨蚀刻藏品（跨赛季永久保留）。
+            </p>
+          </div>
+          <div className="chest-console-actions">
+            <button
+              type="button"
+              className="btn-outline mono-num"
+              data-pop="+1 赛季宝箱"
+              disabled={player.activityPoints < 100}
+              onClick={() =>
+                void runAction(() => api.redeemSeasonChest({ count: 1 }))
+              }
+            >
+              兑换宝箱 (-100 积分)
+            </button>
+            <button
+              type="button"
+              className="btn-primary mono-num"
+              data-pop="✦ 开启秘宝"
+              disabled={chestCount < 1}
+              onClick={() =>
+                void runAction(() =>
+                  api.openSeasonChest({ clientSeedHint: Date.now() }),
+                )
+              }
+            >
+              <Sparkles size={ICON.sm} />
+              <span>开箱 ({chestCount})</span>
+            </button>
+          </div>
+        </div>
+
+        {state.collectibles.length === 0 ? (
+          <div className="empty-stage-hint">
+            尚未铸造赛季蚀刻藏品。参与公会捐献或每晚 20:00 战区会战获取活动积分即可兑换开箱！
+          </div>
+        ) : (
+          <div className="collectibles-grid">
+            {state.collectibles.map((item) => (
+              <article key={item.itemId} className="collectible-card">
+                <ProceduralRelicSVG item={item} />
+                <div className="collectible-meta">
+                  <div className="collectible-title-row">
+                    <strong>{item.name}</strong>
+                    <span
+                      className={`rarity-badge rarity-${item.rarityTier.toLowerCase()}`}
+                    >
+                      {item.rarityTier}
+                    </span>
+                  </div>
+                  <div className="special-tag-row">{item.specialTag}</div>
+                  <dl className="collectible-kv mono-num">
+                    <div>
+                      <dt>编号</dt>
+                      <dd>#{item.serialNumber}</dd>
+                    </div>
+                    <div>
+                      <dt>纹理</dt>
+                      <dd>
+                        {item.textureName} · {item.paletteName}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>种子</dt>
+                      <dd>{item.patternSeed}</dd>
+                    </div>
+                  </dl>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Settings, Season Notices, Monetary Ledger Audit & Chronicle Modal (收敛到设置中的纪事与赛季动向)
+ */
+export function SettingsChronicleModal({
+  state,
+  theme,
+  onToggleTheme,
+  onLogout,
+  onClose,
+}: {
+  state: DashboardStateResp;
+  theme: ThemeMode;
+  onToggleTheme: () => void;
+  onLogout: () => void;
+  onClose: () => void;
+}) {
+  const { player, macroLedger, currentSeason } = state;
+
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="设置与聚落纪事">
+      <div className="modal-sheet">
+        <div className="modal-header">
+          <div>
+            <h2>设置 · 赛季动向与聚落编年纪事</h2>
+            <p>
+              领主账号：{player.handle}（{player.professionName}） · 当前赛季：{currentSeason?.title ?? "S1 · 黑曜苏醒"}
+            </p>
+          </div>
+          <div className="toolbar-actions">
+            <button
+              type="button"
+              className="btn-outline"
+              data-pop={theme === "light" ? "曜石夜间" : "纸墨日间"}
+              onClick={onToggleTheme}
+            >
+              {theme === "light" ? (
+                <Moon size={ICON.xs} />
+              ) : (
+                <Sun size={ICON.xs} />
+              )}
+              <span>{theme === "light" ? "切换曜石夜间" : "切换纸墨日间"}</span>
+            </button>
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={onLogout}
+            >
+              <LogOut size={ICON.xs} />
+              <span>退出登录</span>
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={onClose}
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+
         <div className="tab-body split-2col">
+          {/* Left Column: Season Notices, Cross-Season Rules & Monetary Ledger Audit */}
           <div className="subpanel">
             <div className="subpanel-head">
-              <h3>赛季动向</h3>
+              <h3>
+                <Scale size={ICON.sm} />
+                <span>赛季动向 · 跨季规则与宏观账本</span>
+              </h3>
             </div>
+
             <div className="notice-stack">
               {state.seasonNotices.map((sn) => (
                 <article key={sn.seasonId} className="season-notice-card">
@@ -822,12 +1131,60 @@ export function MacroEmpireWorkspace({
                   </ul>
                 </article>
               ))}
+
+              {currentSeason && (
+                <article className="season-notice-card">
+                  <div className="bp-top">
+                    <strong>跨赛季继承与重置规则</strong>
+                    <span className="tag-badge tag-success">永久契约</span>
+                  </div>
+                  <p>{currentSeason.subtitle}</p>
+                  <ul>
+                    {currentSeason.retentionRules.map((r) => (
+                      <li key={r}>✓ 永久保留：{r}</li>
+                    ))}
+                    {currentSeason.resetRules.map((r) => (
+                      <li key={r}>↻ 赛季重置：{r}</li>
+                    ))}
+                  </ul>
+                </article>
+              )}
+            </div>
+
+            <div className="ledger-audit-box mono-num">
+              <div className="ledger-row">
+                <span>央行总发行 (M_issued)</span>
+                <strong>{formatGold(macroLedger.totalIssuedBasis)} G</strong>
+              </div>
+              <div className="ledger-row">
+                <span>玩家流通 + 挂单托管</span>
+                <span>
+                  {formatGold(
+                    macroLedger.playerHeldBasis + macroLedger.escrowFrozenBasis,
+                  )}{" "}
+                  G
+                </span>
+              </div>
+              <div className="ledger-row">
+                <span>NPC 做市商 + 国库储备</span>
+                <span>
+                  {formatGold(
+                    macroLedger.npcHeldBasis + macroLedger.treasuryHeldBasis,
+                  )}{" "}
+                  G
+                </span>
+              </div>
+              <div className="ledger-row">
+                <span>累计通缩销毁</span>
+                <span>{formatGold(macroLedger.permanentlyBurnedBasis)} G</span>
+              </div>
             </div>
           </div>
 
+          {/* Right Column: Settlement & Empire Chronicle */}
           <div className="subpanel">
             <div className="subpanel-head">
-              <h3>纪事</h3>
+              <h3>聚落编年纪事 ({state.eventLogs.length})</h3>
             </div>
             <ul className="event-log-list">
               {state.eventLogs.map((ev) => (
@@ -840,7 +1197,7 @@ export function MacroEmpireWorkspace({
             </ul>
           </div>
         </div>
-      )}
-    </section>
+      </div>
+    </div>
   );
 }

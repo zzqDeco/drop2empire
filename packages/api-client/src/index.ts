@@ -19,6 +19,7 @@ import {
   type SaveAllocationPresetReq,
   type SwitchAccountReq,
   type SwitchGuildReq,
+  type GuildActionReq,
   type ToggleEdictReq,
   type DispatchExpeditionReq,
   type TradeCaravanReq,
@@ -290,6 +291,12 @@ export class EmpireClient {
   switchGuild = (req: SwitchGuildReq) =>
     this.#request<DashboardStateResp>(IDL_ROUTES.SwitchGuild.clientPath, {
       method: IDL_ROUTES.SwitchGuild.method,
+      body: JSON.stringify(req),
+    });
+
+  guildAction = (req: GuildActionReq) =>
+    this.#request<DashboardStateResp>(IDL_ROUTES.GuildAction.clientPath, {
+      method: IDL_ROUTES.GuildAction.method,
       body: JSON.stringify(req),
     });
 

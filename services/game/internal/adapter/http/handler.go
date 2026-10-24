@@ -503,26 +503,79 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		})
 	}
 
+	domain.EnsureGuildState(w)
+	nodeNameMap := make(map[string]string, len(w.WarNodes))
+	for _, wn := range w.WarNodes {
+		nodeNameMap[wn.NodeID] = wn.Name
+	}
+
+	guildsDTO := make([]*empire.GuildDTO, 0, len(w.Guilds))
+	for _, g := range w.Guilds {
+		fName := "黑曜商会 (OBSIDIAN)"
+		if g.Faction == domain.GuildArgent {
+			fName = "白银同盟 (ARGENT)"
+		}
+		membersDTO := make([]*empire.GuildMemberDTO, 0, len(g.Members))
+		for _, m := range g.Members {
+			membersDTO = append(membersDTO, &empire.GuildMemberDTO{
+				Handle:       m.Handle,
+				Role:         m.Role,
+				Contribution: m.Contribution,
+				WarDeployed:  m.WarDeployed,
+			})
+		}
+		rallyName := nodeNameMap[g.RallyNodeID]
+		if rallyName == "" {
+			rallyName = "中央宝藏城 ★"
+		}
+		guildsDTO = append(guildsDTO, &empire.GuildDTO{
+			GuildId:           g.GuildID,
+			Name:              g.Name,
+			Tag:               g.Tag,
+			Faction:           g.Faction,
+			FactionName:       fName,
+			LeaderHandle:      g.LeaderHandle,
+			Level:             g.Level,
+			Xp:                g.XP,
+			NextLevelXp:       domain.GuildNextLevelXP(g.Level),
+			MemberCount:       int32(len(g.Members)),
+			TreasuryGoldBasis: g.TreasuryGoldBasis,
+			RallyNodeId:       g.RallyNodeID,
+			RallyNodeName:     rallyName,
+			Announcement:      g.Announcement,
+			BonusSummary:      domain.GuildBonusSummary(g.Level, g.Faction),
+			Members:           membersDTO,
+		})
+	}
+
 	guildName := "黑曜商会 (OBSIDIAN)"
 	if p.GuildCode == domain.GuildArgent {
 		guildName = "白银同盟 (ARGENT)"
 	}
+	if p.JoinedGuildID != "" {
+		if jg := domain.FindGuild(w, p.JoinedGuildID); jg != nil {
+			guildName = "[" + jg.Tag + "] " + jg.Name + " · " + jg.Faction
+		}
+	}
 
 	warDTO := &empire.WarStateDTO{
-		SeasonCode:          w.SeasonCode,
-		SeasonName:          w.SeasonName,
-		CurrentDay:          w.WarDay,
-		NextSettlementLabel: "每日 20:00 (UTC+8) 锁定快照结算",
-		PlayerGuild:         p.GuildCode,
-		PlayerGuildName:     guildName,
-		PlayerRole:          "战略执政官 & 军需官",
-		DailyBudgetUsed:     p.DailyWarBudgetUsed,
-		DailyBudgetCap:      domain.DailyWarBudgetCap,
-		ObsidianTotalScore:  w.ObsidianScore,
-		ArgentTotalScore:    w.ArgentScore,
-		Nodes:               warNodesDTO,
-		Edges:               warEdgesDTO,
-		SettlementHistory:   warHistDTO,
+		SeasonCode:              w.SeasonCode,
+		SeasonName:              w.SeasonName,
+		CurrentDay:              w.WarDay,
+		NextSettlementLabel:     "每日 20:00 (UTC+8) 锁定快照结算",
+		PlayerGuild:             p.GuildCode,
+		PlayerGuildName:         guildName,
+		PlayerRole:              "公会执政官 & 军需官",
+		DailyBudgetUsed:         p.DailyWarBudgetUsed,
+		DailyBudgetCap:          domain.DailyWarBudgetCap,
+		ObsidianTotalScore:      w.ObsidianScore,
+		ArgentTotalScore:        w.ArgentScore,
+		Nodes:                   warNodesDTO,
+		Edges:                   warEdgesDTO,
+		SettlementHistory:       warHistDTO,
+		JoinedGuildId:           p.JoinedGuildID,
+		PlayerGuildContribution: p.GuildContribution,
+		Guilds:                  guildsDTO,
 	}
 
 	collectiblesDTO := make([]*empire.CollectibleItemDTO, 0, len(w.Collectibles))
@@ -1215,6 +1268,30 @@ func (s *Server) CancelMarketOrder(ctx context.Context, req *empire.CancelMarket
 
 func (s *Server) SwitchGuild(ctx context.Context, req *empire.SwitchGuildReq) (*empire.DashboardStateResp, error) {
 	w, err := s.svc.SwitchGuild(ctx, req.GuildCode)
+	if err != nil {
+		return nil, err
+	}
+	return mapDashboardResp(w), nil
+}
+
+func (s *Server) GuildAction(ctx context.Context, req *empire.GuildActionReq) (*empire.DashboardStateResp, error) {
+	var guildID, name, tag, faction, rallyNodeID string
+	if req.GuildId != nil {
+		guildID = *req.GuildId
+	}
+	if req.Name != nil {
+		name = *req.Name
+	}
+	if req.Tag != nil {
+		tag = *req.Tag
+	}
+	if req.Faction != nil {
+		faction = *req.Faction
+	}
+	if req.RallyNodeId != nil {
+		rallyNodeID = *req.RallyNodeId
+	}
+	w, err := s.svc.GuildAction(ctx, req.Action, guildID, name, tag, faction, rallyNodeID)
 	if err != nil {
 		return nil, err
 	}
