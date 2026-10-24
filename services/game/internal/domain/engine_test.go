@@ -294,15 +294,22 @@ func TestColonyDepthSystemsConversionEdictsExpeditionsAndCaravan(t *testing.T) {
 		t.Fatalf("expected equipped weapon to be destroyed on MIA, got %s", p.RaidLoadout.WeaponKey)
 	}
 
-	// Verify anti-macro GatherWater rate limit & batch cap
+	// Verify anti-macro GatherWater leaky-bucket rate limit & batch cap
 	if err := GatherWater(p, 50, now.Add(1*time.Second)); err == nil {
 		t.Fatal("expected GatherWater with clicks > 10 to be rejected")
 	}
+	// Two single clicks 10ms apart (normal TCP jitter) are absorbed by the burst window
 	if err := GatherWater(p, 1, now.Add(2*time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if err := GatherWater(p, 1, now.Add(2*time.Second+10*time.Millisecond)); err == nil {
-		t.Fatal("expected GatherWater within 10ms (< 45ms human interval) to be rate-limited")
+	if err := GatherWater(p, 1, now.Add(2*time.Second+10*time.Millisecond)); err != nil {
+		t.Fatalf("expected 2nd single click within TCP jitter window to succeed, got %v", err)
+	}
+	// Sustained auto-clicker macro spam (30 clicks within 30ms > 22 clicks/sec ceiling) is rejected
+	_ = GatherWater(p, 10, now.Add(2*time.Second+20*time.Millisecond))
+	_ = GatherWater(p, 10, now.Add(2*time.Second+25*time.Millisecond))
+	if err := GatherWater(p, 10, now.Add(2*time.Second+30*time.Millisecond)); err == nil {
+		t.Fatal("expected sustained macro click spam (>22 clicks/sec) to be rate-limited")
 	}
 }
 

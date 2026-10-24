@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
   ApiError,
@@ -91,11 +91,11 @@ export function App() {
     applyTheme(theme);
   }, [theme]);
 
-  const applyServerState = (next: DashboardStateResp) => {
+  const applyServerState = useCallback((next: DashboardStateResp) => {
     setState(next);
     setLastSyncAtMs(Date.now());
     setNowTickMs(Date.now());
-  };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -123,13 +123,14 @@ export function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [applyServerState]);
 
+  const hasState = state !== null;
   const hasActivePopulation = (state?.player.populationTotal ?? 0) > 0;
   const activeHandle = state?.player.handle ?? "";
 
   useEffect(() => {
-    if (!state || !hasActivePopulation) return;
+    if (!hasState || !hasActivePopulation) return;
     const timer = window.setInterval(() => {
       api
         .getDashboard()
@@ -139,18 +140,18 @@ export function App() {
         .catch(() => {});
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [state, hasActivePopulation, activeHandle]);
+  }, [hasState, hasActivePopulation, activeHandle, applyServerState]);
 
   useEffect(() => {
-    if (!state || !hasActivePopulation) return;
+    if (!hasState || !hasActivePopulation) return;
     const id = window.setInterval(() => {
       setNowTickMs(Date.now());
     }, 150);
     return () => window.clearInterval(id);
-  }, [state, hasActivePopulation]);
+  }, [hasState, hasActivePopulation]);
 
   useEffect(() => {
-    if (!state || !hasActivePopulation || isAdminRoute) return;
+    if (!hasState || !hasActivePopulation || isAdminRoute) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -161,34 +162,37 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [state, hasActivePopulation, isAdminRoute]);
+  }, [hasState, hasActivePopulation, isAdminRoute]);
 
-  const runAction = async (
-    fn: () => Promise<DashboardStateResp>,
-    successMsg?: string,
-  ) => {
-    setErrorBanner(null);
-    setBusy(true);
-    try {
-      const next = await fn();
-      applyServerState(next);
-      if (successMsg) {
-        setNoticeBanner(successMsg);
+  const runAction = useCallback(
+    async (
+      fn: () => Promise<DashboardStateResp>,
+      successMsg?: string,
+    ) => {
+      setErrorBanner(null);
+      setBusy(true);
+      try {
+        const next = await fn();
+        applyServerState(next);
+        if (successMsg) {
+          setNoticeBanner(successMsg);
+        }
+      } catch (err: unknown) {
+        if (err instanceof ApiError && err.status === 401) {
+          api.setSessionToken(null);
+          setState(null);
+          setErrorBanner(err.message);
+        } else if (err instanceof Error) {
+          setErrorBanner(err.message);
+        } else {
+          setErrorBanner("操作未完成");
+        }
+      } finally {
+        setBusy(false);
       }
-    } catch (err: unknown) {
-      if (err instanceof ApiError && err.status === 401) {
-        api.setSessionToken(null);
-        setState(null);
-        setErrorBanner(err.message);
-      } else if (err instanceof Error) {
-        setErrorBanner(err.message);
-      } else {
-        setErrorBanner("操作未完成");
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+    [applyServerState],
+  );
 
   const handleLogout = async () => {
     setBusy(true);

@@ -385,7 +385,7 @@ func AssignedPopulation(p *PlayerState) int32 {
 	return sum
 }
 
-// GatherWater processes manual water gathering with server-authoritative batch and interval rate-limiting.
+// GatherWater processes manual water gathering with server-authoritative batch cap and leaky-bucket anti-macro rate-limiting.
 func GatherWater(p *PlayerState, clicks int32, now time.Time) error {
 	if clicks <= 0 {
 		clicks = 1
@@ -393,13 +393,19 @@ func GatherWater(p *PlayerState, clicks int32, now time.Time) error {
 	if clicks > SettlementBalance.MaxClicksPerRequest {
 		return ErrPrecondition("gather_rate_limited", fmt.Sprintf("单次手动打水请求不得超过 %d 次", SettlementBalance.MaxClicksPerRequest))
 	}
-	if !p.LastGatherWaterAt.IsZero() && now.After(p.LastGatherWaterAt) {
-		gapMs := now.Sub(p.LastGatherWaterAt).Milliseconds()
-		if gapMs > 0 && gapMs < SettlementBalance.MinGatherIntervalMs {
-			return ErrPrecondition("gather_rate_limited", "打水点击频率超出人类极限，请按正常节奏汲水")
-		}
+	// Leaky-bucket rate limiter with a 500ms burst window to absorb TCP jitter while blocking sustained >22 clicks/sec macros
+	const burstWindow = 500 * time.Millisecond
+	stepCost := time.Duration(clicks) * time.Duration(SettlementBalance.MinGatherIntervalMs) * time.Millisecond
+	floorTime := now.Add(-burstWindow)
+	baseTime := p.LastGatherWaterAt
+	if baseTime.IsZero() || baseTime.Before(floorTime) {
+		baseTime = floorTime
 	}
-	p.LastGatherWaterAt = now
+	nextTime := baseTime.Add(stepCost)
+	if nextTime.After(now.Add(burstWindow)) {
+		return ErrPrecondition("gather_rate_limited", "打水点击频率超出人类极限，请按正常节奏汲水")
+	}
+	p.LastGatherWaterAt = nextTime
 
 	perClickMilli := SettlementBalance.BaseGatherClickMilli
 	if p.UnlockedBlueprints[BPFirstResident] {

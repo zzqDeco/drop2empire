@@ -86,31 +86,29 @@ export function WastelandRaidPanel({
 
   const settlingRef = useRef(false);
 
+  const activeSeed = activeSession?.seed ?? 0;
+  const serverTimeRemMs = activeSession?.timeRemainingMs ?? 0;
+  const serverFacing = activeSession?.facing ?? "right";
+
   // Sync local countdown & facing from authoritative server session
   useEffect(() => {
-    if (!inRaid || !activeSession) {
+    if (!inRaid || activeSeed <= 0) {
       setChanneling(null);
       setShowLootModal(false);
       settlingRef.current = false;
       return;
     }
-    setTimeLeftMs(activeSession.timeRemainingMs);
+    setTimeLeftMs(serverTimeRemMs);
     if (
-      activeSession.facing === "up" ||
-      activeSession.facing === "down" ||
-      activeSession.facing === "left" ||
-      activeSession.facing === "right"
+      serverFacing === "up" ||
+      serverFacing === "down" ||
+      serverFacing === "left" ||
+      serverFacing === "right"
     ) {
-      setFacing(activeSession.facing);
+      setFacing(serverFacing);
     }
     settlingRef.current = false;
-  }, [
-    inRaid,
-    activeSession?.seed,
-    activeSession?.timeRemainingMs,
-    activeSession?.facing,
-    activeSession,
-  ]);
+  }, [inRaid, activeSeed, serverTimeRemMs, serverFacing]);
 
   const triggerFinishRaid = useCallback(
     (status: "EXTRACTED" | "MIA") => {
@@ -132,7 +130,7 @@ export function WastelandRaidPanel({
 
   // Real-time countdown & channeling ticker (100ms)
   useEffect(() => {
-    if (!inRaid || !activeSession) return;
+    if (!inRaid || activeSeed <= 0) return;
     const id = window.setInterval(() => {
       const now = Date.now();
       setTimeLeftMs((prev) => {
@@ -160,7 +158,7 @@ export function WastelandRaidPanel({
       });
     }, 100);
     return () => window.clearInterval(id);
-  }, [inRaid, activeSession, triggerFinishRaid]);
+  }, [inRaid, activeSeed, triggerFinishRaid]);
 
   // Complete channeling when progressPct reaches 100 -> Request Server Chest Roll or Extraction!
   useEffect(() => {
@@ -238,29 +236,42 @@ export function WastelandRaidPanel({
       setChanneling(null);
 
       const isBossAlive = dest.kind === "enemy_boss" && !dest.looted;
-      const isMerchant = dest.kind === "merchant";
-      const isUnsearchedChest =
-        (dest.kind === "chest_wood" ||
-          dest.kind === "chest_iron" ||
-          dest.kind === "chest_coffin" ||
-          dest.kind === "chest_abyss") &&
-        !dest.looted;
 
       void runAction(async () => {
         const resp = await api.raidAction({ action: "move", dx, dy });
-        if (isBossAlive || isMerchant) {
+        const nextSess = resp.raidLoadout.activeSession;
+        if (!nextSess) {
+          setChanneling(null);
+          setShowLootModal(false);
+          return resp;
+        }
+        const nextZone = nextSess.zones[nextSess.currentZoneId];
+        const landed =
+          nextZone?.tiles[nextSess.playerY * nextZone.width + nextSess.playerX];
+        if (!landed) return resp;
+
+        if (
+          (isBossAlive && nextSess.activeChestDrops.length > 0) ||
+          landed.kind === "merchant"
+        ) {
           setShowLootModal(true);
-        } else if (isUnsearchedChest) {
+        } else if (
+          (landed.kind === "chest_wood" ||
+            landed.kind === "chest_iron" ||
+            landed.kind === "chest_coffin" ||
+            landed.kind === "chest_abyss") &&
+          !landed.looted
+        ) {
           const dur = computeChestChannelMs(
-            dest.kind,
-            scavRemMs > 0,
-            dest.channelMs,
+            landed.kind,
+            nextSess.scavRemainingMs > 0,
+            landed.channelMs,
           );
           setChanneling({
-            label: CHEST_CHANNEL_LABELS[dest.kind] ?? "正在搜索容器",
-            kind: dest.kind as TileKind,
-            x: nx,
-            y: ny,
+            label: CHEST_CHANNEL_LABELS[landed.kind] ?? "正在搜索容器",
+            kind: landed.kind as TileKind,
+            x: nextSess.playerX,
+            y: nextSess.playerY,
             startedAt: Date.now(),
             durationMs: dur,
             progressPct: 0,
@@ -269,15 +280,7 @@ export function WastelandRaidPanel({
         return resp;
       });
     },
-    [
-      inRaid,
-      currentZone,
-      lastMoveAtMs,
-      effectiveMoveCooldownMs,
-      pos,
-      scavRemMs,
-      runAction,
-    ],
+    [inRaid, currentZone, lastMoveAtMs, effectiveMoveCooldownMs, pos, runAction],
   );
 
   // Keyboard WASD / Arrow navigation + [B]/[Tab] toggle for hidden backpack
