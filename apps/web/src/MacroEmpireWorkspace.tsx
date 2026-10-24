@@ -1331,7 +1331,7 @@ export function WorldMapCompassModal({
       key: "settlement",
       title: "领主主城 · 聚落与个人档案",
       subtitle:
-        "完整个人视角：领主披挂形象衣橱、汲水与资源总账、居民调配与文明蓝图研发。",
+        "完整个人视角：领主披挂形象衣橱、汲水与资源总账、居民调配、技术研究与设施建设。",
       coord: "N 00° · E 00° (中央主城)",
       unlocked: true,
       lockHint: "",
@@ -1344,7 +1344,7 @@ export function WorldMapCompassModal({
         "三幕式探索撤离：行前整备与保险箱 → 敕令增益卡抽取 → 全屏裂隙搜打撤与局内游商营帐。",
       coord: "N 18° · W 42° (西北裂隙)",
       unlocked: showScoutScene,
-      lockHint: "需在主城达到 5 人口并解锁【荒原斥候营】蓝图",
+      lockHint: "需研究烧炭技术并建造【荒原斥候营】",
       badge: showScoutScene ? "可出征" : "未解锁",
     },
     {
@@ -1486,13 +1486,13 @@ export function WorldMapCompassModal({
               strokeDasharray="5 4"
               opacity="0.8"
             >
-              <line x1="380" y1="112" x2="145" y2="56" />
-              <line x1="380" y1="112" x2="595" y2="56" />
-              <line x1="380" y1="112" x2="165" y2="172" />
-              <line x1="380" y1="112" x2="585" y2="170" />
+              {showScoutScene && <line x1="380" y1="112" x2="145" y2="56" />}
+              {showAdvancedWorld && <line x1="380" y1="112" x2="595" y2="56" />}
+              {showLordScene && <line x1="380" y1="112" x2="165" y2="172" />}
+              {showAdvancedWorld && <line x1="380" y1="112" x2="585" y2="170" />}
             </g>
             {/* Node 1: Scout Camp (NW) */}
-            <g
+            {showScoutScene && <g
               transform="translate(145, 56)"
               style={{ cursor: showScoutScene ? "pointer" : "not-allowed" }}
               onClick={() => {
@@ -1521,9 +1521,9 @@ export function WorldMapCompassModal({
               >
                 荒原斥候营
               </text>
-            </g>
+            </g>}
             {/* Node 2: Guild & War Zone (NE) */}
-            <g
+            {showAdvancedWorld && <g
               transform="translate(595, 56)"
               style={{ cursor: showAdvancedWorld ? "pointer" : "not-allowed" }}
               onClick={() => {
@@ -1552,7 +1552,7 @@ export function WorldMapCompassModal({
               >
                 公会与战区
               </text>
-            </g>
+            </g>}
             {/* Node 3: Central Settlement & Personal Profile (Center) */}
             <g
               transform="translate(380, 112)"
@@ -1590,7 +1590,7 @@ export function WorldMapCompassModal({
               </text>
             </g>
             {/* Node 4: Relic Vault (SW) */}
-            <g
+            {showLordScene && <g
               transform="translate(165, 172)"
               style={{ cursor: showLordScene ? "pointer" : "not-allowed" }}
               onClick={() => {
@@ -1619,9 +1619,9 @@ export function WorldMapCompassModal({
               >
                 墨械秘宝馆
               </text>
-            </g>
+            </g>}
             {/* Node 5: Workshop & Spot Market (SE) */}
-            <g
+            {showAdvancedWorld && <g
               transform="translate(585, 170)"
               style={{ cursor: showAdvancedWorld ? "pointer" : "not-allowed" }}
               onClick={() => {
@@ -1650,12 +1650,12 @@ export function WorldMapCompassModal({
               >
                 工坊与交易所
               </text>
-            </g>
+            </g>}
           </svg>
         </div>
 
         <div className="world-map-zone-grid">
-          {zones.map((z) => {
+          {zones.filter((z) => z.unlocked).map((z) => {
             const isCurrent = activeScene === z.key;
             const isCitadel = z.key === "settlement";
             return (

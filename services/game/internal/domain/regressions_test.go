@@ -208,6 +208,7 @@ func TestProductionConservesInputsAndIsIndependentOfRequestPartitions(t *testing
 		p.PopulationTotal = 1
 		p.Workers[JobCharcoal] = 1
 		p.UnlockedBlueprints[BPCharcoalKiln] = true
+		p.BuildingCounts[BPCharcoalKiln] = 1
 		p.ResourcesMilli[ResWood] = ResourceScale
 		return p
 	}
@@ -340,6 +341,7 @@ func TestMarketFillSettlesRestingBuyerBeforeCreditingInputResources(t *testing.T
 	buyer.PopulationTotal = 1
 	buyer.Workers[JobCharcoal] = 1
 	buyer.UnlockedBlueprints[BPCharcoalKiln] = true
+	buyer.BuildingCounts[BPCharcoalKiln] = 1
 	buyer.ResourcesMilli[ResWater] = 100_000
 	buyer.ResourcesMilli[ResWood] = 0
 	buyer.GoldBasis = 100 * GoldScale

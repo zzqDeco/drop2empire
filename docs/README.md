@@ -12,8 +12,8 @@
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **[`design/01-overall/`](design/01-overall/)** | **整体设计**<br>*(Overall Framework)* | 全局顶层 | **跨赛季永恒不变** | 核心设计支柱、零剧透渐进披露铁律、九章史诗叙事脉络、玩家三阶段生命周期 (`Phase 1/2/3`)、四大子系统单向/双向耦合总图 | 具体岗位的每秒产出数值、单件装备属性、单赛季限定外观名录 |
 | **[`design/02-macro/`](design/02-macro/)** | **宏观设计**<br>*(Macro Economy & War)* | 全服多玩家 | **跨赛季恒定法则** | 宏观货币存量恒等式 $M(t)$、货币水龙头/水池矩阵、CLOB 限价订单簿撮合算法、四大终身职业宏观分工互锁、双商会 7 日图拓扑领土战与 20:00 权威结算 | 单人打水连击反馈、2D 肉鸽网格单步移动毫秒数、单赛季宝箱掉率 |
-| **[`design/03-micro/`](design/03-micro/)** | **微观设计**<br>*(Micro Systems & Mechanics)* | 单人 / 单局 | **核心机制恒定** | 单人聚落八大物资、饮水维持费与断水惩罚、上下游转化公式、仓储上限与 10:1 虹吸冲矿、17 级基建蓝图、政令与游商、**荒原 2D 多区块传送门搜打撤核心机制（实时倒计时、移速频率冷却、五档读条、安全箱保底、一次性蓝图研习/销毁、54 张行前增益卡）**、领主常驻动态形象渲染架构 | 全服货币发行账本、当季绝版外观的具体掉率与指导价 |
-| **[`design/04-seasons/`](design/04-seasons/)** | **赛季设计**<br>*(Seasonal Content)* | 单赛季周期 | **每赛季独立更替** | 跨赛季「重置项 vs 永久保留项」严格边界、本赛季蓝图与安全保险箱生命周期、**当季（如 S1「黑曜苏醒」）专属的 12 款限定可交易动态外观表 (`cos_*`)、16 项局外整备军械库与 10 种一次性蓝图 (`bp_*`) 掉率及指导价** | 跨赛季通用的底层撮合引擎或 4 层 Clean DDD 代码规范 |
+| **[`design/03-micro/`](design/03-micro/)** | **微观设计**<br>*(Micro Systems & Mechanics)* | 单人 / 单局 | **核心机制恒定** | 单人聚落八大物资、饮水维持费与断水惩罚、上下游转化公式、仓储上限与 10:1 虹吸冲矿、技术研究、重复建设与并行工程、政令与游商、**荒原 2D 多区块传送门搜打撤核心机制（实时倒计时、移速频率冷却、五档读条、安全箱保底、一次性蓝图研习/销毁、54 张行前增益卡）**、领主常驻动态形象渲染架构 | 全服货币发行账本、当季绝版外观的具体掉率与指导价 |
+| **[`design/04-seasons/`](design/04-seasons/)** | **赛季设计**<br>*(Seasonal Content)* | 单赛季周期 | **每赛季独立更替** | 跨赛季「重置项 vs 永久保留项」严格边界、本赛季蓝图与安全保险箱生命周期、**当季（如 S1「黑曜苏醒」）专属的 12 款限定可交易动态外观表 (`cos_*`)、19 项局外整备军械库与 10 种一次性蓝图 (`bp_*`) 掉率及指导价** | 跨赛季通用的底层撮合引擎或 4 层 Clean DDD 代码规范 |
 
 ---
 
@@ -34,10 +34,10 @@
 - [`design/02-macro/chamber-war-macro.md`](design/02-macro/chamber-war-macro.md) — 黑曜 vs 白银双商会 8 节点图拓扑领土战争、补给线校验、三兵种克制矩阵与每日 20:00 权威结算
 
 ### D. 03 · 微观设计层 (`design/03-micro/`)
-- [`design/03-micro/settlement-production-and-edicts.md`](design/03-micro/settlement-production-and-edicts.md) — 聚落八大物资、伴生副产物、饮水维持费、上下游转化岗位、仓储阶梯与 10:1 虹吸冲矿、17 级蓝图树、4 大政令与游商易物契约
+- [`design/03-micro/settlement-production-and-edicts.md`](design/03-micro/settlement-production-and-edicts.md) — 聚落八大物资、伴生副产物、饮水维持费、上下游转化岗位、仓储阶梯与 10:1 虹吸冲矿、技术与建设目录、旧存档迁移、4 大政令与游商易物契约
 - [`design/03-micro/wasteland-2d-extraction-roguelite.md`](design/03-micro/wasteland-2d-extraction-roguelite.md) — 荒原 2D 多区块传送门搜打撤肉鸽机制、实时沙暴倒计时、移速频率限制、五档宝箱读条、安全保险箱保底、一次性蓝图研习/销毁与 54 种行前增益卡轮抽池
 - [`design/03-micro/avatar-and-procedural-relics.md`](design/03-micro/avatar-and-procedural-relics.md) — 领主常驻动态卡通形象 (`LordAvatarSVG` 在 Profile 衣橱与 2D 地图实机棋子的双场景渲染) 与 CS 式唯一编号 UV 蚀刻藏品
 
 ### E. 04 · 赛季设计层 (`design/04-seasons/`)
 - [`design/04-seasons/season-framework.md`](design/04-seasons/season-framework.md) — 赛季更替通用框架：跨赛季重置项 vs 永久保留项边界、一次性蓝图与安全保险箱当季生命周期、绝版外观流通规则
-- [`design/04-seasons/s1-obsidian-awakening.md`](design/04-seasons/s1-obsidian-awakening.md) — **【S1 赛季：黑曜苏醒】专属策划案**：S1 主题、12 款 S1 限定可交易动态外观掉率与指导价表、16 项 S1 局外整备军械与 10 种一次性蓝图完整参数表
+- [`design/04-seasons/s1-obsidian-awakening.md`](design/04-seasons/s1-obsidian-awakening.md) — **【S1 赛季：黑曜苏醒】专属策划案**：S1 主题、12 款 S1 限定可交易动态外观掉率与指导价表、19 项 S1 局外整备军械与 10 种一次性蓝图完整参数表

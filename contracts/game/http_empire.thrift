@@ -19,6 +19,7 @@ struct ResourceLineDTO {
 }
 
 struct WorkerJobDTO {
+  11: required i32 capacity (api.body="capacity")
   1: required string jobKey (api.body="jobKey")
   2: required string name (api.body="name")
   3: required i32 assigned (api.body="assigned")
@@ -42,6 +43,7 @@ struct AllocationPresetDTO {
 }
 
 struct CostItemDTO {
+  6: required i64 capacityMilli (api.body="capacityMilli")
   1: required string resourceKey (api.body="resourceKey")
   2: required string resourceName (api.body="resourceName")
   3: required i64 requiredMilli (api.body="requiredMilli")
@@ -50,6 +52,8 @@ struct CostItemDTO {
 }
 
 struct BlueprintNodeDTO {
+  12: required string kind (api.body="kind")
+  13: required string blockedReason (api.body="blockedReason")
   1: required string code (api.body="code")
   2: required string name (api.body="name")
   3: required string stage (api.body="stage")
@@ -61,6 +65,44 @@ struct BlueprintNodeDTO {
   9: required bool canUnlock (api.body="canUnlock")
   10: required bool visible (api.body="visible")
   11: required i64 etaSeconds (api.body="etaSeconds")
+}
+
+struct TechnologyNodeDTO {
+  1: required string code (api.body="code")
+  2: required string name (api.body="name")
+  3: required string effectSummary (api.body="effectSummary")
+  4: required list<CostItemDTO> costs (api.body="costs")
+  5: required bool researched (api.body="researched")
+  6: required bool visible (api.body="visible")
+  7: required bool canResearch (api.body="canResearch")
+  8: required string blockedReason (api.body="blockedReason")
+}
+
+struct BuildingNodeDTO {
+  1: required string code (api.body="code")
+  2: required string name (api.body="name")
+  3: required string technologyName (api.body="technologyName")
+  4: required string effectSummary (api.body="effectSummary")
+  5: required list<CostItemDTO> costs (api.body="costs")
+  6: required i32 owned (api.body="owned")
+  7: required i32 limit (api.body="limit")
+  8: required bool visible (api.body="visible")
+  9: required bool researched (api.body="researched")
+  10: required bool canBuild (api.body="canBuild")
+  11: required string blockedReason (api.body="blockedReason")
+  12: required string jobKey (api.body="jobKey")
+  13: required i32 assigned (api.body="assigned")
+  14: required i32 totalSlots (api.body="totalSlots")
+}
+
+struct SettlementProgressDTO {
+  1: required i64 commandSeq (api.body="commandSeq")
+  2: required i32 housingCapacity (api.body="housingCapacity")
+  3: required list<TechnologyNodeDTO> technologies (api.body="technologies")
+  4: required list<BuildingNodeDTO> buildings (api.body="buildings")
+  5: required string guideCode (api.body="guideCode")
+  6: required string guideTitle (api.body="guideTitle")
+  7: required string guideText (api.body="guideText")
 }
 
 struct ColonyEdictDTO {
@@ -512,6 +554,7 @@ struct PlayerProfileDTO {
 }
 
 struct DashboardStateResp {
+  33: required SettlementProgressDTO settlement (api.body="settlement")
   32: required i64 revision (api.body="revision")
   1: required string serverTime (api.body="serverTime")
   2: required PlayerProfileDTO player (api.body="player")
@@ -601,6 +644,17 @@ struct SaveAllocationPresetReq {
 
 struct UnlockBlueprintReq {
   1: required string code (api.body="code")
+}
+
+struct ResearchTechnologyReq {
+  1: required string code (api.body="code")
+  2: required i64 commandSeq (api.body="commandSeq")
+}
+
+struct ConstructBuildingReq {
+  1: required string code (api.body="code")
+  2: required i32 quantity (api.body="quantity")
+  3: required i64 commandSeq (api.body="commandSeq")
 }
 
 struct ToggleEdictReq {
@@ -739,6 +793,8 @@ struct BenchmarkMilestoneDTO {
 }
 
 struct BenchmarkRunDTO {
+  7: required bool completed (api.body="completed")
+  8: required string failureReason (api.body="failureReason")
   1: required string strategyCode (api.body="strategyCode")
   2: required string strategyName (api.body="strategyName")
   3: required string description (api.body="description")
@@ -764,6 +820,8 @@ service EmpireService {
   DashboardStateResp RecruitResident(1: RecruitResidentReq req) (api.post="/api/v1/empire/production/recruit")
   DashboardStateResp AllocateWorkers(1: AllocateWorkersReq req) (api.post="/api/v1/empire/production/allocate")
   DashboardStateResp SaveAllocationPreset(1: SaveAllocationPresetReq req) (api.post="/api/v1/empire/production/presets")
+  DashboardStateResp ResearchTechnology(1: ResearchTechnologyReq req) (api.post="/api/v1/empire/settlement/research")
+  DashboardStateResp ConstructBuilding(1: ConstructBuildingReq req) (api.post="/api/v1/empire/settlement/build")
   DashboardStateResp UnlockBlueprint(1: UnlockBlueprintReq req) (api.post="/api/v1/empire/progression/unlock-blueprint")
   DashboardStateResp ChooseProfession(1: ChooseProfessionReq req) (api.post="/api/v1/empire/progression/choose-profession")
   DashboardStateResp CraftItem(1: CraftItemReq req) (api.post="/api/v1/empire/crafting/craft")

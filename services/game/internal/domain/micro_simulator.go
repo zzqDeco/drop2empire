@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"math"
+	"time"
 )
 
 type BenchmarkMilestone struct {
@@ -14,6 +15,8 @@ type BenchmarkMilestone struct {
 }
 
 type BenchmarkRun struct {
+	Completed      bool
+	FailureReason  string
 	StrategyCode   string
 	StrategyName   string
 	Description    string
@@ -34,229 +37,140 @@ func FormatDurationMMSS(sec float64) string {
 	return fmt.Sprintf("%02d:%02d.%d", mins, secs, tenths)
 }
 
-// RunPhase1Benchmarks runs the deterministic 0.5s-step simulation from 0 water & 10 initial manual clicks
-// through all Phase 1 milestones including the 3 Treasure Parts (GDD 4.4 & 21.1).
+// RunPhase1Benchmarks uses the same commands, integer production and capacity
+// checks as actual players. Only ten opening clicks are supplied. No inventory,
+// population or milestone is injected; decisions are attempted every ten seconds.
 func RunPhase1Benchmarks() []BenchmarkRun {
-	strategies := []struct {
-		code        string
-		name        string
-		desc        string
-		waterShare  [4]float64 // [before_axe, axe_to_quarry, quarry_to_workshop, workshop_to_treasure]
-		woodShare   [4]float64
-		stoneShare  [4]float64
-		useUpgrades bool
+	runs := []BenchmarkRun{}
+	for _, st := range []struct {
+		code, name string
+		population int32
+		explore    bool
 	}{
-		{
-			code:        "gdd_baseline",
-			name:        "GDD 4.4 原始基准策略（无中间工具增效）",
-			desc:        "仅开局手点 10 次水，严格按 100% → 70/30 → 60/25/15 → 50/30/20 固定比例分配，不购买引水轮/石锯/三部件增效。",
-			waterShare:  [4]float64{1.0, 0.70, 0.60, 0.50},
-			woodShare:   [4]float64{0.0, 0.30, 0.25, 0.30},
-			stoneShare:  [4]float64{0.0, 0.00, 0.15, 0.20},
-			useUpgrades: false,
-		},
-		{
-			code:        "balanced_parts",
-			name:        "V1 推荐均衡策略（含引水轮 + 石锯 + 宝藏三部件）",
-			desc:        "在第 9–30 分钟区间依次制造【导水阀芯】【承压木框】【铭文石板】，每 3–5 分钟获得一次阶段性产能正反馈。",
-			waterShare:  [4]float64{1.0, 0.70, 0.60, 0.48},
-			woodShare:   [4]float64{0.0, 0.30, 0.25, 0.30},
-			stoneShare:  [4]float64{0.0, 0.00, 0.15, 0.22},
-			useUpgrades: true,
-		},
-		{
-			code:        "sprint_dynamic",
-			name:        "激进动态调仓策略（按缺口实时切换重心）",
-			desc:        "人口达标前全力打水，解锁伐木/采石后根据当前目标蓝图的短板资源动态倾斜劳动力。",
-			waterShare:  [4]float64{1.0, 0.65, 0.55, 0.44},
-			woodShare:   [4]float64{0.0, 0.35, 0.28, 0.32},
-			stoneShare:  [4]float64{0.0, 0.00, 0.17, 0.24},
-			useUpgrades: true,
-		},
-	}
-
-	runs := make([]BenchmarkRun, 0, len(strategies))
-	for _, st := range strategies {
-		runs = append(runs, simulateSingleRun(st.code, st.name, st.desc, st.waterShare, st.woodShare, st.stoneShare, st.useUpgrades))
+		{"expansion", "扩张经营", 12, false},
+		{"small_colony", "低人口经营", 8, false},
+		{"early_exploration", "优先探索并承担一次失败", 12, true},
+	} {
+		run, _ := simulateSettlementOpening(st.code, st.name, st.population, st.explore)
+		runs = append(runs, run)
 	}
 	return runs
 }
 
-func simulateSingleRun(
-	code, name, desc string,
-	waterShare, woodShare, stoneShare [4]float64,
-	useUpgrades bool,
-) BenchmarkRun {
-	simSec := 10.0
-	water := int64(10) * ResourceScale
-	wood := int64(0)
-	stone := int64(0)
-	pop := int32(0)
-
-	unlocked := map[string]bool{}
-	var milestones []BenchmarkMilestone
-
-	recordMilestone := func(mCode, mName string) {
-		milestones = append(milestones, BenchmarkMilestone{
-			Code:           mCode,
-			Name:           mName,
-			ReachedSeconds: simSec,
-			FormattedTime:  FormatDurationMMSS(simSec),
-			Population:     pop,
-		})
+func simulateSettlementOpening(code, name string, population int32, explore bool) (BenchmarkRun, *WorldState) {
+	now := time.Date(2026, 10, 25, 0, 0, 0, 0, time.UTC)
+	w := NewDefaultWorld(now)
+	p := w.Players["pioneer"]
+	_ = GatherWater(p, 10, now)
+	run := BenchmarkRun{StrategyCode: code, StrategyName: name, Description: "真实领域指令；开局 10 次取水，此后仅自动生产；每 10 秒作一次经营决策。", Milestones: []BenchmarkMilestone{}}
+	type step struct {
+		code, name string
+		done       func() bool
+		action     func(time.Time) error
 	}
-
-	for step := 0; step < 7200; step++ {
-		targetPop := int32(10)
-		if unlocked[BPAxeBlueprint] {
-			targetPop = 25
+	steps := []step{}
+	recruit := func(target int32) {
+		steps = append(steps, step{fmt.Sprintf("population_%d", target), fmt.Sprintf("人口达到 %d", target), func() bool { return p.PopulationTotal >= target }, func(at time.Time) error { return RecruitResident(p, 1, at) }})
+	}
+	research := func(code string) {
+		t, _ := FindTechnology(code)
+		steps = append(steps, step{"research_" + code, t.Name, func() bool { return p.ResearchedTechnologies[code] }, func(at time.Time) error { return ResearchTechnology(p, code, p.SettlementCommandSeq+1, at) }})
+	}
+	build := func(code string, target int32) {
+		b, _ := FindBuilding(code)
+		steps = append(steps, step{fmt.Sprintf("%s_%d", code, target), b.Name, func() bool { return p.BuildingCounts[code] >= target }, func(at time.Time) error { return ConstructBuilding(p, code, 1, p.SettlementCommandSeq+1, at) }})
+	}
+	project := func(code string) {
+		steps = append(steps, step{code, code, func() bool { return p.UnlockedBlueprints[code] }, func(at time.Time) error { return UnlockBlueprint(w, p, code, at) }})
+	}
+	recruit(1)
+	research(TechWoodworking)
+	recruit(4)
+	build(BuildingLumberCamp, 1)
+	build(BuildingHouse, 1)
+	recruit(8)
+	if population > 8 {
+		build(BuildingLumberCamp, 2)
+	}
+	research(TechMining)
+	build(BuildingQuarry, 1)
+	research(TechCharcoal)
+	build(BPCharcoalKiln, 1)
+	if population > 8 {
+		build(BuildingHouse, 2)
+		recruit(population)
+	}
+	build(BPWaterCistern, 1)
+	if explore {
+		build(BPScoutCamp, 1)
+		for _, item := range []string{"gear_wood_spear", "gear_linen_vest"} {
+			steps = append(steps, step{item, "基础整备", func() bool { return p.RaidGearInventory[item] > 0 }, func(at time.Time) error { return ManageRaidGear(p, "craft", item, at) }})
 		}
-		if unlocked[BPQuarryTech] {
-			targetPop = 40
-		}
-
-		for pop < targetPop {
-			cost := NextResidentCostMilli(pop)
-			if water >= cost {
-				water -= cost
-				pop++
-				if pop == 1 {
-					recordMilestone("first_resident", "首位居民（自动打水）")
-				}
+		steps = append(steps, step{"raid_mia", "首次探索失败后恢复建设", func() bool { return p.RaidLoadout.LastSettlementReport != nil }, func(at time.Time) error {
+			if err := StartRaid(p, at); err != nil {
+				return err
+			}
+			return ApplyRaidCommand(p, p.RaidLoadout.ActiveSession.RaidID, 1, RaidCommand{Action: "finish", Status: "MIA"}, at)
+		}})
+	}
+	research(TechMechanics)
+	build(BPBasicWorkshop, 1)
+	if population <= 8 {
+		project(BPPartFrame)
+		project(BPPartTablet)
+		project(BPPartValve)
+	} else {
+		project(BPPartValve)
+		project(BPPartFrame)
+		project(BPPartTablet)
+	}
+	project(BPMysteryTreasure)
+	current := 0
+	for sec := 0; sec <= 3600; sec++ {
+		at := now.Add(time.Duration(sec) * time.Second)
+		if sec%10 == 0 && current < len(steps) {
+			st := steps[current]
+			err := st.action(at)
+			if err != nil {
+				run.FailureReason = st.name + ": " + err.Error()
+			}
+			if st.done() {
+				run.Milestones = append(run.Milestones, BenchmarkMilestone{Code: st.code, Name: st.name, ReachedSeconds: float64(sec), FormattedTime: FormatDurationMMSS(float64(sec)), Population: p.PopulationTotal})
+				current++
+			}
+			// Cap-aware, fixed integer staffing. Basic gathering bootstraps the first
+			// lumber camp; surplus workers gather water rather than exceeding job slots.
+			if p.PopulationTotal < 2 {
+				p.Workers = map[string]int32{JobWater: p.PopulationTotal}
+			} else if JobCapacity(p, JobWood) == 0 {
+				_ = AllocateWorkers(p, "manual", map[string]int32{JobForage: 1, JobWater: p.PopulationTotal - 1}, "", at)
 			} else {
-				break
+				remaining := p.PopulationTotal
+				desired := map[string]int32{}
+				water := max(int32(1), (p.PopulationTotal*180+1999)/2000)
+				remaining -= water
+				for _, j := range []struct {
+					key  string
+					want int32
+				}{{JobCharcoal, max(1, p.PopulationTotal/6)}, {JobStone, p.PopulationTotal / 4}, {JobWood, remaining}} {
+					n := min(j.want, JobCapacity(p, j.key), remaining)
+					desired[j.key] = n
+					remaining -= n
+				}
+				desired[JobWater] = water + remaining
+				_ = AllocateWorkers(p, "manual", desired, "", at)
 			}
 		}
-
-		if !unlocked[BPAxeBlueprint] && pop >= 10 && water >= 200*ResourceScale {
-			water -= 200 * ResourceScale
-			unlocked[BPAxeBlueprint] = true
-			recordMilestone(BPAxeBlueprint, "斧头蓝图（解锁伐木）")
+		if current == len(steps) {
+			run.Completed = true
+			run.FailureReason = ""
+			run.TotalSeconds = float64(sec)
+			run.FormattedTotal = FormatDurationMMSS(float64(sec))
+			return run, w
 		}
-		if useUpgrades && unlocked[BPAxeBlueprint] && !unlocked[BPWaterWheel1] && pop >= 16 &&
-			water >= 350*ResourceScale && wood >= 80*ResourceScale {
-			water -= 350 * ResourceScale
-			wood -= 80 * ResourceScale
-			unlocked[BPWaterWheel1] = true
-			recordMilestone(BPWaterWheel1, "木制引水轮（打水+25%）")
-		}
-		if unlocked[BPAxeBlueprint] && !unlocked[BPQuarryTech] && pop >= 25 &&
-			water >= 600*ResourceScale && wood >= 300*ResourceScale {
-			water -= 600 * ResourceScale
-			wood -= 300 * ResourceScale
-			unlocked[BPQuarryTech] = true
-			recordMilestone(BPQuarryTech, "采石技术（解锁采石）")
-		}
-		if useUpgrades && unlocked[BPQuarryTech] && !unlocked[BPStoneSaw1] && pop >= 32 &&
-			water >= 1600*ResourceScale && wood >= 650*ResourceScale && stone >= 180*ResourceScale {
-			water -= 1600 * ResourceScale
-			wood -= 650 * ResourceScale
-			stone -= 180 * ResourceScale
-			unlocked[BPStoneSaw1] = true
-			recordMilestone(BPStoneSaw1, "石刃联动锯台（木/石+25%）")
-		}
-		if unlocked[BPQuarryTech] && !unlocked[BPBasicWorkshop] && pop >= 40 &&
-			water >= 5000*ResourceScale && wood >= 1500*ResourceScale && stone >= 500*ResourceScale {
-			water -= 5000 * ResourceScale
-			wood -= 1500 * ResourceScale
-			stone -= 500 * ResourceScale
-			unlocked[BPBasicWorkshop] = true
-			recordMilestone(BPBasicWorkshop, "基础工坊（开放宝藏锻造）")
-		}
-
-		if useUpgrades {
-			if unlocked[BPBasicWorkshop] && !unlocked[BPPartValve] &&
-				water >= 4200*ResourceScale && wood >= 1400*ResourceScale && stone >= 400*ResourceScale {
-				water -= 4200 * ResourceScale
-				wood -= 1400 * ResourceScale
-				stone -= 400 * ResourceScale
-				unlocked[BPPartValve] = true
-				recordMilestone(BPPartValve, "宝藏部件 I · 导水阀芯")
-			}
-			if unlocked[BPPartValve] && !unlocked[BPPartFrame] &&
-				water >= 4800*ResourceScale && wood >= 2200*ResourceScale && stone >= 550*ResourceScale {
-				water -= 4800 * ResourceScale
-				wood -= 2200 * ResourceScale
-				stone -= 550 * ResourceScale
-				unlocked[BPPartFrame] = true
-				recordMilestone(BPPartFrame, "宝藏部件 II · 承压木框")
-			}
-			if unlocked[BPPartFrame] && !unlocked[BPPartTablet] &&
-				water >= 5000*ResourceScale && wood >= 1600*ResourceScale && stone >= 800*ResourceScale {
-				water -= 5000 * ResourceScale
-				wood -= 1600 * ResourceScale
-				stone -= 800 * ResourceScale
-				unlocked[BPPartTablet] = true
-				recordMilestone(BPPartTablet, "宝藏部件 III · 铭文石板")
-			}
-			if unlocked[BPPartTablet] && !unlocked[BPMysteryTreasure] &&
-				water >= 4000*ResourceScale && wood >= 1800*ResourceScale && stone >= 450*ResourceScale {
-				water -= 4000 * ResourceScale
-				wood -= 1800 * ResourceScale
-				stone -= 450 * ResourceScale
-				unlocked[BPMysteryTreasure] = true
-				recordMilestone(BPMysteryTreasure, "神秘的宝藏（选择职业）")
-				break
-			}
-		} else {
-			if unlocked[BPBasicWorkshop] && !unlocked[BPMysteryTreasure] &&
-				water >= 18000*ResourceScale && wood >= 7000*ResourceScale && stone >= 2200*ResourceScale {
-				water -= 18000 * ResourceScale
-				wood -= 7000 * ResourceScale
-				stone -= 2200 * ResourceScale
-				unlocked[BPMysteryTreasure] = true
-				recordMilestone(BPMysteryTreasure, "神秘的宝藏（选择职业）")
-				break
-			}
-		}
-
-		stageIdx := 0
-		if unlocked[BPBasicWorkshop] {
-			stageIdx = 3
-		} else if unlocked[BPQuarryTech] {
-			stageIdx = 2
-		} else if unlocked[BPAxeBlueprint] {
-			stageIdx = 1
-		}
-
-		wWood := int32(math.Round(float64(pop) * woodShare[stageIdx]))
-		wStone := int32(math.Round(float64(pop) * stoneShare[stageIdx]))
-		wWater := pop - wWood - wStone
-
-		waterMult := int64(100)
-		woodMult := int64(100)
-		stoneMult := int64(100)
-		if useUpgrades {
-			if unlocked[BPWaterWheel1] {
-				waterMult += 25
-			}
-			if unlocked[BPStoneSaw1] {
-				woodMult += 25
-				stoneMult += 25
-			}
-			if unlocked[BPPartValve] {
-				waterMult += 20
-			}
-			if unlocked[BPPartFrame] {
-				woodMult += 25
-			}
-			if unlocked[BPPartTablet] {
-				stoneMult += 30
-			}
-		}
-
-		water += (int64(wWater) * 2000 * waterMult) / 200
-		wood += (int64(wWood) * 450 * woodMult) / 200
-		stone += (int64(wStone) * 220 * stoneMult) / 200
-		simSec += 0.5
+		AdvancePlayerSeconds(p, 1)
 	}
-
-	return BenchmarkRun{
-		StrategyCode:   code,
-		StrategyName:   name,
-		Description:    desc,
-		TotalSeconds:   simSec,
-		FormattedTotal: FormatDurationMMSS(simSec),
-		Milestones:     milestones,
-	}
+	run.TotalSeconds = 3600
+	run.FormattedTotal = "未完成"
+	return run, w
 }

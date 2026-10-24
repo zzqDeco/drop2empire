@@ -15,10 +15,11 @@ import {
   Sun,
   UserCheck,
 } from "lucide-react";
+import { SettlementPanel } from "./SettlementPanel";
 import { ICON } from "./icons";
 import { SETTLEMENT_UI_CONFIG } from "./config/gameConfig";
 import { applyTheme, getInitialTheme, type ThemeMode } from "./theme";
-import { formatETA, formatGold, formatRate, formatResource } from "./format";
+import { formatGold, formatRate, formatResource } from "./format";
 import { CivilizationSilhouetteSVG } from "./RaidSpritesSVG";
 import {
   LordProfileWardrobeBar,
@@ -134,6 +135,11 @@ export function App() {
   const hasActivePopulation = (state?.player.populationTotal ?? 0) > 0;
   const activeHandle = state?.player.handle ?? "";
   const raidActive = !!state?.raidLoadout.activeSession;
+  const canNavigateWorld = !!state && (
+    state.player.profession !== "none" ||
+    state.blueprints.some((b) => b.code === "scout_camp" && b.unlocked) ||
+    state.cosmetics.some((c) => c.ownedCount > 0) || state.collectibles.length > 0
+  );
 
   useEffect(() => {
     if (!hasState || !hasActivePopulation || raidActive) return;
@@ -159,7 +165,7 @@ export function App() {
   }, [hasState, hasActivePopulation, raidActive, activeScene]);
 
   useEffect(() => {
-    if (!hasState || !hasActivePopulation || isAdminRoute) return;
+    if (!hasState || !hasActivePopulation || !canNavigateWorld || raidActive || isAdminRoute) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -170,7 +176,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [hasState, hasActivePopulation, isAdminRoute]);
+  }, [hasState, hasActivePopulation, canNavigateWorld, raidActive, isAdminRoute]);
 
   const runAction = useCallback(
     async (
@@ -622,7 +628,7 @@ export function App() {
   }
 
   // Stage B: Population >= 1 -> Progressive Multi-Scene Unfolding Dashboard
-  const showJobAllocationColumn = axeUnlocked || player.profession !== "none";
+  const showJobAllocationColumn = player.populationTotal > 0;
   const showProfessionChoice =
     treasureUnlocked && player.profession === "none";
   const showAdvancedWorld = player.profession !== "none";
@@ -636,70 +642,13 @@ export function App() {
   const unlockedResources = resources.filter((r) => r.unlocked);
   const unlockedJobs = jobs.filter((j) => j.unlocked);
   const unlockedEdicts = (state.edicts ?? []).filter((e) => e.unlocked);
-  const activeBlueprints = blueprints.filter(
-    (bp) => bp.visible && !bp.unlocked,
-  );
-  const completedBlueprints = blueprints.filter((bp) => bp.unlocked);
-
   const waterJob = jobs.find((j) => j.jobKey === "water");
   const waterAssignedCount = waterJob?.assigned ?? 0;
-  const woodAssignedCount = jobs.find((j) => j.jobKey === "wood")?.assigned ?? 0;
-  const stoneAssignedCount =
-    jobs.find((j) => j.jobKey === "stone")?.assigned ?? 0;
-
-  const storyChapter = !firstResBpUnlocked
-    ? {
-        key: "ch1-water",
-        tag: "第一章 · 初立营火",
-        text: "第一位居民已拎起木桶自动汲水（+2.0/秒）。继续积攒 30 滴水，在右侧解锁【最初的居所】。",
-      }
-    : !axeUnlocked
-      ? {
-          key: "ch2-axe",
-          tag: "第二章 · 居所生根",
-          text: "居所立起屋檐，手点打水翻倍（+2/次）。招募满 3 名居民，解锁【斧头蓝图】向枯木林进发。",
-        }
-      : woodAssignedCount === 0
-        ? {
-            key: "ch3-wood",
-            tag: "第三章 · 伐木开林",
-            text: "石斧已铸成！【岗位】面板已展开，点击【伐木 +1】调派居民采集木材。",
-          }
-        : !quarryUnlocked
-          ? {
-              key: "ch4-quarry",
-              tag: "第四章 · 水木并进",
-              text: "林间响起伐木声。建造【一号引水轮】提升水力，并扩充至 8 人口研发【采石技术】。",
-            }
-          : stoneAssignedCount === 0
-            ? {
-                key: "ch5-stone",
-                tag: "第五章 · 破岩采石",
-                text: "山麓岩脉已探明！在【岗位】面板点击【采石 +1】，调派居民开采筑城石料。",
-              }
-            : !workshopUnlocked
-              ? {
-                  key: "ch6-workshop",
-                  tag: "第六章 · 工坊奠基",
-                  text: "水、木、石三脉齐备。升级【石刃锯台】，集齐物资建造【基础工坊】。",
-                }
-              : !treasureUnlocked
-                ? {
-                    key: "ch7-treasure",
-                    tag: "第七章 · 远古遗物",
-                    text: "工坊炉火彻夜不息。锻造【高压铜阀】【承重横梁】【古文明石板】，开启【神秘的宝藏】。",
-                  }
-                : player.profession === "none"
-                  ? {
-                      key: "ch8-prof",
-                      tag: "第八章 · 圣坛择业",
-                      text: "远古宝藏轰然开启！择定你的终身职业，即可在右下角【世界舆图】中解锁皇家工坊市场与公会战区。",
-                    }
-                  : {
-                      key: "ch9-empire",
-                      tag: "第九章 · 滴水成城",
-                      text: "聚落已蜕变为帝国重镇！主界面融合领主个人档案与主城生产，点击右下角【世界舆图 (M)】即可前往荒原裂隙、工坊交易所、公会战区与秘宝馆。",
-                    };
+  const storyChapter = {
+    key: state.settlement.guideCode,
+    tag: state.settlement.guideTitle,
+    text: state.settlement.guideText,
+  };
 
   const civEra: "stone" | "colony" | "workshop" | "empire" = !quarryUnlocked
     ? "stone"
@@ -710,10 +659,10 @@ export function App() {
         : "empire";
 
   const currentAckChapterKey = `${player.handle}:${storyChapter.key}`;
-  const showCivChapterPopup = dismissedChapterKey !== currentAckChapterKey;
+  const showCivChapterPopup = treasureUnlocked && dismissedChapterKey !== currentAckChapterKey;
 
   const zoneTitleMap: Record<WorldZoneKey, string> = {
-    settlement: "◆ 帝国主城 · 领主与聚落总览 ◆",
+    settlement: showAdvancedWorld ? "◆ 帝国主城 · 领主与聚落总览 ◆" : "◆ 滴水成城 · 聚落 ◆",
     scout: "◆ 西北裂隙 · 荒原斥候大营 ◆",
     market: "◆ 东南商埠 · 皇家工坊与交易所 ◆",
     war: "◆ 东北前线 · 公会驻地与八城战区 ◆",
@@ -749,7 +698,7 @@ export function App() {
             ◆
           </span>
           <div className="metric-cell imperial-plaque">
-            <span className="metric-label">帝国人口</span>
+            <span className="metric-label">{showAdvancedWorld ? "帝国人口" : "聚落人口"}</span>
             <span className="metric-value mono-num">
               {player.populationTotal}
             </span>
@@ -786,21 +735,21 @@ export function App() {
         </div>
 
         <div className="toolbar-actions imperial-header-wing">
-          <button
+          {showAdvancedWorld && <button
             type="button"
             className="btn-outline"
             onClick={() => setShowAnnouncementModal(true)}
           >
             <Scale size={ICON.xs} />
-            <span>帝国公告 ({state.seasonNotices.length})</span>
-          </button>
+            <span className="mono-num">帝国公告 ({state.seasonNotices.length})</span>
+          </button>}
           <button
             type="button"
             className="btn-outline"
             onClick={() => setShowSettingsModal(true)}
           >
             <Hammer size={ICON.xs} />
-            <span>设置 ({state.eventLogs.length})</span>
+            <span>设置</span>
           </button>
         </div>
       </header>
@@ -831,6 +780,9 @@ export function App() {
           ======================================================================== */}
       {activeScene === "settlement" && (
         <div key="scene-settlement">
+          <div className="status-banner status-info" aria-label="聚落进展">
+            <div><strong>{storyChapter.tag}</strong><p>{storyChapter.text}</p></div>
+          </div>
           {showProfessionChoice && (
             <section className="profession-gate-banner" aria-label="选择职业">
               <div className="section-head">
@@ -884,7 +836,7 @@ export function App() {
           >
             {/* Column 1: Integrated Personal Lord Profile + Resources (with Separate Gross / Drain / Net Rates) */}
             <div className="settlement-left-col">
-              <LordProfileWardrobeBar state={state} runAction={runAction} />
+              {showScoutScene && <LordProfileWardrobeBar state={state} runAction={runAction} />}
 
               <section className="panel" aria-label="资源">
               <div className="panel-header">
@@ -1050,6 +1002,15 @@ export function App() {
                 </div>
               )}
               </section>
+              <details className="panel">
+                <summary>聚落纪事</summary>
+                <ul className="event-log-list">
+                  {state.eventLogs.slice(0, 5).map((ev) => <li key={ev.id} className="event-log-item">
+                    <span className="event-time mono-num">{ev.timestamp}</span>
+                    <span className="event-msg mono-num">{ev.message}</span>
+                  </li>)}
+                </ul>
+              </details>
             </div>
 
             {/* Column 2: Worker Allocation & Colony Edicts */}
@@ -1070,6 +1031,7 @@ export function App() {
                     type="button"
                     className="btn-outline"
                     data-pop="✓ 均衡调配"
+                    disabled={busy}
                     onClick={() =>
                       void runAction(() =>
                         api.allocateWorkers({ mode: "auto_balanced" }),
@@ -1082,6 +1044,7 @@ export function App() {
                     type="button"
                     className="btn-outline"
                     data-pop="💧 打水优先"
+                    disabled={busy}
                     onClick={() =>
                       void runAction(() =>
                         api.allocateWorkers({ mode: "water_focus" }),
@@ -1095,6 +1058,7 @@ export function App() {
                       type="button"
                       className="btn-outline"
                       data-pop="🪵 伐木优先"
+                    disabled={busy}
                       onClick={() =>
                         void runAction(() =>
                           api.allocateWorkers({ mode: "wood_focus" }),
@@ -1109,6 +1073,7 @@ export function App() {
                       type="button"
                       className="btn-outline"
                       data-pop="🪨 采石优先"
+                    disabled={busy}
                       onClick={() =>
                         void runAction(() =>
                           api.allocateWorkers({ mode: "stone_focus" }),
@@ -1122,10 +1087,11 @@ export function App() {
 
                 <div className="job-list">
                   {unlockedJobs.map((job) => {
-                    const canAddPool =
+                    const availableResidents =
                       job.jobKey === "water"
                         ? player.populationTotal - job.assigned
                         : player.populationIdle + waterAssignedCount;
+                    const canAddPool = Math.min(availableResidents, job.capacity - job.assigned);
 
                     return (
                       <div
@@ -1156,7 +1122,7 @@ export function App() {
                               type="button"
                               className="btn-step mono-num"
                               data-pop={`-5 ${job.name}`}
-                              disabled={job.assigned < 5}
+                              disabled={busy || job.assigned < 5}
                               onClick={() => adjustJobCount(job.jobKey, -5)}
                             >
                               -5
@@ -1165,19 +1131,19 @@ export function App() {
                               type="button"
                               className="btn-step mono-num"
                               data-pop={`-1 ${job.name}`}
-                              disabled={job.assigned <= 0}
+                              disabled={busy || job.assigned <= 0}
                               onClick={() => adjustJobCount(job.jobKey, -1)}
                             >
                               -1
                             </button>
                             <span className="job-count mono-num">
-                              {job.assigned}
+                              {job.assigned}/{job.capacity}
                             </span>
                             <button
                               type="button"
                               className="btn-step mono-num"
                               data-pop={`+1 ${job.name}`}
-                              disabled={canAddPool < 1}
+                              disabled={busy || canAddPool < 1}
                               onClick={() => adjustJobCount(job.jobKey, 1)}
                             >
                               +1
@@ -1186,7 +1152,7 @@ export function App() {
                               type="button"
                               className="btn-step mono-num"
                               data-pop={`+5 ${job.name}`}
-                              disabled={canAddPool < 5}
+                              disabled={busy || canAddPool < 5}
                               onClick={() => adjustJobCount(job.jobKey, 5)}
                             >
                               +5
@@ -1298,141 +1264,7 @@ export function App() {
               </section>
             )}
 
-            {/* Column 3: Resident Recruitment & Blueprints */}
-            <section className="panel" aria-label="发展">
-              <div className="panel-header">
-                <div className="panel-title">
-                  <Compass size={ICON.sm} />
-                  <h2>招募与蓝图</h2>
-                </div>
-                <span className="tag-badge mono-num">
-                  人口 {player.populationTotal}
-                </span>
-              </div>
-
-              <div className="recruit-card">
-                <div className="recruit-meta">
-                  <div className="recruit-head">
-                    <strong>招募居民</strong>
-                    <span className="tag-badge mono-num">
-                      {formatETA(player.nextResidentEtaSeconds)}
-                    </span>
-                  </div>
-                  <div className="recruit-cost mono-num">
-                    -{formatResource(player.nextResidentCostWaterMilli, 1)} 水
-                  </div>
-                </div>
-                <div className="recruit-btns">
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    data-pop="+1 居民"
-                    disabled={
-                      liveWaterMilli < player.nextResidentCostWaterMilli
-                    }
-                    onClick={() =>
-                      void runAction(() => api.recruitResident({ count: 1 }))
-                    }
-                  >
-                    <Plus size={ICON.xs} />
-                    <span>+1</span>
-                  </button>
-                  {player.populationTotal >= 5 && (
-                    <button
-                      type="button"
-                      className="btn-outline mono-num"
-                      data-pop="+5 居民"
-                      disabled={
-                        liveWaterMilli < player.nextResidentCostWaterMilli
-                      }
-                      onClick={() =>
-                        void runAction(() => api.recruitResident({ count: 5 }))
-                      }
-                    >
-                      +5
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="blueprint-list">
-                {activeBlueprints.map((bp) => {
-                  const popOK = player.populationTotal >= bp.requiredPopulation;
-                  return (
-                    <article
-                      key={bp.code}
-                      className={`bp-card ${bp.canUnlock ? "bp-ready" : ""}`}
-                    >
-                      <div className="bp-top">
-                        <div>
-                          <strong>{bp.name}</strong>
-                          <span
-                            className={`bp-pop-req mono-num ${popOK ? "rate-pos" : ""}`}
-                          >
-                            人口 {player.populationTotal}/
-                            {bp.requiredPopulation}
-                          </span>
-                        </div>
-                        <span className="tag-badge mono-num">
-                          {formatETA(bp.etaSeconds)}
-                        </span>
-                      </div>
-                      <p className="bp-desc">{bp.effectSummary}</p>
-                      <div className="bp-footer">
-                        <div className="bp-costs">
-                          {bp.costs.map((c) => {
-                            const cur =
-                              c.resourceKey === "water"
-                                ? liveWaterMilli
-                                : c.currentMilli;
-                            const ok = cur >= c.requiredMilli;
-                            return (
-                              <span
-                                key={c.resourceKey}
-                                className={`cost-chip mono-num ${ok ? "cost-ok" : "cost-lack"}`}
-                              >
-                                {c.resourceName} {formatResource(cur, 0)}/
-                                {formatResource(c.requiredMilli, 0)}
-                              </span>
-                            );
-                          })}
-                        </div>
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          data-pop={`✓ 解锁 ${bp.name}`}
-                          disabled={!bp.canUnlock}
-                          onClick={() =>
-                            void runAction(() =>
-                              api.unlockBlueprint({ code: bp.code }),
-                            )
-                          }
-                        >
-                          解锁
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-
-                {completedBlueprints.length > 0 && (
-                  <details className="settlement-item">
-                    <summary className="mono-num">
-                      已解锁 ({completedBlueprints.length})
-                    </summary>
-                    {completedBlueprints.map((bp) => (
-                      <div key={bp.code} className="bp-card bp-unlocked">
-                        <div className="bp-top">
-                          <strong>{bp.name}</strong>
-                          <span className="tag-badge tag-success">✓</span>
-                        </div>
-                        <p className="bp-desc">{bp.effectSummary}</p>
-                      </div>
-                    ))}
-                  </details>
-                )}
-              </div>
-            </section>
+            <SettlementPanel state={state} busy={busy} runAction={runAction} />
           </main>
         </div>
       )}
@@ -1480,7 +1312,7 @@ export function App() {
       {/* ========================================================================
           FLOATING WORLD MAP COMPASS BUTTON (右下角世界舆图按钮，前往各大功能区)
           ======================================================================== */}
-      <button
+      {canNavigateWorld && <button
         type="button"
         className="world-map-fab"
         aria-label="打开世界舆图 (快捷键 M)"
@@ -1495,7 +1327,7 @@ export function App() {
             {activeScene === "settlement" ? "前往疆域 [M]" : "切换疆域 [M]"}
           </span>
         </div>
-      </button>
+      </button>}
 
       {/* ========================================================================
           CIVILIZATION CHAPTER PROGRESSION POPUP (章节推进时浮出文明剪影，常驻收敛于设置)
@@ -1544,7 +1376,7 @@ export function App() {
       {/* ========================================================================
           WORLD MAP COMPASS MODAL (世界舆图疆域导航)
           ======================================================================== */}
-      {showWorldMapModal && (
+      {showWorldMapModal && canNavigateWorld && (
         <WorldMapCompassModal
           state={state}
           activeScene={activeScene}
@@ -1559,7 +1391,7 @@ export function App() {
       {/* ========================================================================
           IMPERIAL ANNOUNCEMENT MODAL (帝国公告 · 赛季动向与宏观账本)
           ======================================================================== */}
-      {showAnnouncementModal && (
+      {showAnnouncementModal && showAdvancedWorld && (
         <ImperialAnnouncementModal
           state={state}
           onClose={() => setShowAnnouncementModal(false)}

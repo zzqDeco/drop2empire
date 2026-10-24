@@ -8,7 +8,7 @@ import (
 
 // SeasonResetRules lists what is wiped at the start of every new season (docs/design/04-seasons/season-framework.md).
 var SeasonResetRules = []string{
-	"聚落人口、水/木/炭/石/铁/军粮库存及基建科技蓝图全部归零",
+	"聚落人口、物资、已研究技术、建筑、改良与工程进度全部归零，恢复初始营地",
 	"终身职业抉择、工坊装槽设备及三系军备库存全部归零",
 	"玩家流通与托管金币、开放挂单及商会城池战驻军全部归零",
 	"本赛季已研读的荒原高阶蓝图配方（bp_*）与赛季安全保险箱等级重置为 1 格",
@@ -203,6 +203,7 @@ func RolloverSeason(w *WorldState, nextSeasonTitle string, now time.Time) {
 		}
 
 		p.UnlockedBlueprints = map[string]bool{}
+		ResetSettlementProgress(p)
 		p.ActiveEdicts = map[string]bool{}
 		p.ActiveExpedition = nil
 		p.InstalledEquipments = map[string]int32{}

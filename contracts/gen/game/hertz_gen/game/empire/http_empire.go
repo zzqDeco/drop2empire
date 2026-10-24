@@ -80,6 +80,7 @@ func (p *ResourceLineDTO) String() string {
 }
 
 type WorkerJobDTO struct {
+	Capacity               int32  `thrift:"capacity,11,required" json:"capacity"`
 	JobKey                 string `thrift:"jobKey,1,required" json:"jobKey"`
 	Name                   string `thrift:"name,2,required" json:"name"`
 	Assigned               int32  `thrift:"assigned,3,required" json:"assigned"`
@@ -97,6 +98,10 @@ func NewWorkerJobDTO() *WorkerJobDTO {
 }
 
 func (p *WorkerJobDTO) InitDefault() {
+}
+
+func (p *WorkerJobDTO) GetCapacity() (v int32) {
+	return p.Capacity
 }
 
 func (p *WorkerJobDTO) GetJobKey() (v string) {
@@ -201,6 +206,7 @@ func (p *AllocationPresetDTO) String() string {
 }
 
 type CostItemDTO struct {
+	CapacityMilli int64  `thrift:"capacityMilli,6,required" json:"capacityMilli"`
 	ResourceKey   string `thrift:"resourceKey,1,required" json:"resourceKey"`
 	ResourceName  string `thrift:"resourceName,2,required" json:"resourceName"`
 	RequiredMilli int64  `thrift:"requiredMilli,3,required" json:"requiredMilli"`
@@ -213,6 +219,10 @@ func NewCostItemDTO() *CostItemDTO {
 }
 
 func (p *CostItemDTO) InitDefault() {
+}
+
+func (p *CostItemDTO) GetCapacityMilli() (v int64) {
+	return p.CapacityMilli
 }
 
 func (p *CostItemDTO) GetResourceKey() (v string) {
@@ -243,6 +253,8 @@ func (p *CostItemDTO) String() string {
 }
 
 type BlueprintNodeDTO struct {
+	Kind               string         `thrift:"kind,12,required" json:"kind"`
+	BlockedReason      string         `thrift:"blockedReason,13,required" json:"blockedReason"`
 	Code               string         `thrift:"code,1,required" json:"code"`
 	Name               string         `thrift:"name,2,required" json:"name"`
 	Stage              string         `thrift:"stage,3,required" json:"stage"`
@@ -261,6 +273,14 @@ func NewBlueprintNodeDTO() *BlueprintNodeDTO {
 }
 
 func (p *BlueprintNodeDTO) InitDefault() {
+}
+
+func (p *BlueprintNodeDTO) GetKind() (v string) {
+	return p.Kind
+}
+
+func (p *BlueprintNodeDTO) GetBlockedReason() (v string) {
+	return p.BlockedReason
 }
 
 func (p *BlueprintNodeDTO) GetCode() (v string) {
@@ -312,6 +332,202 @@ func (p *BlueprintNodeDTO) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("BlueprintNodeDTO(%+v)", *p)
+}
+
+type TechnologyNodeDTO struct {
+	Code          string         `thrift:"code,1,required" json:"code"`
+	Name          string         `thrift:"name,2,required" json:"name"`
+	EffectSummary string         `thrift:"effectSummary,3,required" json:"effectSummary"`
+	Costs         []*CostItemDTO `thrift:"costs,4,required,list<CostItemDTO>" json:"costs"`
+	Researched    bool           `thrift:"researched,5,required" json:"researched"`
+	Visible       bool           `thrift:"visible,6,required" json:"visible"`
+	CanResearch   bool           `thrift:"canResearch,7,required" json:"canResearch"`
+	BlockedReason string         `thrift:"blockedReason,8,required" json:"blockedReason"`
+}
+
+func NewTechnologyNodeDTO() *TechnologyNodeDTO {
+	return &TechnologyNodeDTO{}
+}
+
+func (p *TechnologyNodeDTO) InitDefault() {
+}
+
+func (p *TechnologyNodeDTO) GetCode() (v string) {
+	return p.Code
+}
+
+func (p *TechnologyNodeDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *TechnologyNodeDTO) GetEffectSummary() (v string) {
+	return p.EffectSummary
+}
+
+func (p *TechnologyNodeDTO) GetCosts() (v []*CostItemDTO) {
+	return p.Costs
+}
+
+func (p *TechnologyNodeDTO) GetResearched() (v bool) {
+	return p.Researched
+}
+
+func (p *TechnologyNodeDTO) GetVisible() (v bool) {
+	return p.Visible
+}
+
+func (p *TechnologyNodeDTO) GetCanResearch() (v bool) {
+	return p.CanResearch
+}
+
+func (p *TechnologyNodeDTO) GetBlockedReason() (v string) {
+	return p.BlockedReason
+}
+
+func (p *TechnologyNodeDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("TechnologyNodeDTO(%+v)", *p)
+}
+
+type BuildingNodeDTO struct {
+	Code           string         `thrift:"code,1,required" json:"code"`
+	Name           string         `thrift:"name,2,required" json:"name"`
+	TechnologyName string         `thrift:"technologyName,3,required" json:"technologyName"`
+	EffectSummary  string         `thrift:"effectSummary,4,required" json:"effectSummary"`
+	Costs          []*CostItemDTO `thrift:"costs,5,required,list<CostItemDTO>" json:"costs"`
+	Owned          int32          `thrift:"owned,6,required" json:"owned"`
+	Limit          int32          `thrift:"limit,7,required" json:"limit"`
+	Visible        bool           `thrift:"visible,8,required" json:"visible"`
+	Researched     bool           `thrift:"researched,9,required" json:"researched"`
+	CanBuild       bool           `thrift:"canBuild,10,required" json:"canBuild"`
+	BlockedReason  string         `thrift:"blockedReason,11,required" json:"blockedReason"`
+	JobKey         string         `thrift:"jobKey,12,required" json:"jobKey"`
+	Assigned       int32          `thrift:"assigned,13,required" json:"assigned"`
+	TotalSlots     int32          `thrift:"totalSlots,14,required" json:"totalSlots"`
+}
+
+func NewBuildingNodeDTO() *BuildingNodeDTO {
+	return &BuildingNodeDTO{}
+}
+
+func (p *BuildingNodeDTO) InitDefault() {
+}
+
+func (p *BuildingNodeDTO) GetCode() (v string) {
+	return p.Code
+}
+
+func (p *BuildingNodeDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *BuildingNodeDTO) GetTechnologyName() (v string) {
+	return p.TechnologyName
+}
+
+func (p *BuildingNodeDTO) GetEffectSummary() (v string) {
+	return p.EffectSummary
+}
+
+func (p *BuildingNodeDTO) GetCosts() (v []*CostItemDTO) {
+	return p.Costs
+}
+
+func (p *BuildingNodeDTO) GetOwned() (v int32) {
+	return p.Owned
+}
+
+func (p *BuildingNodeDTO) GetLimit() (v int32) {
+	return p.Limit
+}
+
+func (p *BuildingNodeDTO) GetVisible() (v bool) {
+	return p.Visible
+}
+
+func (p *BuildingNodeDTO) GetResearched() (v bool) {
+	return p.Researched
+}
+
+func (p *BuildingNodeDTO) GetCanBuild() (v bool) {
+	return p.CanBuild
+}
+
+func (p *BuildingNodeDTO) GetBlockedReason() (v string) {
+	return p.BlockedReason
+}
+
+func (p *BuildingNodeDTO) GetJobKey() (v string) {
+	return p.JobKey
+}
+
+func (p *BuildingNodeDTO) GetAssigned() (v int32) {
+	return p.Assigned
+}
+
+func (p *BuildingNodeDTO) GetTotalSlots() (v int32) {
+	return p.TotalSlots
+}
+
+func (p *BuildingNodeDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("BuildingNodeDTO(%+v)", *p)
+}
+
+type SettlementProgressDTO struct {
+	CommandSeq      int64                `thrift:"commandSeq,1,required" json:"commandSeq"`
+	HousingCapacity int32                `thrift:"housingCapacity,2,required" json:"housingCapacity"`
+	Technologies    []*TechnologyNodeDTO `thrift:"technologies,3,required,list<TechnologyNodeDTO>" json:"technologies"`
+	Buildings       []*BuildingNodeDTO   `thrift:"buildings,4,required,list<BuildingNodeDTO>" json:"buildings"`
+	GuideCode       string               `thrift:"guideCode,5,required" json:"guideCode"`
+	GuideTitle      string               `thrift:"guideTitle,6,required" json:"guideTitle"`
+	GuideText       string               `thrift:"guideText,7,required" json:"guideText"`
+}
+
+func NewSettlementProgressDTO() *SettlementProgressDTO {
+	return &SettlementProgressDTO{}
+}
+
+func (p *SettlementProgressDTO) InitDefault() {
+}
+
+func (p *SettlementProgressDTO) GetCommandSeq() (v int64) {
+	return p.CommandSeq
+}
+
+func (p *SettlementProgressDTO) GetHousingCapacity() (v int32) {
+	return p.HousingCapacity
+}
+
+func (p *SettlementProgressDTO) GetTechnologies() (v []*TechnologyNodeDTO) {
+	return p.Technologies
+}
+
+func (p *SettlementProgressDTO) GetBuildings() (v []*BuildingNodeDTO) {
+	return p.Buildings
+}
+
+func (p *SettlementProgressDTO) GetGuideCode() (v string) {
+	return p.GuideCode
+}
+
+func (p *SettlementProgressDTO) GetGuideTitle() (v string) {
+	return p.GuideTitle
+}
+
+func (p *SettlementProgressDTO) GetGuideText() (v string) {
+	return p.GuideText
+}
+
+func (p *SettlementProgressDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("SettlementProgressDTO(%+v)", *p)
 }
 
 type ColonyEdictDTO struct {
@@ -2668,6 +2884,7 @@ func (p *PlayerProfileDTO) String() string {
 }
 
 type DashboardStateResp struct {
+	Settlement          *SettlementProgressDTO   `thrift:"settlement,33,required" json:"settlement"`
 	Revision            int64                    `thrift:"revision,32,required" json:"revision"`
 	ServerTime          string                   `thrift:"serverTime,1,required" json:"serverTime"`
 	Player              *PlayerProfileDTO        `thrift:"player,2,required" json:"player"`
@@ -2707,6 +2924,15 @@ func NewDashboardStateResp() *DashboardStateResp {
 }
 
 func (p *DashboardStateResp) InitDefault() {
+}
+
+var DashboardStateResp_Settlement_DEFAULT *SettlementProgressDTO
+
+func (p *DashboardStateResp) GetSettlement() (v *SettlementProgressDTO) {
+	if !p.IsSetSettlement() {
+		return DashboardStateResp_Settlement_DEFAULT
+	}
+	return p.Settlement
 }
 
 func (p *DashboardStateResp) GetRevision() (v int64) {
@@ -2880,6 +3106,10 @@ func (p *DashboardStateResp) GetCurrentSeason() (v *SeasonStateDTO) {
 		return DashboardStateResp_CurrentSeason_DEFAULT
 	}
 	return p.CurrentSeason
+}
+
+func (p *DashboardStateResp) IsSetSettlement() bool {
+	return p.Settlement != nil
 }
 
 func (p *DashboardStateResp) IsSetPlayer() bool {
@@ -3296,6 +3526,65 @@ func (p *UnlockBlueprintReq) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("UnlockBlueprintReq(%+v)", *p)
+}
+
+type ResearchTechnologyReq struct {
+	Code       string `thrift:"code,1,required" json:"code"`
+	CommandSeq int64  `thrift:"commandSeq,2,required" json:"commandSeq"`
+}
+
+func NewResearchTechnologyReq() *ResearchTechnologyReq {
+	return &ResearchTechnologyReq{}
+}
+
+func (p *ResearchTechnologyReq) InitDefault() {
+}
+
+func (p *ResearchTechnologyReq) GetCode() (v string) {
+	return p.Code
+}
+
+func (p *ResearchTechnologyReq) GetCommandSeq() (v int64) {
+	return p.CommandSeq
+}
+
+func (p *ResearchTechnologyReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ResearchTechnologyReq(%+v)", *p)
+}
+
+type ConstructBuildingReq struct {
+	Code       string `thrift:"code,1,required" json:"code"`
+	Quantity   int32  `thrift:"quantity,2,required" json:"quantity"`
+	CommandSeq int64  `thrift:"commandSeq,3,required" json:"commandSeq"`
+}
+
+func NewConstructBuildingReq() *ConstructBuildingReq {
+	return &ConstructBuildingReq{}
+}
+
+func (p *ConstructBuildingReq) InitDefault() {
+}
+
+func (p *ConstructBuildingReq) GetCode() (v string) {
+	return p.Code
+}
+
+func (p *ConstructBuildingReq) GetQuantity() (v int32) {
+	return p.Quantity
+}
+
+func (p *ConstructBuildingReq) GetCommandSeq() (v int64) {
+	return p.CommandSeq
+}
+
+func (p *ConstructBuildingReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ConstructBuildingReq(%+v)", *p)
 }
 
 type ToggleEdictReq struct {
@@ -4212,6 +4501,8 @@ func (p *BenchmarkMilestoneDTO) String() string {
 }
 
 type BenchmarkRunDTO struct {
+	Completed      bool                     `thrift:"completed,7,required" json:"completed"`
+	FailureReason  string                   `thrift:"failureReason,8,required" json:"failureReason"`
 	StrategyCode   string                   `thrift:"strategyCode,1,required" json:"strategyCode"`
 	StrategyName   string                   `thrift:"strategyName,2,required" json:"strategyName"`
 	Description    string                   `thrift:"description,3,required" json:"description"`
@@ -4225,6 +4516,14 @@ func NewBenchmarkRunDTO() *BenchmarkRunDTO {
 }
 
 func (p *BenchmarkRunDTO) InitDefault() {
+}
+
+func (p *BenchmarkRunDTO) GetCompleted() (v bool) {
+	return p.Completed
+}
+
+func (p *BenchmarkRunDTO) GetFailureReason() (v string) {
+	return p.FailureReason
 }
 
 func (p *BenchmarkRunDTO) GetStrategyCode() (v string) {
@@ -4320,6 +4619,10 @@ type EmpireService interface {
 	AllocateWorkers(ctx context.Context, req *AllocateWorkersReq) (r *DashboardStateResp, err error)
 
 	SaveAllocationPreset(ctx context.Context, req *SaveAllocationPresetReq) (r *DashboardStateResp, err error)
+
+	ResearchTechnology(ctx context.Context, req *ResearchTechnologyReq) (r *DashboardStateResp, err error)
+
+	ConstructBuilding(ctx context.Context, req *ConstructBuildingReq) (r *DashboardStateResp, err error)
 
 	UnlockBlueprint(ctx context.Context, req *UnlockBlueprintReq) (r *DashboardStateResp, err error)
 

@@ -41,6 +41,8 @@ const (
 	PatternRecruitResident = "POST /api/v1/empire/production/recruit"
 	PatternAllocateWorkers = "POST /api/v1/empire/production/allocate"
 	PatternSaveAllocationPreset = "POST /api/v1/empire/production/presets"
+	PatternResearchTechnology = "POST /api/v1/empire/settlement/research"
+	PatternConstructBuilding = "POST /api/v1/empire/settlement/build"
 	PatternUnlockBlueprint = "POST /api/v1/empire/progression/unlock-blueprint"
 	PatternChooseProfession = "POST /api/v1/empire/progression/choose-profession"
 	PatternCraftItem = "POST /api/v1/empire/crafting/craft"
@@ -72,7 +74,7 @@ const (
 	PatternPublishNotice = "POST /api/v1/empire/admin/notices"
 )
 
-// EmpireServiceRoutes lists all 38 route specifications declared on EmpireService.
+// EmpireServiceRoutes lists all 40 route specifications declared on EmpireService.
 var EmpireServiceRoutes = []RouteSpec{
 	{Name: "GetDashboard", Method: "GET", Path: "/api/v1/empire/state", MuxPattern: PatternGetDashboard, RequestType: "GetDashboardReq", ResponseType: "DashboardStateResp"},
 	{Name: "RegisterAccount", Method: "POST", Path: "/api/v1/empire/auth/register", MuxPattern: PatternRegisterAccount, RequestType: "RegisterAccountReq", ResponseType: "DashboardStateResp"},
@@ -83,6 +85,8 @@ var EmpireServiceRoutes = []RouteSpec{
 	{Name: "RecruitResident", Method: "POST", Path: "/api/v1/empire/production/recruit", MuxPattern: PatternRecruitResident, RequestType: "RecruitResidentReq", ResponseType: "DashboardStateResp"},
 	{Name: "AllocateWorkers", Method: "POST", Path: "/api/v1/empire/production/allocate", MuxPattern: PatternAllocateWorkers, RequestType: "AllocateWorkersReq", ResponseType: "DashboardStateResp"},
 	{Name: "SaveAllocationPreset", Method: "POST", Path: "/api/v1/empire/production/presets", MuxPattern: PatternSaveAllocationPreset, RequestType: "SaveAllocationPresetReq", ResponseType: "DashboardStateResp"},
+	{Name: "ResearchTechnology", Method: "POST", Path: "/api/v1/empire/settlement/research", MuxPattern: PatternResearchTechnology, RequestType: "ResearchTechnologyReq", ResponseType: "DashboardStateResp"},
+	{Name: "ConstructBuilding", Method: "POST", Path: "/api/v1/empire/settlement/build", MuxPattern: PatternConstructBuilding, RequestType: "ConstructBuildingReq", ResponseType: "DashboardStateResp"},
 	{Name: "UnlockBlueprint", Method: "POST", Path: "/api/v1/empire/progression/unlock-blueprint", MuxPattern: PatternUnlockBlueprint, RequestType: "UnlockBlueprintReq", ResponseType: "DashboardStateResp"},
 	{Name: "ChooseProfession", Method: "POST", Path: "/api/v1/empire/progression/choose-profession", MuxPattern: PatternChooseProfession, RequestType: "ChooseProfessionReq", ResponseType: "DashboardStateResp"},
 	{Name: "CraftItem", Method: "POST", Path: "/api/v1/empire/crafting/craft", MuxPattern: PatternCraftItem, RequestType: "CraftItemReq", ResponseType: "DashboardStateResp"},
@@ -125,6 +129,8 @@ type EmpireServiceRouteHandlers struct {
 	RecruitResident http.HandlerFunc
 	AllocateWorkers http.HandlerFunc
 	SaveAllocationPreset http.HandlerFunc
+	ResearchTechnology http.HandlerFunc
+	ConstructBuilding http.HandlerFunc
 	UnlockBlueprint http.HandlerFunc
 	ChooseProfession http.HandlerFunc
 	CraftItem http.HandlerFunc
@@ -194,6 +200,14 @@ func RegisterEmpireServiceRoutes(mux *http.ServeMux, h EmpireServiceRouteHandler
 		panic("EmpireServiceRouteHandlers.SaveAllocationPreset (" + PatternSaveAllocationPreset + ") is nil")
 	}
 	mux.HandleFunc(PatternSaveAllocationPreset, h.SaveAllocationPreset)
+	if h.ResearchTechnology == nil {
+		panic("EmpireServiceRouteHandlers.ResearchTechnology (" + PatternResearchTechnology + ") is nil")
+	}
+	mux.HandleFunc(PatternResearchTechnology, h.ResearchTechnology)
+	if h.ConstructBuilding == nil {
+		panic("EmpireServiceRouteHandlers.ConstructBuilding (" + PatternConstructBuilding + ") is nil")
+	}
+	mux.HandleFunc(PatternConstructBuilding, h.ConstructBuilding)
 	if h.UnlockBlueprint == nil {
 		panic("EmpireServiceRouteHandlers.UnlockBlueprint (" + PatternUnlockBlueprint + ") is nil")
 	}
@@ -481,6 +495,44 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			fn = mw.WrapRoute(RouteSpec{Name: "SaveAllocationPreset", Method: "POST", Path: "/api/v1/empire/production/presets", MuxPattern: PatternSaveAllocationPreset, RequestType: "SaveAllocationPresetReq", ResponseType: "DashboardStateResp"}, fn)
 		}
 		h.SaveAllocationPreset = fn
+	}
+	if h.ResearchTechnology == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req ResearchTechnologyReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.ResearchTechnology(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "ResearchTechnology", Method: "POST", Path: "/api/v1/empire/settlement/research", MuxPattern: PatternResearchTechnology, RequestType: "ResearchTechnologyReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.ResearchTechnology = fn
+	}
+	if h.ConstructBuilding == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req ConstructBuildingReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.ConstructBuilding(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "ConstructBuilding", Method: "POST", Path: "/api/v1/empire/settlement/build", MuxPattern: PatternConstructBuilding, RequestType: "ConstructBuildingReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.ConstructBuilding = fn
 	}
 	if h.UnlockBlueprint == nil {
 		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

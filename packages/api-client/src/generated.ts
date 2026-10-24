@@ -19,6 +19,7 @@ export interface ResourceLineDTO {
 }
 
 export interface WorkerJobDTO {
+  capacity: number;
   jobKey: string;
   name: string;
   assigned: number;
@@ -42,6 +43,7 @@ export interface AllocationPresetDTO {
 }
 
 export interface CostItemDTO {
+  capacityMilli: number;
   resourceKey: string;
   resourceName: string;
   requiredMilli: number;
@@ -50,6 +52,8 @@ export interface CostItemDTO {
 }
 
 export interface BlueprintNodeDTO {
+  kind: string;
+  blockedReason: string;
   code: string;
   name: string;
   stage: string;
@@ -61,6 +65,44 @@ export interface BlueprintNodeDTO {
   canUnlock: boolean;
   visible: boolean;
   etaSeconds: number;
+}
+
+export interface TechnologyNodeDTO {
+  code: string;
+  name: string;
+  effectSummary: string;
+  costs: CostItemDTO[];
+  researched: boolean;
+  visible: boolean;
+  canResearch: boolean;
+  blockedReason: string;
+}
+
+export interface BuildingNodeDTO {
+  code: string;
+  name: string;
+  technologyName: string;
+  effectSummary: string;
+  costs: CostItemDTO[];
+  owned: number;
+  limit: number;
+  visible: boolean;
+  researched: boolean;
+  canBuild: boolean;
+  blockedReason: string;
+  jobKey: string;
+  assigned: number;
+  totalSlots: number;
+}
+
+export interface SettlementProgressDTO {
+  commandSeq: number;
+  housingCapacity: number;
+  technologies: TechnologyNodeDTO[];
+  buildings: BuildingNodeDTO[];
+  guideCode: string;
+  guideTitle: string;
+  guideText: string;
 }
 
 export interface ColonyEdictDTO {
@@ -512,6 +554,7 @@ export interface PlayerProfileDTO {
 }
 
 export interface DashboardStateResp {
+  settlement: SettlementProgressDTO;
   revision: number;
   serverTime: string;
   player: PlayerProfileDTO;
@@ -601,6 +644,17 @@ export interface SaveAllocationPresetReq {
 
 export interface UnlockBlueprintReq {
   code: string;
+}
+
+export interface ResearchTechnologyReq {
+  code: string;
+  commandSeq: number;
+}
+
+export interface ConstructBuildingReq {
+  code: string;
+  quantity: number;
+  commandSeq: number;
 }
 
 export interface ToggleEdictReq {
@@ -739,6 +793,8 @@ export interface BenchmarkMilestoneDTO {
 }
 
 export interface BenchmarkRunDTO {
+  completed: boolean;
+  failureReason: string;
   strategyCode: string;
   strategyName: string;
   description: string;
@@ -838,6 +894,24 @@ export const IDL_ROUTES = {
     path: "/api/v1/empire/production/presets",
     clientPath: "/empire/production/presets",
     requestType: "SaveAllocationPresetReq",
+    responseType: "DashboardStateResp",
+  },
+  ResearchTechnology: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/settlement/research",
+    clientPath: "/empire/settlement/research",
+    requestType: "ResearchTechnologyReq",
+    responseType: "DashboardStateResp",
+  },
+  ConstructBuilding: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/settlement/build",
+    clientPath: "/empire/settlement/build",
+    requestType: "ConstructBuildingReq",
     responseType: "DashboardStateResp",
   },
   UnlockBlueprint: {

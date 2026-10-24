@@ -21,22 +21,17 @@ func NextResidentCostMilli(n int32) int64 {
 	return int64(cost) * ResourceScale
 }
 
-// ResourceCapacityMilli computes the storage capacity for resKey by starting from BaseResourceCapacityUnits
-// and applying any unlocked BlueprintSpec.CapacityOverrideUnits modifiers.
+// ResourceCapacityMilli derives storage from built assets and preserved legacy rights.
 func ResourceCapacityMilli(p *PlayerState, resKey string) int64 {
-	capUnits, exists := BaseResourceCapacityUnits[resKey]
-	if !exists {
-		return 0
+	capMilli := BaseResourceCapacityUnits[resKey]*ResourceScale + p.LegacyCapacityMilli[resKey]
+	multiplier := int64(1)
+	if p.UnlockedBlueprints[BPStoneVault] {
+		multiplier = 2
 	}
-	for _, bp := range BlueprintCatalog {
-		if !p.UnlockedBlueprints[bp.Code] {
-			continue
-		}
-		if override, ok := bp.CapacityOverrideUnits[resKey]; ok && override > capUnits {
-			capUnits = override
-		}
+	for _, b := range BuildingCatalog {
+		capMilli += int64(p.BuildingCounts[b.Code]) * b.CapacityUnits[resKey] * ResourceScale * multiplier
 	}
-	return capUnits * ResourceScale
+	return capMilli
 }
 
 func addResourceWithCap(p *PlayerState, resKey string, deltaMilli int64) int64 {
@@ -72,6 +67,7 @@ type ComputedJob struct {
 	EffectiveRateMilli     int64
 	TotalOutputPerSecMilli int64
 	EfficiencyPct          int32
+	Capacity               int32
 	Unlocked               bool
 	UnlockHint             string
 	InputSummary           string
@@ -153,17 +149,9 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 
 	out := make([]ComputedJob, 0, len(JobCatalog))
 	for _, js := range JobCatalog {
-		unlocked := p.PopulationTotal > 0
-		if js.RequiredBlueprint != "" && !p.UnlockedBlueprints[js.RequiredBlueprint] {
-			unlocked = false
-		}
-		if js.RequiresProfession && p.Profession == ProfNone {
-			unlocked = false
-		}
-		assigned := p.Workers[js.Key]
-		if !unlocked {
-			assigned = 0
-		}
+		capacity := JobCapacity(p, js.Key)
+		unlocked := capacity > 0
+		assigned := min(max(0, p.Workers[js.Key]), capacity)
 		effPct := effByJob[js.Key]
 		effRate := (js.BaseRateMilli * effPct) / 100
 		totalRate := int64(assigned) * effRate
@@ -177,6 +165,7 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 			TotalOutputPerSecMilli: totalRate,
 			EfficiencyPct:          int32(effPct),
 			Unlocked:               unlocked,
+			Capacity:               capacity,
 			UnlockHint:             js.UnlockHint,
 			InputSummary:           js.InputSummary,
 		})
@@ -206,7 +195,7 @@ func ComputeResourceFlows(p *PlayerState) (gross map[string]int64, drain map[str
 	gross[ResWater] += jobMap[JobWater].TotalOutputPerSecMilli
 
 	woodOut := jobMap[JobWood].TotalOutputPerSecMilli
-	gross[ResWood] += woodOut
+	gross[ResWood] += woodOut + jobMap[JobForage].TotalOutputPerSecMilli
 	if woodOut > 0 {
 		gross[ResFlint] += (woodOut * byproductMult) / SettlementBalance.WoodToFlintDivisor
 	}
@@ -248,40 +237,36 @@ func ComputeResourceFlows(p *PlayerState) (gross map[string]int64, drain map[str
 		if cj.Assigned <= 0 || cj.TotalOutputPerSecMilli <= 0 {
 			continue
 		}
-		switch js.Key {
-		case JobCharcoal:
-			woodNeed := int64(cj.Assigned) * js.InputsPerWorkerMilli[ResWood]
-			if p.ResourcesMilli[ResWood] > 0 || gross[ResWood] >= drain[ResWood]+woodNeed {
-				drain[ResWood] += woodNeed
-				gross[ResCharcoal] += cj.TotalOutputPerSecMilli
-			} else if availWood := gross[ResWood] - drain[ResWood]; availWood > 0 {
-				drain[ResWood] += availWood
-				gross[ResCharcoal] += (cj.TotalOutputPerSecMilli * availWood) / woodNeed
-			}
-		case JobSmeltIron:
-			stoneNeed := int64(cj.Assigned) * js.InputsPerWorkerMilli[ResStone]
-			coalNeed := int64(cj.Assigned) * js.InputsPerWorkerMilli[ResCharcoal]
-			hasStone := p.ResourcesMilli[ResStone] > 0 || gross[ResStone] >= stoneNeed
-			hasCoal := p.ResourcesMilli[ResCharcoal] > 0 || gross[ResCharcoal] >= coalNeed || p.ResourcesMilli[ResWood] > 0
-			if hasStone && hasCoal {
-				drain[ResStone] += stoneNeed
-				if p.ResourcesMilli[ResCharcoal] > 0 || gross[ResCharcoal] > 0 {
-					drain[ResCharcoal] += coalNeed
-				} else {
-					drain[ResWood] += coalNeed
-				}
-				gross[ResIronIngot] += cj.TotalOutputPerSecMilli
-			}
-		case JobPrepRation:
-			waterNeed := int64(cj.Assigned) * js.InputsPerWorkerMilli[ResWater]
-			woodNeed := int64(cj.Assigned) * js.InputsPerWorkerMilli[ResWood]
-			if (p.ResourcesMilli[ResWater] > 0 || gross[ResWater] >= drain[ResWater]+waterNeed) &&
-				(p.ResourcesMilli[ResWood] > 0 || gross[ResWood] >= drain[ResWood]+woodNeed) {
-				drain[ResWater] += waterNeed
-				drain[ResWood] += woodNeed
-				gross[ResRation] += cj.TotalOutputPerSecMilli
+		available := func(key string) int64 { return max(0, p.ResourcesMilli[key]+gross[key]-drain[key]) }
+		inputs := js.InputsPerWorkerMilli
+		if js.Key == JobSmeltIron {
+			stoneNeed := int64(cj.Assigned) * inputs[ResStone]
+			fuelNeed := int64(cj.Assigned) * inputs[ResCharcoal]
+			coal := min(fuelNeed, available(ResCharcoal))
+			wood := min(fuelNeed, available(ResWood))
+			work := min(int64(1_000_000), min(stoneNeed, available(ResStone))*1_000_000/stoneNeed,
+				min(fuelNeed, coal+wood)*1_000_000/fuelNeed)
+			fuel := fuelNeed * work / 1_000_000
+			coalUsed := min(fuel, coal)
+			drain[ResStone] += stoneNeed * work / 1_000_000
+			drain[ResCharcoal] += coalUsed
+			drain[ResWood] += fuel - coalUsed
+			gross[cj.OutputResourceKey] += cj.TotalOutputPerSecMilli * work / 1_000_000
+			continue
+		}
+		// Preview one second of work using actual available inputs. A nonzero
+		// stock smaller than one second's demand must not advertise full output.
+		work := int64(1_000_000)
+		for key, perWorker := range inputs {
+			need := int64(cj.Assigned) * perWorker
+			if need > 0 {
+				work = min(work, min(need, available(key))*1_000_000/need)
 			}
 		}
+		for key, perWorker := range inputs {
+			drain[key] += int64(cj.Assigned) * perWorker * work / 1_000_000
+		}
+		gross[cj.OutputResourceKey] += cj.TotalOutputPerSecMilli * work / 1_000_000
 	}
 
 	waterCap := ResourceCapacityMilli(p, ResWater)
@@ -321,6 +306,7 @@ func applyElapsedSimMs(p *PlayerState, simMs int64) {
 		produceSecond(p)
 	}
 	p.SimulatedElapsedSeconds += ticks
+	RefreshSettlementDiscovery(p)
 }
 
 func productionStock(p *PlayerState, key string) int64 {
@@ -364,7 +350,7 @@ func produceSecond(p *PlayerState) {
 	var waterProduced, waterDemand int64
 	// Gather, pay upkeep, then route only net water overflow into the siphon.
 	for _, job := range jobs {
-		if job.JobKey != JobWater && job.JobKey != JobWood && job.JobKey != JobStone {
+		if job.JobKey != JobWater && job.JobKey != JobWood && job.JobKey != JobStone && job.JobKey != JobForage {
 			continue
 		}
 		output := job.TotalOutputPerSecMilli * 1000
@@ -563,6 +549,12 @@ func RecruitResident(p *PlayerState, count int32, now time.Time) error {
 	recruited := int32(0)
 	var totalSpentMilli int64
 	for i := int32(0); i < count; i++ {
+		if p.PopulationTotal >= HousingCapacity(p) {
+			if recruited == 0 {
+				return ErrPrecondition("housing_full", "住房已满，请先建造木屋")
+			}
+			break
+		}
 		cost := NextResidentCostMilli(p.PopulationTotal)
 		if p.ResourcesMilli[ResWater] < cost {
 			if recruited == 0 {
@@ -584,320 +576,176 @@ func RecruitResident(p *PlayerState, count int32, now time.Time) error {
 	return nil
 }
 
-func isJobUnlockedForPlayer(p *PlayerState, jobKey string) (bool, string) {
+func isJobUnlockedForPlayer(p *PlayerState, key string) (bool, string) {
 	for _, js := range JobCatalog {
-		if js.Key != jobKey {
-			continue
+		if js.Key == key {
+			if JobCapacity(p, key) > 0 {
+				return true, ""
+			}
+			return false, js.UnlockHint
 		}
-		if js.RequiredBlueprint != "" && !p.UnlockedBlueprints[js.RequiredBlueprint] {
-			return false, fmt.Sprintf("尚未解锁前置科技（%s）", js.UnlockHint)
-		}
-		if js.RequiresProfession && p.Profession == ProfNone {
-			return false, "尚未开启工坊高炉/军需产线，无法分配该岗位"
-		}
-		return true, ""
 	}
 	return false, "未知的岗位"
 }
 
 func AllocateWorkers(p *PlayerState, mode string, entries map[string]int32, presetName string, now time.Time) error {
-	total := p.PopulationTotal
-	if total <= 0 {
-		return ErrPrecondition("no_population", "当前尚无居民可供分配，请先招募居民")
+	if p.PopulationTotal <= 0 {
+		return ErrPrecondition("no_population", "请先招募居民")
 	}
-
 	switch mode {
-	case "delta":
-		for k, delta := range entries {
-			if delta == 0 {
-				continue
-			}
-			if ok, reason := isJobUnlockedForPlayer(p, k); !ok {
-				return ErrPrecondition("job_locked", reason)
-			}
-			assigned := AssignedPopulation(p)
-			idle := total - assigned
-			if idle < 0 {
-				idle = 0
-			}
-			if delta > 0 {
-				useIdle := delta
-				if useIdle > idle {
-					useIdle = idle
-				}
-				needTransfer := delta - useIdle
-				if needTransfer > 0 {
-					if k != JobWater {
-						if p.Workers[JobWater] < needTransfer {
-							return ErrPrecondition("no_available_workers", "当前无闲置或打水居民可供调配，请先从其他岗位调出居民")
-						}
-						p.Workers[JobWater] -= needTransfer
-					} else {
-						for _, src := range []string{JobPrepRation, JobSmeltIron, JobStone, JobCharcoal, JobWood} {
-							if needTransfer <= 0 {
-								break
-							}
-							avail := p.Workers[src]
-							if avail <= 0 {
-								continue
-							}
-							take := needTransfer
-							if take > avail {
-								take = avail
-							}
-							p.Workers[src] -= take
-							needTransfer -= take
-						}
-						if needTransfer > 0 {
-							return ErrPrecondition("no_available_workers", "所有居民均已在打水岗位")
-						}
-					}
-				}
-				p.Workers[k] += delta
-			} else {
-				rem := -delta
-				if rem > p.Workers[k] {
-					rem = p.Workers[k]
-				}
-				if rem > 0 {
-					p.Workers[k] -= rem
-					if k != JobWater {
-						p.Workers[JobWater] += rem
-					}
-				}
-			}
-		}
-		return nil
-
-	case "manual":
-		next := map[string]int32{
-			JobWater:      0,
-			JobWood:       0,
-			JobCharcoal:   0,
-			JobStone:      0,
-			JobSmeltIron:  0,
-			JobPrepRation: 0,
-		}
-		var sum int32
-		for k, v := range entries {
-			if v < 0 {
-				return ErrInvalidInput("分配人数不能为负数")
-			}
-			if v == 0 {
-				continue
-			}
-			if k == JobWood && !p.UnlockedBlueprints[BPAxeBlueprint] {
-				return ErrPrecondition("job_locked", "尚未解锁【斧头蓝图】，无法分配伐木工")
-			}
-			if k == JobCharcoal && !p.UnlockedBlueprints[BPCharcoalKiln] {
-				return ErrPrecondition("job_locked", "尚未解锁【砖砌炭窑】，无法分配烧炭工")
-			}
-			if k == JobStone && !p.UnlockedBlueprints[BPQuarryTech] {
-				return ErrPrecondition("job_locked", "尚未解锁【采石技术】，无法分配采石工")
-			}
-			if (k == JobSmeltIron || k == JobPrepRation) && !p.UnlockedBlueprints[BPBasicWorkshop] {
-				return ErrPrecondition("job_locked", "尚未建成【基础工坊】，无法分配工坊岗位")
-			}
-			next[k] = v
-			sum += v
-		}
-		if sum > total {
-			excess := sum - total
-			if next[JobWater] >= excess && next[JobWater] == p.Workers[JobWater] {
-				next[JobWater] -= excess
-				sum -= excess
-			} else {
-				return ErrPrecondition("population_exceeded", fmt.Sprintf("分配总人数 (%d) 超过当前人口上限 (%d)", sum, total))
-			}
-		}
-		p.Workers = next
-		AppendLog(p, now, "PRODUCTION", fmt.Sprintf("已更新劳动力分配：打水 %d / 伐木 %d / 采石 %d / 炼铁 %d / 军粮 %d（闲置 %d）。",
-			next[JobWater], next[JobWood], next[JobStone], next[JobSmeltIron], next[JobPrepRation], total-sum))
-		return nil
-
 	case "auto_balanced":
 		ApplyBalancedAllocation(p)
-		AppendLog(p, now, "PRODUCTION", "已按当前科技阶段执行【智能均衡分配】。")
 		return nil
-
-	case "water_focus":
-		ApplyFocusAllocation(p, JobWater)
-		AppendLog(p, now, "PRODUCTION", "已切换为【优先打水】劳动力配置。")
-		return nil
-
-	case "wood_focus":
-		if !p.UnlockedBlueprints[BPAxeBlueprint] {
-			return ErrPrecondition("job_locked", "尚未解锁【斧头蓝图】")
+	case "water_focus", "wood_focus", "stone_focus":
+		key := map[string]string{"water_focus": JobWater, "wood_focus": JobWood, "stone_focus": JobStone}[mode]
+		if ok, reason := isJobUnlockedForPlayer(p, key); !ok {
+			return ErrPrecondition("job_locked", reason)
 		}
-		ApplyFocusAllocation(p, JobWood)
-		AppendLog(p, now, "PRODUCTION", "已切换为【优先伐木】劳动力配置。")
+		ApplyFocusAllocation(p, key)
 		return nil
-
-	case "stone_focus":
-		if !p.UnlockedBlueprints[BPQuarryTech] {
-			return ErrPrecondition("job_locked", "尚未解锁【采石技术】")
-		}
-		ApplyFocusAllocation(p, JobStone)
-		AppendLog(p, now, "PRODUCTION", "已切换为【优先采石】劳动力配置。")
-		return nil
-
 	case "preset":
-		for _, pr := range p.Presets {
-			if pr.Name == presetName {
-				ApplyScaledPreset(p, pr.Allocations)
-				AppendLog(p, now, "PRODUCTION", fmt.Sprintf("已应用分配方案【%s】。", presetName))
+		for _, preset := range p.Presets {
+			if preset.Name == presetName {
+				ApplyScaledPreset(p, preset.Allocations)
 				return nil
 			}
 		}
-		return ErrNotFound("未找到指定的分配方案")
-
+		return ErrNotFound("未找到分配方案")
+	case "manual", "delta":
 	default:
 		return ErrInvalidInput("未知的分配模式")
 	}
+	next := map[string]int32{}
+	if mode == "delta" {
+		for k, v := range p.Workers {
+			next[k] = v
+		}
+	}
+	for key, value := range entries {
+		known := false
+		for _, js := range JobCatalog {
+			if js.Key == key {
+				known = true
+				break
+			}
+		}
+		if !known {
+			return ErrInvalidInput("未知的岗位")
+		}
+		if mode == "manual" && value < 0 {
+			return ErrInvalidInput("分配人数不能为负数")
+		}
+		if value > 0 {
+			if ok, reason := isJobUnlockedForPlayer(p, key); !ok {
+				return ErrPrecondition("job_locked", reason)
+			}
+		}
+		if mode == "manual" {
+			next[key] = value
+		}
+	}
+	if mode == "delta" {
+		// Apply releases before additions in stable catalog order. Nothing mutates p
+		// until all requests, capacities and population have been validated.
+		for _, js := range JobCatalog {
+			if delta := entries[js.Key]; delta < 0 {
+				removed := int32(min(int64(next[js.Key]), -int64(delta)))
+				next[js.Key] -= removed
+				if js.Key != JobWater {
+					next[JobWater] += removed
+				}
+			}
+		}
+		for _, js := range JobCatalog {
+			if delta := entries[js.Key]; delta > 0 {
+				if int64(next[js.Key])+int64(delta) > int64(JobCapacity(p, js.Key)) {
+					return ErrPrecondition("job_capacity", "岗位已满，请先增建设施")
+				}
+				var used int64
+				for _, n := range next {
+					used += int64(n)
+				}
+				need := max(int64(0), int64(delta)-(int64(p.PopulationTotal)-used))
+				if js.Key != JobWater {
+					if need > int64(next[JobWater]) {
+						return ErrPrecondition("no_available_workers", "没有可调配的居民")
+					}
+					next[JobWater] -= int32(need)
+				} else {
+					for _, source := range JobCatalog {
+						if source.Key == JobWater {
+							continue
+						}
+						take := min(need, int64(next[source.Key]))
+						next[source.Key] -= int32(take)
+						need -= take
+					}
+					if need > 0 {
+						return ErrPrecondition("no_available_workers", "没有可调配的居民")
+					}
+				}
+				next[js.Key] += delta
+			}
+		}
+	}
+	var sum int64
+	for key, n := range next {
+		if n < 0 || n > JobCapacity(p, key) {
+			return ErrPrecondition("job_capacity", "分配超过已建设施的岗位容量")
+		}
+		sum += int64(n)
+	}
+	if sum > int64(p.PopulationTotal) {
+		return ErrPrecondition("population_exceeded", "分配总人数超过当前人口")
+	}
+	p.Workers = next
+	return nil
+}
+
+// Presets and automatic allocation respect installed capacity; overflow returns
+// to water gathering, keeping a recovery path available at zero stock.
+func ApplyScaledPreset(p *PlayerState, raw map[string]int32) {
+	var totalWeight int64
+	for _, js := range JobCatalog {
+		if JobCapacity(p, js.Key) > 0 && raw[js.Key] > 0 {
+			totalWeight += int64(raw[js.Key])
+		}
+	}
+	next := map[string]int32{}
+	remaining := p.PopulationTotal
+	if totalWeight > 0 {
+		for _, js := range JobCatalog {
+			if js.Key == JobWater || raw[js.Key] <= 0 {
+				continue
+			}
+			n := int32(int64(p.PopulationTotal) * int64(raw[js.Key]) / totalWeight)
+			n = min(n, JobCapacity(p, js.Key), remaining)
+			next[js.Key] = n
+			remaining -= n
+		}
+	}
+	next[JobWater] = remaining
+	p.Workers = next
 }
 
 func ApplyBalancedAllocation(p *PlayerState) {
-	total := p.PopulationTotal
-	next := map[string]int32{
-		JobWater:      0,
-		JobWood:       0,
-		JobCharcoal:   0,
-		JobStone:      0,
-		JobSmeltIron:  0,
-		JobPrepRation: 0,
-	}
-	if total <= 0 {
-		p.Workers = next
+	if p.PopulationTotal < 2 {
+		p.Workers = map[string]int32{JobWater: p.PopulationTotal}
 		return
 	}
-	if !p.UnlockedBlueprints[BPAxeBlueprint] {
-		next[JobWater] = total
-		p.Workers = next
+	if JobCapacity(p, JobWood) == 0 {
+		p.Workers = map[string]int32{JobWater: p.PopulationTotal - 1, JobForage: 1}
 		return
 	}
-	if !p.UnlockedBlueprints[BPQuarryTech] {
-		wood := int32(math.Round(float64(total) * 0.30))
-		if wood < 1 {
-			wood = 1
-		}
-		next[JobWood] = wood
-		next[JobWater] = total - wood
-		p.Workers = next
-		return
-	}
-	if !p.UnlockedBlueprints[BPBasicWorkshop] {
-		wood := int32(math.Round(float64(total) * 0.25))
-		stone := int32(math.Round(float64(total) * 0.15))
-		if stone < 1 {
-			stone = 1
-		}
-		next[JobWood] = wood
-		next[JobStone] = stone
-		next[JobWater] = total - wood - stone
-		p.Workers = next
-		return
-	}
-	if p.Profession == ProfNone {
-		wood := int32(math.Round(float64(total) * 0.30))
-		stone := int32(math.Round(float64(total) * 0.20))
-		next[JobWood] = wood
-		next[JobStone] = stone
-		next[JobWater] = total - wood - stone
-		p.Workers = next
-		return
-	}
-	iron := int32(math.Max(1, math.Round(float64(total)*0.10)))
-	ration := int32(math.Max(1, math.Round(float64(total)*0.10)))
-	wood := int32(math.Round(float64(total) * 0.25))
-	stone := int32(math.Round(float64(total) * 0.20))
-	water := total - iron - ration - wood - stone
-	if water < 1 {
-		water = 1
-	}
-	next[JobWater] = water
-	next[JobWood] = wood
-	next[JobStone] = stone
-	next[JobSmeltIron] = iron
-	next[JobPrepRation] = ration
-	p.Workers = next
+	ApplyScaledPreset(p, map[string]int32{JobWater: 3, JobWood: 5, JobStone: 3, JobCharcoal: 2, JobSmeltIron: 1, JobPrepRation: 1})
 }
 
-func ApplyFocusAllocation(p *PlayerState, focusJob string) {
-	total := p.PopulationTotal
-	next := map[string]int32{
-		JobWater:      0,
-		JobWood:       0,
-		JobCharcoal:   0,
-		JobStone:      0,
-		JobSmeltIron:  0,
-		JobPrepRation: 0,
-	}
-	primary := int32(math.Ceil(float64(total) * 0.75))
-	rem := total - primary
-	next[focusJob] = primary
-	if focusJob != JobWater {
-		next[JobWater] = rem
-	} else if p.UnlockedBlueprints[BPAxeBlueprint] {
-		next[JobWood] = rem
-	} else {
-		next[JobWater] = total
-	}
-	p.Workers = next
-}
-
-func ApplyScaledPreset(p *PlayerState, raw map[string]int32) {
-	var rawSum int32
-	for k, v := range raw {
-		if k == JobWood && !p.UnlockedBlueprints[BPAxeBlueprint] {
-			continue
-		}
-		if k == JobStone && !p.UnlockedBlueprints[BPQuarryTech] {
-			continue
-		}
-		if (k == JobSmeltIron || k == JobPrepRation) && !p.UnlockedBlueprints[BPBasicWorkshop] {
-			continue
-		}
-		if v > 0 {
-			rawSum += v
-		}
-	}
-	if rawSum <= 0 {
-		ApplyBalancedAllocation(p)
+func ApplyFocusAllocation(p *PlayerState, focus string) {
+	if focus == JobWater {
+		p.Workers = map[string]int32{JobWater: p.PopulationTotal}
 		return
 	}
-	total := p.PopulationTotal
-	next := map[string]int32{
-		JobWater:      0,
-		JobWood:       0,
-		JobCharcoal:   0,
-		JobStone:      0,
-		JobSmeltIron:  0,
-		JobPrepRation: 0,
-	}
-	var assigned int32
-	for _, k := range []string{JobWood, JobStone, JobSmeltIron, JobPrepRation} {
-		v := raw[k]
-		if v <= 0 {
-			continue
-		}
-		if k == JobWood && !p.UnlockedBlueprints[BPAxeBlueprint] {
-			continue
-		}
-		if k == JobStone && !p.UnlockedBlueprints[BPQuarryTech] {
-			continue
-		}
-		if (k == JobSmeltIron || k == JobPrepRation) && !p.UnlockedBlueprints[BPBasicWorkshop] {
-			continue
-		}
-		scaled := int32(math.Round(float64(total) * float64(v) / float64(rawSum)))
-		if assigned+scaled > total {
-			scaled = total - assigned
-		}
-		next[k] = scaled
-		assigned += scaled
-	}
-	next[JobWater] = total - assigned
-	p.Workers = next
+	ApplyScaledPreset(p, map[string]int32{focus: 3, JobWater: 1})
 }
 
 func SavePreset(p *PlayerState, name string, now time.Time) error {
@@ -937,8 +785,11 @@ func UnlockBlueprint(w *WorldState, p *PlayerState, code string, now time.Time) 
 	if p.UnlockedBlueprints[code] {
 		return ErrPrecondition("already_unlocked", "该蓝图已经解锁")
 	}
-	if spec.PrerequisiteCode != "" && !p.UnlockedBlueprints[spec.PrerequisiteCode] {
-		return ErrPrecondition("prerequisite_missing", "尚未完成前置蓝图研发")
+	if spec.Kind == "building" {
+		return ErrPrecondition("construction_required", "这是一项设施，请先研究技术再在建设区建造")
+	}
+	if !BlueprintPrerequisitesMet(p, *spec) {
+		return ErrPrecondition("prerequisite_missing", "请完成前置设施或全部工程部件")
 	}
 	if p.PopulationTotal < spec.RequiredPopulation {
 		return ErrPrecondition("insufficient_population", fmt.Sprintf("需要人口达到 %d 人（当前 %d 人）", spec.RequiredPopulation, p.PopulationTotal))
@@ -1055,12 +906,15 @@ func ClaimExpedition(p *PlayerState, now time.Time) error {
 		return ErrPrecondition("expedition_in_progress", fmt.Sprintf("斥候仍在探索中，还需 %d 秒归来", rem))
 	}
 	route := p.ActiveExpedition.RouteCode
-	p.ActiveExpedition = nil
 
 	for _, spec := range ExpeditionCatalog {
 		if spec.RouteCode != route {
 			continue
 		}
+		if spec.EvenSimSecBonusPop > 0 && p.SimulatedElapsedSeconds%2 == 0 && p.PopulationTotal+spec.EvenSimSecBonusPop > HousingCapacity(p) {
+			return ErrPrecondition("housing_full", "请扩建住房后安置归来的居民")
+		}
+		p.ActiveExpedition = nil
 		for resKey, rewardMilli := range spec.RewardsMilli {
 			addResourceWithCap(p, resKey, rewardMilli)
 		}
@@ -1077,8 +931,8 @@ func ClaimExpedition(p *PlayerState, now time.Time) error {
 }
 
 func TradeCaravan(p *PlayerState, offerCode string, now time.Time) error {
-	if !p.UnlockedBlueprints[BPScoutCamp] {
-		return ErrPrecondition("scout_camp_locked", "请先建造【荒原斥候营】点亮信标以吸引流浪行商")
+	if p.BuildingCounts[BuildingCaravan] == 0 {
+		return ErrPrecondition("caravan_locked", "请先建造游商驿站")
 	}
 	var spec *CaravanOfferSpec
 	for i := range CaravanOfferCatalog {
@@ -1089,6 +943,12 @@ func TradeCaravan(p *PlayerState, offerCode string, now time.Time) error {
 	}
 	if spec == nil {
 		return ErrNotFound("未知的行商契约")
+	}
+	if p.PopulationTotal+spec.RewardPopulation > HousingCapacity(p) {
+		return ErrPrecondition("housing_full", "住房不足以安置这些居民")
+	}
+	if !CaravanOfferVisible(p, *spec) {
+		return ErrPrecondition("offer_locked", "尚未认识这份契约中的物资")
 	}
 	for resKey, reqMilli := range spec.CostsMilli {
 		if p.ResourcesMilli[resKey] < reqMilli {

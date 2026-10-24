@@ -102,6 +102,7 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 				return err
 			}
 		}
+		domain.RefreshSettlementDiscovery(p)
 		if err := s.repo.SaveWorld(txCtx, w); err != nil {
 			return err
 		}
@@ -150,6 +151,7 @@ func (s *Service) RegisterAccount(ctx context.Context, handle, password, inviteC
 		w.AdminMode = false
 
 		domain.SettleProduction(p, now)
+		domain.RefreshSettlementDiscovery(p)
 		if err := s.repo.SaveWorld(txCtx, w); err != nil {
 			return err
 		}
@@ -193,6 +195,7 @@ func (s *Service) LoginAccount(ctx context.Context, handle, password string) (*d
 		w.AdminMode = p.IsAdmin
 
 		domain.SettleProduction(p, now)
+		domain.RefreshSettlementDiscovery(p)
 		if err := s.repo.SaveWorld(txCtx, w); err != nil {
 			return err
 		}

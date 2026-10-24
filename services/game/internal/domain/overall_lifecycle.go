@@ -125,6 +125,7 @@ func EnsureDefaultAccounts(w *WorldState, now time.Time) {
 		if pl.UnlockedBlueprints == nil {
 			pl.UnlockedBlueprints = map[string]bool{}
 		}
+		EnsureSettlementState(pl)
 		EnsureRaidState(pl)
 	}
 	if p, ok := w.Players["pioneer"]; ok {
@@ -232,6 +233,8 @@ func NewDefaultWorld(now time.Time) *WorldState {
 		"held_relic": ResCosAlchLantern,
 		"companion":  ResCosMechOwl,
 	}
+	veteran.SettlementVersion = 0
+	EnsureSettlementState(veteran)
 	EnsureRaidState(veteran)
 	for eqKey, stacks := range OverallBalance.VeteranInstalledEquips {
 		veteran.InstalledEquipments[eqKey] = stacks
@@ -267,6 +270,7 @@ func NewBlankPlayer(handle string, now time.Time) *PlayerState {
 		ResourcesMilli:          res,
 		FrozenResourcesMilli:    frozen,
 		UnlockedBlueprints:      map[string]bool{},
+		SettlementVersion:       SettlementRulesVersion,
 		ActiveEdicts:            map[string]bool{},
 		InstalledEquipments:     map[string]int32{},
 		Presets:                 []AllocationPreset{},
@@ -282,6 +286,7 @@ func NewBlankPlayer(handle string, now time.Time) *PlayerState {
 		LastOfflineSummary:      "",
 		EventLogs:               []EventEntry{},
 	}
+	EnsureSettlementState(p)
 	EnsureRaidState(p)
 	AppendLog(p, now, "PRODUCTION", "文明起点：点击【手动打水 +1】积攒最初的 10 滴水，招募第一位居民开启自动化。")
 	return p

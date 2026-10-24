@@ -33,6 +33,8 @@ import {
   type RolloverSeasonReq,
   type PublishNoticeReq,
   type UnlockBlueprintReq,
+  type ResearchTechnologyReq,
+  type ConstructBuildingReq,
 } from "./generated";
 
 export * from "./generated";
@@ -185,6 +187,33 @@ export class EmpireClient {
         body: JSON.stringify(req),
       },
     );
+
+  async #settlementRequest(path: string, init: RequestInit): Promise<DashboardStateResp> {
+    const token = this.getSessionToken();
+    try {
+      try { return await this.#request<DashboardStateResp>(path, init); }
+      catch (error) {
+        if (!(error instanceof TypeError) || this.getSessionToken() !== token) throw error;
+        return await this.#request<DashboardStateResp>(path, init);
+      }
+    } catch (error) {
+      if (this.getSessionToken() === token && (error instanceof TypeError ||
+          (error instanceof ApiError && error.code === "settlement_sequence_conflict"))) {
+        return this.getDashboard();
+      }
+      throw error;
+    }
+  }
+
+  researchTechnology = (req: ResearchTechnologyReq) =>
+    this.#settlementRequest(IDL_ROUTES.ResearchTechnology.clientPath, {
+      method: IDL_ROUTES.ResearchTechnology.method, body: JSON.stringify(req),
+    });
+
+  constructBuilding = (req: ConstructBuildingReq) =>
+    this.#settlementRequest(IDL_ROUTES.ConstructBuilding.clientPath, {
+      method: IDL_ROUTES.ConstructBuilding.method, body: JSON.stringify(req),
+    });
 
   unlockBlueprint = (req: UnlockBlueprintReq) =>
     this.#request<DashboardStateResp>(IDL_ROUTES.UnlockBlueprint.clientPath, {

@@ -14,27 +14,27 @@ var SettlementBalance = struct {
 	LateExponent      float64
 
 	// Hydration & Siphon parameters:
-	MinPopForHydrationDrain int32
-	BaseWaterDrainPerPop    int64 // milli-water/sec per resident
+	MinPopForHydrationDrain  int32
+	BaseWaterDrainPerPop     int64 // milli-water/sec per resident
 	DehydrationEfficiencyPct int64 // 50% efficiency when dehydrated
-	SiphonStoneDivisor      int64 // 10:1 water overflow -> stone
-	SiphonFlintDivisor      int64 // 80:1 water overflow -> flint
+	SiphonStoneDivisor       int64 // 10:1 water overflow -> stone
+	SiphonFlintDivisor       int64 // 80:1 water overflow -> flint
 
 	// Byproduct proc divisors:
-	WoodToFlintDivisor        int64
-	StoneToFlintDivisor       int64
+	WoodToFlintDivisor         int64
+	StoneToFlintDivisor        int64
 	StoneToAncientShardDivisor int64
 
 	// Manual water gathering & anti-cheat rate limit:
-	BaseGatherClickMilli       int64
-	UpgradedGatherClickMilli   int64
-	FlintProcEveryNClicks      int64
-	FlintProcAmountMilli       int64
-	MaxClicksPerRequest        int32
-	MaxHumanClicksPerSecond    int64
-	MinGatherIntervalMs        int64
-	GatherBurstAllowanceMs     int64
-	MaxRecruitBatchCount       int32
+	BaseGatherClickMilli     int64
+	UpgradedGatherClickMilli int64
+	FlintProcEveryNClicks    int64
+	FlintProcAmountMilli     int64
+	MaxClicksPerRequest      int32
+	MaxHumanClicksPerSecond  int64
+	MinGatherIntervalMs      int64
+	GatherBurstAllowanceMs   int64
+	MaxRecruitBatchCount     int32
 }{
 	EarlyPopThreshold: 40,
 	EarlyBaseCost:     10.0,
@@ -78,6 +78,7 @@ type JobSpec struct {
 }
 
 var JobCatalog = []JobSpec{
+	{Key: JobForage, Name: "拾枝", OutputResourceKey: ResWood, BaseRateMilli: 150, UnlockHint: "第一位居民到来后开放", InputSummary: "无需设施 · 最多 1 人 · 应急取得木材"},
 	{
 		Key:               JobWater,
 		Name:              "打水",
@@ -92,7 +93,7 @@ var JobCatalog = []JobSpec{
 		OutputResourceKey: ResWood,
 		BaseRateMilli:     450,
 		RequiredBlueprint: BPAxeBlueprint,
-		UnlockHint:        "解锁斧头蓝图",
+		UnlockHint:        "建造伐木棚",
 		InputSummary:      "产出木材 · 伴生燧石",
 	},
 	{
@@ -101,7 +102,7 @@ var JobCatalog = []JobSpec{
 		OutputResourceKey:    ResCharcoal,
 		BaseRateMilli:        280,
 		RequiredBlueprint:    BPCharcoalKiln,
-		UnlockHint:           "解锁砖砌炭窑",
+		UnlockHint:           "建造炭窑",
 		InputSummary:         "消耗 0.30 木/s → 木炭",
 		InputsPerWorkerMilli: map[string]int64{ResWood: 300},
 	},
@@ -111,7 +112,7 @@ var JobCatalog = []JobSpec{
 		OutputResourceKey: ResStone,
 		BaseRateMilli:     220,
 		RequiredBlueprint: BPQuarryTech,
-		UnlockHint:        "解锁采石技术",
+		UnlockHint:        "建造采石场",
 		InputSummary:      "产出石材 · 伴生残片",
 	},
 	{
@@ -151,176 +152,31 @@ var BaseResourceCapacityUnits = map[string]int64{
 	ResRation:       2000,
 }
 
-// BlueprintCatalog defines the 17 progression blueprints and their declarative stat modifiers.
-var BlueprintCatalog = []BlueprintSpec{
-	{
-		Code:               BPFirstResident,
-		Name:               "定居引水渠",
-		Stage:              "phase1_early",
-		RequiredPopulation: 1,
-		PrerequisiteCode:   "",
-		CostsMilli:         map[string]int64{ResWater: 15 * ResourceScale},
-		EffectSummary:      "手动打水翻倍（+2/次） · 点击小概率伴生燧石结晶",
-	},
-	{
-		Code:                  BPWaterCistern,
-		Name:                  "深井蓄水池",
-		Stage:                 "phase1_early",
-		RequiredPopulation:    4,
-		PrerequisiteCode:      BPFirstResident,
-		CostsMilli:            map[string]int64{ResWater: 85 * ResourceScale},
-		EffectSummary:         "【基建扩容】净水仓储上限提升至 1,200",
-		CapacityOverrideUnits: map[string]int64{ResWater: 1200},
-	},
-	{
-		Code:               BPColonyEdicts,
-		Name:               "聚落法令碑",
-		Stage:              "phase1_early",
-		RequiredPopulation: 6,
-		PrerequisiteCode:   BPFirstResident,
-		CostsMilli:         map[string]int64{ResWater: 120 * ResourceScale},
-		EffectSummary:      "【机制解锁】开放聚落政令开关（篝火夜班 / 节水配给）",
-	},
-	{
-		Code:               BPScoutCamp,
-		Name:               "荒原斥候营",
-		Stage:              "phase1_early",
-		RequiredPopulation: 8,
-		PrerequisiteCode:   BPColonyEdicts,
-		CostsMilli:         map[string]int64{ResWater: 160 * ResourceScale},
-		EffectSummary:      "【新系统】开放荒原裂隙搜打撤与流浪行商易物驿站",
-	},
-	{
-		Code:               BPAxeBlueprint,
-		Name:               "斧头蓝图",
-		Stage:              "phase1_early",
-		RequiredPopulation: 10,
-		PrerequisiteCode:   "",
-		CostsMilli:         map[string]int64{ResWater: 200 * ResourceScale},
-		EffectSummary:      "解锁【伐木】岗位 · 伐木伴生燧石结晶",
-	},
-	{
-		Code:               BPCharcoalKiln,
-		Name:               "砖砌炭窑",
-		Stage:              "phase1_early",
-		RequiredPopulation: 12,
-		PrerequisiteCode:   BPAxeBlueprint,
-		CostsMilli:         map[string]int64{ResWater: 240 * ResourceScale, ResWood: 65 * ResourceScale},
-		EffectSummary:      "【转化链】解锁【烧炭】岗位（实时消耗原木烧制木炭）",
-	},
-	{
-		Code:                  BPLumberYard,
-		Name:                  "巨木料场",
-		Stage:                 "phase1_early",
-		RequiredPopulation:    14,
-		PrerequisiteCode:      BPAxeBlueprint,
-		CostsMilli:            map[string]int64{ResWater: 280 * ResourceScale, ResWood: 120 * ResourceScale},
-		EffectSummary:         "【基建扩容】木材上限提升至 1,500 · 烧炭效率 +20%",
-		CapacityOverrideUnits: map[string]int64{ResWood: 1500, ResCharcoal: 800},
-		JobEfficiencyBonusPct: map[string]int64{JobCharcoal: 20},
-	},
-	{
-		Code:                  BPWaterWheel1,
-		Name:                  "木制引水轮",
-		Stage:                 "phase1_early",
-		RequiredPopulation:    16,
-		PrerequisiteCode:      BPAxeBlueprint,
-		CostsMilli:            map[string]int64{ResWater: 350 * ResourceScale, ResWood: 80 * ResourceScale},
-		EffectSummary:         "打水 +25% · 水上限提升至 2,400 · 解锁《水压锯木锤》机关",
-		CapacityOverrideUnits: map[string]int64{ResWater: 2400},
-		JobEfficiencyBonusPct: map[string]int64{JobWater: 25},
-	},
-	{
-		Code:               BPSiphonSluice,
-		Name:               "虹吸冲矿槽",
-		Stage:              "phase1_early",
-		RequiredPopulation: 20,
-		PrerequisiteCode:   BPWaterWheel1,
-		CostsMilli:         map[string]int64{ResWater: 500 * ResourceScale, ResWood: 180 * ResourceScale, ResFlint: 3 * ResourceScale},
-		EffectSummary:      "【跨资源联动】开启后，净水满仓溢出量按 10:1 自动冲刷转化为石材与燧石",
-		AutoEnableEdict:    EdictSiphonSluice,
-	},
-	{
-		Code:               BPQuarryTech,
-		Name:               "采石技术",
-		Stage:              "phase1_early",
-		RequiredPopulation: 25,
-		PrerequisiteCode:   BPAxeBlueprint,
-		CostsMilli:         map[string]int64{ResWater: 600 * ResourceScale, ResWood: 300 * ResourceScale},
-		EffectSummary:      "解锁【采石】岗位 · 深层采掘伴生古文明残片",
-	},
-	{
-		Code:                  BPStoneVault,
-		Name:                  "石砌坚库",
-		Stage:                 "phase1_early",
-		RequiredPopulation:    28,
-		PrerequisiteCode:      BPQuarryTech,
-		CostsMilli:            map[string]int64{ResWater: 900 * ResourceScale, ResWood: 360 * ResourceScale, ResStone: 110 * ResourceScale},
-		EffectSummary:         "【基建扩容】水上限 6,000 / 木上限 2,500 / 石上限 1,500",
-		CapacityOverrideUnits: map[string]int64{ResWater: 6000, ResWood: 2500, ResStone: 1500},
-	},
-	{
-		Code:                  BPStoneSaw1,
-		Name:                  "石刃锯台",
-		Stage:                 "phase1_early",
-		RequiredPopulation:    32,
-		PrerequisiteCode:      BPQuarryTech,
-		CostsMilli:            map[string]int64{ResWater: 1600 * ResourceScale, ResWood: 650 * ResourceScale, ResStone: 180 * ResourceScale},
-		EffectSummary:         "伐木、采石效率 +25% · 伴生矿掉落率翻倍",
-		JobEfficiencyBonusPct: map[string]int64{JobWood: 25, JobStone: 25},
-		DoublesByproductProc:  true,
-	},
-	{
-		Code:                  BPBasicWorkshop,
-		Name:                  "基础工坊",
-		Stage:                 "phase1_workshop",
-		RequiredPopulation:    40,
-		PrerequisiteCode:      BPQuarryTech,
-		CostsMilli:            map[string]int64{ResWater: 5000 * ResourceScale, ResWood: 1500 * ResourceScale, ResStone: 500 * ResourceScale},
-		EffectSummary:         "全资源库容巨幅扩充 · 解锁工坊合成与宝藏三部件修复",
-		CapacityOverrideUnits: map[string]int64{ResWater: 30000, ResWood: 15000, ResCharcoal: 4000, ResStone: 10000},
-	},
-	{
-		Code:                  BPPartValve,
-		Name:                  "导水阀芯 (1/3)",
-		Stage:                 "phase1_treasure",
-		RequiredPopulation:    40,
-		PrerequisiteCode:      BPBasicWorkshop,
-		CostsMilli:            map[string]int64{ResWater: 4200 * ResourceScale, ResWood: 1400 * ResourceScale, ResStone: 400 * ResourceScale},
-		EffectSummary:         "宝藏部件 I · 打水效率 +20%",
-		JobEfficiencyBonusPct: map[string]int64{JobWater: 20},
-	},
-	{
-		Code:                  BPPartFrame,
-		Name:                  "承压木框 (2/3)",
-		Stage:                 "phase1_treasure",
-		RequiredPopulation:    40,
-		PrerequisiteCode:      BPPartValve,
-		CostsMilli:            map[string]int64{ResWater: 4800 * ResourceScale, ResWood: 2200 * ResourceScale, ResStone: 550 * ResourceScale},
-		EffectSummary:         "宝藏部件 II · 伐木效率 +25%",
-		JobEfficiencyBonusPct: map[string]int64{JobWood: 25},
-	},
-	{
-		Code:                  BPPartTablet,
-		Name:                  "铭文石板 (3/3)",
-		Stage:                 "phase1_treasure",
-		RequiredPopulation:    40,
-		PrerequisiteCode:      BPPartFrame,
-		CostsMilli:            map[string]int64{ResWater: 5000 * ResourceScale, ResWood: 1600 * ResourceScale, ResStone: 800 * ResourceScale},
-		EffectSummary:         "宝藏部件 III · 采石效率 +30%",
-		JobEfficiencyBonusPct: map[string]int64{JobStone: 30},
-	},
-	{
-		Code:               BPMysteryTreasure,
-		Name:               "神秘的宝藏",
-		Stage:              "phase1_treasure",
-		RequiredPopulation: 40,
-		PrerequisiteCode:   BPPartTablet,
-		CostsMilli:         map[string]int64{ResWater: 4000 * ResourceScale, ResWood: 1800 * ResourceScale, ResStone: 450 * ResourceScale},
-		EffectSummary:      "获得 500 金币 · 开启四大终身职业抉择",
-		GrantsGoldBasis:    500 * GoldScale,
-	},
-}
+// BlueprintCatalog contains completed-effect milestones, improvements and projects.
+// Building milestones are earned only by construction, never by research.
+var BlueprintCatalog = func() []BlueprintSpec {
+	nodes := []BlueprintSpec{
+		{Code: BPFirstResident, Name: "汲水改良", Kind: "upgrade", Stage: "early", RequiredPopulation: 1, CostsMilli: resourceCosts(15, 0, 0, 0), EffectSummary: "手动打水 +2/次；每 4 次伴生 0.5 燧石"},
+		{Code: "charcoal_improvement", Name: "炭化改良", Kind: "upgrade", Stage: "industry", RequiredPopulation: 1, PrerequisiteCode: BPCharcoalKiln, CostsMilli: resourceCosts(80, 40, 20, 10), EffectSummary: "烧炭效率 +20%", JobEfficiencyBonusPct: map[string]int64{JobCharcoal: 20}},
+		{Code: BPStoneVault, Name: "石砌仓储改良", Kind: "upgrade", Stage: "industry", RequiredPopulation: 1, PrerequisiteCode: BPQuarryTech, CostsMilli: resourceCosts(200, 100, 60, 0), EffectSummary: "每座蓄水池与物资堆场的仓容翻倍"},
+		{Code: BPStoneSaw1, Name: "石刃锯台改良", Kind: "upgrade", Stage: "industry", RequiredPopulation: 1, PrerequisiteCode: BPCharcoalKiln, CostsMilli: resourceCosts(120, 80, 40, 20), EffectSummary: "伐木、采石效率 +25%；伴生物翻倍", JobEfficiencyBonusPct: map[string]int64{JobWood: 25, JobStone: 25}, DoublesByproductProc: true},
+		{Code: BPPartValve, Name: "导水阀芯", Kind: "project", Stage: "assembly", RequiredPopulation: 1, PrerequisiteCode: BPBasicWorkshop, CostsMilli: resourceCosts(300, 60, 20, 10), EffectSummary: "工程部件 · 取水效率 +20%", JobEfficiencyBonusPct: map[string]int64{JobWater: 20}},
+		{Code: BPPartFrame, Name: "承压木框", Kind: "project", Stage: "assembly", RequiredPopulation: 1, PrerequisiteCode: BPBasicWorkshop, CostsMilli: resourceCosts(100, 100, 30, 15), EffectSummary: "工程部件 · 伐木效率 +25%", JobEfficiencyBonusPct: map[string]int64{JobWood: 25}},
+		{Code: BPPartTablet, Name: "铭文石板", Kind: "project", Stage: "assembly", RequiredPopulation: 1, PrerequisiteCode: BPBasicWorkshop, CostsMilli: resourceCosts(160, 40, 70, 20), EffectSummary: "工程部件 · 采石效率 +30%", JobEfficiencyBonusPct: map[string]int64{JobStone: 30}},
+		{Code: BPMysteryTreasure, Name: "装配古代装置", Kind: "project", Stage: "assembly", RequiredPopulation: 1, PrerequisiteCode: BPBasicWorkshop, RequiredCodes: []string{BPPartValve, BPPartFrame, BPPartTablet}, CostsMilli: map[string]int64{}, EffectSummary: "完成三个部件后装配，领取一次性 500 金币并开放职业", GrantsGoldBasis: 500 * GoldScale},
+	}
+	for _, b := range BuildingCatalog {
+		if b.EffectCode == "" {
+			continue
+		}
+		node := BlueprintSpec{Code: b.EffectCode, Name: b.Name, Kind: "building", Stage: "construction", RequiredPopulation: 1, PrerequisiteCode: b.PrerequisiteCode, CostsMilli: map[string]int64{}, EffectSummary: b.EffectSummary}
+		if b.Code == BPWaterWheel1 {
+			node.JobEfficiencyBonusPct = map[string]int64{JobWater: 25}
+		}
+		nodes = append(nodes, node)
+	}
+	return nodes
+}()
 
 // EdictCatalog defines the 4 Colony Edicts & Mechanisms with declarative stat modifiers.
 var EdictCatalog = []EdictSpec{
@@ -330,7 +186,7 @@ var EdictCatalog = []EdictSpec{
 		Category:              "edict",
 		PrerequisiteCode:      BPColonyEdicts,
 		EffectSummary:         "全岗位采集与工业产出 +45%",
-		DrawbackSummary:       "居民耗水 +0.15/秒，且每秒燃烧 0.40 木材（缺木时自动失效）",
+		DrawbackSummary:       "居民耗水 +0.14/秒，且每秒燃烧 0.40 木材（缺木时自动失效）",
 		MutuallyExclusiveWith: EdictWaterRation,
 		JobEfficiencyBonusPct: map[string]int64{
 			JobWater:      45,
@@ -420,35 +276,35 @@ var CaravanOfferCatalog = []CaravanOfferSpec{
 		OfferCode:     "offer_flint_lumber",
 		Title:         "燧石换急用木料",
 		CostsMilli:    map[string]int64{ResFlint: 3 * ResourceScale},
-		RewardSummary: "换取 +50 木材、+60 水",
-		RewardsMilli:  map[string]int64{ResWood: 50 * ResourceScale, ResWater: 60 * ResourceScale},
+		RewardSummary: "换取 +12 木材、+10 水",
+		RewardsMilli:  map[string]int64{ResWood: 12 * ResourceScale, ResWater: 10 * ResourceScale},
 	},
 	{
 		OfferCode:     "offer_wood_stone",
 		Title:         "原木易石契约",
 		CostsMilli:    map[string]int64{ResWood: 80 * ResourceScale},
-		RewardSummary: "换取 +35 石材、+2 燧石结晶",
-		RewardsMilli:  map[string]int64{ResStone: 35 * ResourceScale, ResFlint: 2 * ResourceScale},
+		RewardSummary: "换取 +25 石材、+1 燧石结晶",
+		RewardsMilli:  map[string]int64{ResStone: 25 * ResourceScale, ResFlint: 1 * ResourceScale},
 	},
 	{
 		OfferCode:     "offer_charcoal_shard",
 		Title:         "燃料换古物拓片",
 		CostsMilli:    map[string]int64{ResCharcoal: 20 * ResourceScale},
-		RewardSummary: "换取 +2 古文明残片、+120 水",
-		RewardsMilli:  map[string]int64{ResAncientShard: 2 * ResourceScale, ResWater: 120 * ResourceScale},
+		RewardSummary: "换取 +1 古文明残片、+80 水",
+		RewardsMilli:  map[string]int64{ResAncientShard: ResourceScale, ResWater: 80 * ResourceScale},
 	},
 	{
 		OfferCode:        "offer_refugee_escort",
 		Title:            "荒原流民赎买契约",
 		CostsMilli:       map[string]int64{ResFlint: 5 * ResourceScale, ResWood: 50 * ResourceScale},
-		RewardSummary:    "直接安置 +2 名居民人口（免除高昂饮水招募费）",
+		RewardSummary:    "安置 +2 名居民（需要 2 个空余住房名额）",
 		RewardPopulation: 2,
 	},
 	{
 		OfferCode:     "offer_shard_supply",
 		Title:         "古物折抵筑城物资",
 		CostsMilli:    map[string]int64{ResAncientShard: 2 * ResourceScale},
-		RewardSummary: "换取 +700 水、+280 木材、+110 石材",
-		RewardsMilli:  map[string]int64{ResWater: 700 * ResourceScale, ResWood: 280 * ResourceScale, ResStone: 110 * ResourceScale},
+		RewardSummary: "换取 +20 水、+10 木材、+4 石材",
+		RewardsMilli:  map[string]int64{ResWater: 20 * ResourceScale, ResWood: 10 * ResourceScale, ResStone: 4 * ResourceScale},
 	},
 }

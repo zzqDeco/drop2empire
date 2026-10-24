@@ -61,3 +61,14 @@ func (s *Service) TradeCaravan(ctx context.Context, offerCode string) (*domain.W
 		return domain.TradeCaravan(p, offerCode, now)
 	})
 }
+
+func (s *Service) ResearchTechnology(ctx context.Context, code string, seq int64) (*domain.WorldState, error) {
+	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+		return domain.ResearchTechnology(p, code, seq, now)
+	})
+}
+func (s *Service) ConstructBuilding(ctx context.Context, code string, quantity int32, seq int64) (*domain.WorldState, error) {
+	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+		return domain.ConstructBuilding(p, code, quantity, seq, now)
+	})
+}

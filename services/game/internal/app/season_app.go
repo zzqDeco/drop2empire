@@ -81,14 +81,26 @@ func (s *Service) ControlSimulation(ctx context.Context, action string, speedMul
 			return nil
 
 		case "unlock_treasure_ready":
-			if target.PopulationTotal < 40 {
-				target.PopulationTotal = 40
+			if target.PopulationTotal < 12 {
+				target.PopulationTotal = 12
 			}
 			for _, bp := range domain.BlueprintCatalog {
 				if bp.Code != domain.BPMysteryTreasure {
 					target.UnlockedBlueprints[bp.Code] = true
 				}
 			}
+			for _, tech := range domain.TechnologyCatalog {
+				target.ResearchedTechnologies[tech.Code] = true
+			}
+			for _, building := range domain.BuildingCatalog {
+				target.BuildingCounts[building.Code] = max(1, target.BuildingCounts[building.Code])
+			}
+			houses := min(domain.MaxBuildingCount, (target.PopulationTotal-domain.InitialHousing+3)/4)
+			target.BuildingCounts[domain.BuildingHouse] = max(houses, target.BuildingCounts[domain.BuildingHouse])
+			target.LegacyHousing += max(0, target.PopulationTotal-domain.HousingCapacity(target))
+			target.SettlementCommandSeq++
+			target.LastSettlementCommand = ""
+			domain.RefreshSettlementDiscovery(target)
 			domain.ApplyBalancedAllocation(target)
 			if target.ResourcesMilli[domain.ResWater] < 5000*domain.ResourceScale {
 				target.ResourcesMilli[domain.ResWater] = 5000 * domain.ResourceScale
@@ -99,10 +111,7 @@ func (s *Service) ControlSimulation(ctx context.Context, action string, speedMul
 			if target.ResourcesMilli[domain.ResStone] < 800*domain.ResourceScale {
 				target.ResourcesMilli[domain.ResStone] = 800 * domain.ResourceScale
 			}
-			if target.SimulatedElapsedSeconds < 1780 {
-				target.SimulatedElapsedSeconds = 1780
-			}
-			domain.AppendLog(target, now, "BLUEPRINT", "【管理员沙盒】已将进度推进至第 29 分钟里程碑（40 人口 + 基础工坊 + 宝藏三部件），可直接点击开启【神秘的宝藏】！")
+			domain.AppendLog(target, now, "BLUEPRINT", "【管理员沙盒】已补齐技术、设施与三个工程部件，可直接装配古代装置；毕业金币需装配后领取。")
 			return nil
 
 		case "reset_player":
@@ -120,6 +129,7 @@ func (s *Service) ControlSimulation(ctx context.Context, action string, speedMul
 			fresh := domain.NewBlankPlayer(target.Handle, now)
 			fresh.PasswordHash = prevHash
 			fresh.IsAdmin = prevAdmin
+			fresh.SettlementCommandSeq = target.SettlementCommandSeq + 1
 			w.Players[target.Handle] = fresh
 			return nil
 

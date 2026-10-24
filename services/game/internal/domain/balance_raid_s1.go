@@ -545,7 +545,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		BlueprintName: "基础免图纸",
 		StatSummary:   "攻击 +6 · 局内阵亡会损毁掉落",
 		AtkBonus:      6,
-		CostsMilli:    map[string]int64{ResWood: 320 * ResourceScale, ResWater: 260 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWood: 60 * ResourceScale, ResWater: 80 * ResourceScale},
 	},
 	{
 		ItemKey:       "gear_flint_bow",
@@ -592,7 +592,7 @@ var RaidGearCatalog = []RaidGearSpec{
 		StatSummary:   "生命 +30 · 护甲 +3 · 阵亡掉落",
 		HpBonus:       30,
 		DefBonus:      3,
-		CostsMilli:    map[string]int64{ResWater: 380 * ResourceScale, ResWood: 280 * ResourceScale},
+		CostsMilli:    map[string]int64{ResWater: 100 * ResourceScale, ResWood: 40 * ResourceScale},
 	},
 	{
 		ItemKey:       "gear_splint_mail",

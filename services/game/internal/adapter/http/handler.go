@@ -135,7 +135,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	for _, meta := range domain.ResourceCatalog {
 		amt := p.ResourcesMilli[meta.Key]
 		frz := p.FrozenResourcesMilli[meta.Key]
-		unlocked := meta.Key == domain.ResWater || amt > 0 || frz > 0
+		unlocked := p.DiscoveredResources[meta.Key] || meta.Key == domain.ResWater || amt > 0 || frz > 0
 		if meta.Key == domain.ResWood && p.UnlockedBlueprints[domain.BPAxeBlueprint] {
 			unlocked = true
 		}
@@ -178,13 +178,18 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	computedJobs := domain.ComputeJobs(p)
 	jobsDTO := make([]*empire.WorkerJobDTO, 0, len(computedJobs))
 	for _, cj := range computedJobs {
+		reportedOutput := cj.TotalOutputPerSecMilli
+		if cj.JobKey == domain.JobCharcoal || cj.JobKey == domain.JobSmeltIron || cj.JobKey == domain.JobPrepRation {
+			reportedOutput = grossRates[cj.OutputResourceKey]
+		}
 		jobsDTO = append(jobsDTO, &empire.WorkerJobDTO{
 			JobKey:                 cj.JobKey,
 			Name:                   cj.Name,
 			Assigned:               cj.Assigned,
+			Capacity:               cj.Capacity,
 			BaseRateMilli:          cj.BaseRateMilli,
 			EffectiveRateMilli:     cj.EffectiveRateMilli,
-			TotalOutputPerSecMilli: cj.TotalOutputPerSecMilli,
+			TotalOutputPerSecMilli: reportedOutput,
 			EfficiencyPct:          cj.EfficiencyPct,
 			Unlocked:               cj.Unlocked,
 			UnlockHint:             cj.UnlockHint,
@@ -195,7 +200,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	presetsDTO := make([]*empire.AllocationPresetDTO, 0, len(p.Presets))
 	for _, pr := range p.Presets {
 		entries := make([]*empire.AllocationEntryDTO, 0, len(pr.Allocations))
-		for _, k := range []string{domain.JobWater, domain.JobWood, domain.JobCharcoal, domain.JobStone, domain.JobSmeltIron, domain.JobPrepRation} {
+		for _, k := range []string{domain.JobWater, domain.JobForage, domain.JobWood, domain.JobCharcoal, domain.JobStone, domain.JobSmeltIron, domain.JobPrepRation} {
 			if c, ok := pr.Allocations[k]; ok && c > 0 {
 				entries = append(entries, &empire.AllocationEntryDTO{
 					JobKey: k,
@@ -213,20 +218,8 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	blueprintsDTO := make([]*empire.BlueprintNodeDTO, 0, len(domain.BlueprintCatalog))
 	for _, bp := range domain.BlueprintCatalog {
 		unlocked := p.UnlockedBlueprints[bp.Code]
-		prereqOK := bp.PrerequisiteCode == "" || p.UnlockedBlueprints[bp.PrerequisiteCode]
-		visible := false
-		if unlocked {
-			visible = true
-		} else if p.PopulationTotal > 0 {
-			switch bp.Code {
-			case domain.BPFirstResident:
-				visible = true
-			case domain.BPAxeBlueprint:
-				visible = p.UnlockedBlueprints[domain.BPFirstResident] || p.PopulationTotal >= 3
-			default:
-				visible = prereqOK
-			}
-		}
+		prereqOK := domain.BlueprintPrerequisitesMet(p, bp)
+		visible := bp.Kind != "building" && (unlocked || (p.PopulationTotal > 0 && (bp.PrerequisiteCode == "" || p.UnlockedBlueprints[bp.PrerequisiteCode])))
 
 		var maxETA int64
 		allResourcesOK := true
@@ -242,6 +235,9 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 				allResourcesOK = false
 			}
 			eta := computeETASeconds(reqMilli, curMilli, rates[rKey])
+			if capacity := domain.ResourceCapacityMilli(p, rKey); capacity > 0 && reqMilli > capacity && curMilli < reqMilli {
+				eta = -1
+			}
 			if eta < 0 {
 				maxETA = -1
 			} else if maxETA >= 0 && eta > maxETA {
@@ -251,14 +247,21 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 				ResourceKey:   rKey,
 				ResourceName:  domain.ResourceName(rKey),
 				RequiredMilli: reqMilli,
+				CapacityMilli: domain.ResourceCapacityMilli(p, rKey),
 				CurrentMilli:  curMilli,
 				EtaSeconds:    eta,
 			})
 		}
 
-		canUnlock := !unlocked && prereqOK && p.PopulationTotal >= bp.RequiredPopulation && allResourcesOK
+		canUnlock := bp.Kind != "building" && !unlocked && prereqOK && allResourcesOK
+		reason := domain.CostsBlockReason(p, bp.CostsMilli)
+		if !prereqOK {
+			reason = "请完成前置设施或全部工程部件"
+		}
 		blueprintsDTO = append(blueprintsDTO, &empire.BlueprintNodeDTO{
 			Code:               bp.Code,
+			Kind:               bp.Kind,
+			BlockedReason:      reason,
 			Name:               bp.Name,
 			Stage:              bp.Stage,
 			RequiredPopulation: bp.RequiredPopulation,
@@ -305,6 +308,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 				ResourceKey:   rKey,
 				ResourceName:  domain.ResourceName(rKey),
 				RequiredMilli: reqMilli,
+				CapacityMilli: domain.ResourceCapacityMilli(p, rKey),
 				CurrentMilli:  curMilli,
 				EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
 			})
@@ -697,6 +701,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 					ResourceKey:   rKey,
 					ResourceName:  domain.ResourceName(rKey),
 					RequiredMilli: reqMilli,
+					CapacityMilli: domain.ResourceCapacityMilli(p, rKey),
 					CurrentMilli:  curMilli,
 					EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
 				})
@@ -733,10 +738,13 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	}
 
 	caravanOffersDTO := make([]*empire.CaravanOfferDTO, 0, len(domain.CaravanOfferCatalog))
-	if p.UnlockedBlueprints[domain.BPScoutCamp] {
+	if p.BuildingCounts[domain.BuildingCaravan] > 0 {
 		for _, cf := range domain.CaravanOfferCatalog {
+			if !domain.CaravanOfferVisible(p, cf) {
+				continue
+			}
 			costsDTO := make([]*empire.CostItemDTO, 0, len(cf.CostsMilli))
-			canTrade := true
+			canTrade := p.PopulationTotal+cf.RewardPopulation <= domain.HousingCapacity(p)
 			for _, rKey := range costOrderAll {
 				reqMilli, exists := cf.CostsMilli[rKey]
 				if !exists {
@@ -750,6 +758,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 					ResourceKey:   rKey,
 					ResourceName:  domain.ResourceName(rKey),
 					RequiredMilli: reqMilli,
+					CapacityMilli: domain.ResourceCapacityMilli(p, rKey),
 					CurrentMilli:  curMilli,
 					EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
 				})
@@ -771,6 +780,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	return &empire.DashboardStateResp{
 		ServerTime:          time.Now().UTC().Format(time.RFC3339Nano),
 		Revision:            p.Revision,
+		Settlement:          mapSettlement(p, rates),
 		Player:              playerDTO,
 		AvailableHandles:    handles,
 		Resources:           resourcesDTO,
@@ -1212,6 +1222,8 @@ func (s *Server) RunBenchmark30m(ctx context.Context, _ *empire.RunBenchmark30mR
 		}
 		runsDTO = append(runsDTO, &empire.BenchmarkRunDTO{
 			StrategyCode:   r.StrategyCode,
+			Completed:      r.Completed,
+			FailureReason:  r.FailureReason,
 			StrategyName:   r.StrategyName,
 			Description:    r.Description,
 			TotalSeconds:   r.TotalSeconds,
@@ -1221,7 +1233,7 @@ func (s *Server) RunBenchmark30m(ctx context.Context, _ *empire.RunBenchmark30mR
 	}
 	return &empire.Benchmark30mResp{
 		Runs: runsDTO,
-		Note: "模拟步长 0.5 秒，整数工人分配，仅开局手点 10 次水。V1 推荐策略通过引入引水轮、石刃锯台与宝藏三部件，彻底消除了第 9–30 分钟的纯挂机空窗期。",
+		Note: "使用真实研究、建造、招募、岗位与生产逻辑；仅开局手点 10 次，每 10 秒作一次经营决策，最多运行 60 分钟。完成时间属于自动策略基准，不代表真人试玩时长。",
 	}, nil
 }
 
@@ -1295,6 +1307,7 @@ func mapRaidPresentation(p *domain.PlayerState) (*empire.EquippedCosmeticsDTO, [
 				ResourceKey:   rKey,
 				ResourceName:  domain.ResourceName(rKey),
 				RequiredMilli: reqMilli,
+				CapacityMilli: domain.ResourceCapacityMilli(p, rKey),
 				CurrentMilli:  curMilli,
 				EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
 			})
@@ -1342,6 +1355,7 @@ func mapRaidPresentation(p *domain.PlayerState) (*empire.EquippedCosmeticsDTO, [
 				ResourceKey:   rKey,
 				ResourceName:  domain.ResourceName(rKey),
 				RequiredMilli: reqMilli,
+				CapacityMilli: domain.ResourceCapacityMilli(p, rKey),
 				CurrentMilli:  curMilli,
 				EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
 			})
@@ -1385,6 +1399,7 @@ func mapRaidPresentation(p *domain.PlayerState) (*empire.EquippedCosmeticsDTO, [
 			ResourceKey:   rKey,
 			ResourceName:  domain.ResourceName(rKey),
 			RequiredMilli: reqMilli,
+			CapacityMilli: domain.ResourceCapacityMilli(p, rKey),
 			CurrentMilli:  curMilli,
 			EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
 		})

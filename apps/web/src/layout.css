@@ -2226,3 +2226,17 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Keep job descriptions readable beside the expanded assigned / capacity count. */
+@media (max-width: 600px) {
+  .job-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .job-controls {
+    justify-content: space-between;
+  }
+  .job-rate-box {
+    text-align: left;
+  }
+}
