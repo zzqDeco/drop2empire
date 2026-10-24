@@ -805,11 +805,6 @@ export function App() {
           ======================================================================== */}
       {activeScene === "settlement" && (
         <div key="scene-settlement">
-          {/* Integrated Personal Lord Profile & 2.5D Voxel Wardrobe */}
-          <div className="settlement-lord-hero-wrap">
-            <LordProfileWardrobeBar state={state} runAction={runAction} />
-          </div>
-
           {showProfessionChoice && (
             <section className="profession-gate-banner" aria-label="选择职业">
               <div className="section-head">
@@ -861,8 +856,11 @@ export function App() {
           <main
             className={`dashboard-grid ${!showJobAllocationColumn ? "dashboard-grid-2col" : ""}`}
           >
-            {/* Column 1: Resources (with Separate Gross / Drain / Net Rates) */}
-            <section className="panel" aria-label="资源">
+            {/* Column 1: Integrated Personal Lord Profile + Resources (with Separate Gross / Drain / Net Rates) */}
+            <div className="settlement-left-col">
+              <LordProfileWardrobeBar state={state} runAction={runAction} />
+
+              <section className="panel" aria-label="资源">
               <div className="panel-header">
                 <div className="panel-title">
                   <Droplets size={ICON.sm} />
@@ -1025,7 +1023,8 @@ export function App() {
                   </table>
                 </div>
               )}
-            </section>
+              </section>
+            </div>
 
             {/* Column 2: Worker Allocation & Colony Edicts */}
             {showJobAllocationColumn && (

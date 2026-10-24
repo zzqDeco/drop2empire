@@ -53,9 +53,17 @@ export function LordAvatarSVG({
   const brass = "var(--warning-text)";
   const verdigris = "var(--success-text)";
 
-  // Horizontal directional shift/skew for 4-way turning feel
-  const dirShiftX = isLeft ? -4 : isRight ? 4 : 0;
-  const flipScaleX = isLeft ? -1 : 1;
+  // Rich tactile palette for Minecraft-proportioned Blueprint & Ink figure
+  const skinFront = "#F3E1C8";
+  const skinSide = "#D9BD98";
+  const hairInk = "#231F1C";
+  const tunicFront = "#28415E";
+  const tunicSide = "#1B2C40";
+  const legFront = "#3D3630";
+
+  // True 4-directional perspective shift (no mirror inversion of light source)
+  const rigShiftX = isLeft ? -3 : isRight ? 3 : 0;
+  const faceFeatureOffsetX = isLeft ? -3 : isRight ? 3 : 0;
 
   return (
     <svg
@@ -63,7 +71,7 @@ export function LordAvatarSVG({
       height={dim}
       viewBox="0 0 120 120"
       role="img"
-      aria-label={`领主体素立绘 (${facing})`}
+      aria-label="领主角色形象"
     >
       <defs>
         <pattern
@@ -159,15 +167,6 @@ export function LordAvatarSVG({
             stroke={ink}
             strokeWidth="1.3"
           />
-          <text
-            x="11"
-            y="16"
-            fill={muted}
-            fontSize="6.5"
-            fontFamily="var(--font-mono)"
-          >
-            MC·VOXEL·{facing.toUpperCase()}
-          </text>
           {hasLegendary && (
             <circle
               cx="60"
@@ -226,9 +225,7 @@ export function LordAvatarSVG({
       />
 
       {/* ==================== MAIN 2.5D MINECRAFT VOXEL RIG ==================== */}
-      <g
-        transform={`translate(${60 + dirShiftX}, 0) scale(${flipScaleX}, 1) translate(-60, 0)`}
-      >
+      <g transform={`translate(${rigShiftX}, 0)`}>
         <g>
           <animateTransform
             attributeName="transform"
@@ -343,7 +340,7 @@ export function LordAvatarSVG({
                     ? paper
                     : bootsKey === "gear_spring_boots"
                       ? sunken
-                      : "url(#voxelSideHatch)"
+                      : legFront
                 }
                 stroke={ink}
                 strokeWidth="1.8"
@@ -398,7 +395,7 @@ export function LordAvatarSVG({
                     ? paper
                     : bootsKey === "gear_spring_boots"
                       ? sunken
-                      : "url(#voxelSideHatch)"
+                      : legFront
                 }
                 stroke={ink}
                 strokeWidth="1.8"
@@ -436,7 +433,7 @@ export function LordAvatarSVG({
             {/* Torso Top Isometric Bevel */}
             <polygon
               points="42,48 48,43 80,43 76,48"
-              fill={paper}
+              fill={tunicFront}
               stroke={ink}
               strokeWidth="1.6"
             />
@@ -446,14 +443,14 @@ export function LordAvatarSVG({
               y="48"
               width="34"
               height="28"
-              fill={paper}
+              fill={tunicFront}
               stroke={ink}
               strokeWidth="2"
             />
             {/* Torso 3D Right Depth Face */}
             <polygon
               points="76,48 82,43 82,71 76,76"
-              fill="url(#voxelSideHatch)"
+              fill={tunicSide}
               stroke={ink}
               strokeWidth="1.8"
             />
@@ -553,7 +550,7 @@ export function LordAvatarSVG({
             {/* Top Face of Left Shoulder Block */}
             <polygon
               points="30,49 36,44 46,44 42,49"
-              fill={paper}
+              fill={tunicFront}
               stroke={ink}
               strokeWidth="1.5"
             />
@@ -563,7 +560,7 @@ export function LordAvatarSVG({
               y="49"
               width="12"
               height="24"
-              fill={sunken}
+              fill={tunicSide}
               stroke={ink}
               strokeWidth="1.8"
             />
@@ -573,7 +570,7 @@ export function LordAvatarSVG({
               y="67"
               width="10"
               height="7"
-              fill={paper}
+              fill={skinFront}
               stroke={ink}
               strokeWidth="1.6"
             />
@@ -675,7 +672,7 @@ export function LordAvatarSVG({
             )}
             <polygon
               points="76,49 82,44 92,44 88,49"
-              fill={paper}
+              fill={tunicFront}
               stroke={ink}
               strokeWidth="1.5"
             />
@@ -684,7 +681,7 @@ export function LordAvatarSVG({
               y="49"
               width="12"
               height="24"
-              fill={sunken}
+              fill={tunicSide}
               stroke={ink}
               strokeWidth="1.8"
             />
@@ -699,7 +696,7 @@ export function LordAvatarSVG({
               y="67"
               width="10"
               height="7"
-              fill={paper}
+              fill={skinFront}
               stroke={ink}
               strokeWidth="1.6"
             />
@@ -770,7 +767,7 @@ export function LordAvatarSVG({
             {/* Isometric Cube Top Face */}
             <polygon
               points="40,18 48,11 82,11 74,18"
-              fill={paper}
+              fill={hairInk}
               stroke={ink}
               strokeWidth="1.8"
             />
@@ -780,25 +777,25 @@ export function LordAvatarSVG({
               y="18"
               width="34"
               height="30"
-              fill={paper}
+              fill={skinFront}
               stroke={ink}
               strokeWidth="2.1"
             />
             {/* Isometric Cube Right Side Depth Face */}
             <polygon
               points="74,18 82,11 82,41 74,48"
-              fill="url(#voxelSideHatch)"
+              fill={skinSide}
               stroke={ink}
               strokeWidth="1.8"
             />
 
             {!isBack ? (
               /* FRONT / SIDE VOXEL FACE FEATURES */
-              <g>
+              <g transform={`translate(${faceFeatureOffsetX}, 0)`}>
                 {/* Voxel Hair / Brow Fringe */}
                 <path
                   d="M40 18 H74 V26 H66 V23 H58 V26 H48 V24 H40 Z"
-                  fill={ink}
+                  fill={hairInk}
                 />
                 {/* Crisp Minecraft-Style Pixel Eyes (with blink) */}
                 <g>
@@ -808,7 +805,7 @@ export function LordAvatarSVG({
                     y="31"
                     width="8"
                     height="5"
-                    fill={ink}
+                    fill={hairInk}
                   >
                     <animate
                       attributeName="height"
@@ -826,7 +823,7 @@ export function LordAvatarSVG({
                     y="31"
                     width="8"
                     height="5"
-                    fill={ink}
+                    fill={hairInk}
                   >
                     <animate
                       attributeName="height"
@@ -839,8 +836,8 @@ export function LordAvatarSVG({
                   <rect x="62" y="32" width="2.5" height="2.5" fill={paper} />
                 </g>
                 {/* Voxel Nose / Mouth */}
-                <rect x="54" y="36" width="6" height="2.5" fill={muted} />
-                <rect x="52" y="42" width="10" height="2.2" fill={ink} />
+                <rect x="54" y="36" width="6" height="2.5" fill={skinSide} />
+                <rect x="52" y="42" width="10" height="2.2" fill={hairInk} />
               </g>
             ) : (
               /* BACK OF CUBIC HEAD (When facing UP) */
@@ -849,16 +846,16 @@ export function LordAvatarSVG({
                   x="40"
                   y="18"
                   width="34"
-                  height="18"
-                  fill="url(#voxelDeepHatch)"
+                  height="22"
+                  fill={hairInk}
                   stroke={ink}
                   strokeWidth="1.4"
                 />
                 <line
                   x1="40"
-                  y1="36"
+                  y1="38"
                   x2="74"
-                  y2="36"
+                  y2="38"
                   stroke={ink}
                   strokeWidth="1.8"
                 />
