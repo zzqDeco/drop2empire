@@ -290,3 +290,79 @@ func BenchmarkOfflineProductionCatchup(b *testing.B) {
 		SettleProduction(p, now.Add(8*time.Hour))
 	}
 }
+
+func TestIronSmeltingFallsBackToWoodDespiteSubMilliCharcoalRemainder(t *testing.T) {
+	now := time.Date(2026, 10, 24, 6, 0, 0, 0, time.UTC)
+	p := NewBlankPlayer("smelter", now)
+	p.PopulationTotal = 2
+	p.Workers[JobSmeltIron] = 2
+	p.UnlockedBlueprints[BPBasicWorkshop] = true
+	p.Profession = ProfArtisan
+	p.ResourcesMilli[ResWater] = 50_000
+	p.ResourcesMilli[ResStone] = 10_000
+	p.ResourcesMilli[ResWood] = 10_000
+	p.ProductionRemainders = map[string]int64{ResCharcoal: 40} // < 100 sub-milli/ms fuel rate
+
+	SettleProduction(p, now.Add(5*time.Second))
+	if p.ResourcesMilli[ResIronIngot] <= 0 {
+		t.Fatalf("expected iron ingot output via wood fallback, got %d (remainders=%v)", p.ResourcesMilli[ResIronIngot], p.ProductionRemainders)
+	}
+	if p.ResourcesMilli[ResWood] >= 10_000 {
+		t.Fatalf("expected wood fallback fuel consumption, got %d", p.ResourcesMilli[ResWood])
+	}
+}
+
+func TestEdictHydroSawDoesNotDrainWaterWhenInactiveAtTickStart(t *testing.T) {
+	now := time.Date(2026, 10, 24, 6, 0, 0, 0, time.UTC)
+	p := NewBlankPlayer("hydro", now)
+	p.PopulationTotal = 1
+	p.Workers[JobWater] = 1
+	p.UnlockedBlueprints[BPColonyEdicts] = true
+	p.UnlockedBlueprints[BPWaterWheel1] = true
+	p.ActiveEdicts[EdictHydroSaw] = true
+	p.ResourcesMilli[ResWater] = 0
+
+	// In the first 1-second tick, water starts at 0 so EdictHydroSaw grants no bonus;
+	// it must not drain 1,500 milli-units of water during that same tick.
+	SettleProduction(p, now.Add(time.Second))
+	if p.ResourcesMilli[ResWater] != 2500 {
+		t.Fatalf("expected full 2500 milli water from 1 worker with BPWaterWheel1 in tick 1 (hydro_saw inactive at tick start), got %d", p.ResourcesMilli[ResWater])
+	}
+}
+
+func TestMarketFillSettlesRestingBuyerBeforeCreditingInputResources(t *testing.T) {
+	t0 := time.Date(2026, 10, 24, 6, 0, 0, 0, time.UTC)
+	w := NewDefaultWorld(t0)
+	w.Orders = nil
+
+	buyer := NewBlankPlayer("resting_buyer", t0)
+	buyer.Profession = ProfArtisan
+	buyer.PopulationTotal = 1
+	buyer.Workers[JobCharcoal] = 1
+	buyer.UnlockedBlueprints[BPCharcoalKiln] = true
+	buyer.ResourcesMilli[ResWater] = 100_000
+	buyer.ResourcesMilli[ResWood] = 0
+	buyer.GoldBasis = 100 * GoldScale
+	w.Players[buyer.Handle] = buyer
+
+	if err := PlaceMarketOrder(w, buyer, ResWood, "BID", GoldScale, 10*ResourceScale, t0); err != nil {
+		t.Fatal(err)
+	}
+
+	// Seller fills the resting buyer's order 1 hour later.
+	t1 := t0.Add(time.Hour)
+	seller := w.Players["archon_demo"]
+	SettleProduction(seller, t1)
+	if err := PlaceMarketOrder(w, seller, ResWood, "ASK", GoldScale, 10*ResourceScale, t1); err != nil {
+		t.Fatal(err)
+	}
+
+	// Buyer now polls at t1: because wood arrived at t1 (not t0), buyer must have 0 charcoal produced over [t0, t1] and all 10,000 milli wood intact.
+	SettleProduction(buyer, t1)
+	if buyer.ResourcesMilli[ResCharcoal] != 0 {
+		t.Fatalf("resting buyer retroactively produced %d charcoal from wood delivered at t1", buyer.ResourcesMilli[ResCharcoal])
+	}
+	if buyer.ResourcesMilli[ResWood] != 10*ResourceScale {
+		t.Fatalf("expected 10,000 milli wood at t1, got %d", buyer.ResourcesMilli[ResWood])
+	}
+}

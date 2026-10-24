@@ -1,4 +1,4 @@
-import type { ServerUpdate } from "./serverState";
+import { advanceChannelingProgress, type ServerUpdate } from "./serverState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
@@ -137,7 +137,7 @@ export function WastelandRaidPanel({
 
   const triggerFinishRaid = useCallback(
     (status: "EXTRACTED" | "MIA") => {
-      if (settlingRef.current) return;
+      if (settlingRef.current || commandPendingRef.current) return;
       settlingRef.current = true;
       setChanneling(null);
       setShowLootModal(false);
@@ -157,27 +157,14 @@ export function WastelandRaidPanel({
       setTimeLeftMs(remaining);
       if (remaining === 0 && !commandPendingRef.current) triggerFinishRaid("MIA");
 
-      setChanneling((cur) => {
-        if (!cur) return null;
-        const elapsed = now - cur.startedAt;
-        if (elapsed >= cur.durationMs) {
-          return { ...cur, progressPct: 100 };
-        }
-        return {
-          ...cur,
-          progressPct: Math.min(
-            99,
-            Math.floor((elapsed / cur.durationMs) * 100),
-          ),
-        };
-      });
+      setChanneling((cur) => advanceChannelingProgress(cur, now, commandPendingRef.current));
     }, 100);
     return () => window.clearInterval(id);
   }, [inRaid, activeRaidId, triggerFinishRaid]);
 
   // Complete channeling when progressPct reaches 100 -> Request Server Chest Roll or Extraction!
   useEffect(() => {
-    if (!channeling || channeling.progressPct < 100) return;
+    if (!channeling || channeling.progressPct < 100 || commandPendingRef.current) return;
     const done = channeling;
     setChanneling(null);
 

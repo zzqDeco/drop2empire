@@ -96,6 +96,8 @@ func (s *Store) LoadWorld(ctx context.Context, now time.Time) (*domain.WorldStat
 				return nil, insertErr
 			}
 			if tag.RowsAffected() == 1 {
+				w.PendingTrades = append([]domain.MarketTrade{}, w.Trades...)
+				w.PendingCollectibles = append([]domain.CollectibleItem{}, w.Collectibles...)
 				if saveErr := s.SaveWorld(ctx, w); saveErr != nil {
 					return nil, saveErr
 				}
@@ -163,8 +165,8 @@ SET state_json = EXCLUDED.state_json, updated_at = now()
 			return err
 		}
 	}
-	// PendingTrades includes every fill, including fills beyond the 60-row UI window.
-	for _, tr := range append(append([]domain.MarketTrade{}, world.Trades...), world.PendingTrades...) {
+	// PendingTrades and PendingCollectibles record only new fills/mints from this transaction.
+	for _, tr := range world.PendingTrades {
 		_, err = s.db.Exec(ctx, `
 INSERT INTO d2e_trades_audit (trade_id, item_key, price_basis, quantity_milli, total_gold_basis, tax_burned_basis, tax_treasury_basis, buyer_handle, seller_handle, executed_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -174,7 +176,8 @@ ON CONFLICT (trade_id) DO NOTHING
 			return err
 		}
 	}
-	for _, c := range world.Collectibles {
+	world.PendingTrades = nil
+	for _, c := range world.PendingCollectibles {
 		_, err = s.db.Exec(ctx, `
 INSERT INTO d2e_collectibles_audit (item_id, serial_number, season_id, base_model_id, texture_id, pattern_seed, rarity_tier, owner_handle, minted_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -184,6 +187,7 @@ ON CONFLICT (item_id) DO UPDATE SET owner_handle = EXCLUDED.owner_handle
 			return err
 		}
 	}
+	world.PendingCollectibles = nil
 	return nil
 }
 

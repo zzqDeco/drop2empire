@@ -28,3 +28,19 @@ export function mergeServerUpdate(
     },
   };
 }
+
+export function advanceChannelingProgress<T extends { startedAt: number; durationMs: number; progressPct: number }>(
+  cur: T | null,
+  nowMs: number,
+  commandPending: boolean,
+): T | null {
+  if (!cur) return null;
+  const elapsed = nowMs - cur.startedAt;
+  if (elapsed >= cur.durationMs && !commandPending) {
+    return { ...cur, progressPct: 100 };
+  }
+  return {
+    ...cur,
+    progressPct: Math.min(99, Math.floor((elapsed / cur.durationMs) * 100)),
+  };
+}

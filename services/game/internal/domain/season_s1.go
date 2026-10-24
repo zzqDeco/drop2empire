@@ -106,6 +106,7 @@ func OpenSeasonChest(w *WorldState, p *PlayerState, _ int64, now time.Time) erro
 		OwnerHandle:   p.Handle,
 	}
 
+	w.PendingCollectibles = append(w.PendingCollectibles, item)
 	w.Collectibles = append([]CollectibleItem{item}, w.Collectibles...)
 	AppendLog(p, now, "COLLECTIBLE", fmt.Sprintf("★ 开启宝箱铸造唯一藏品【%s】（品质：%s，种子：%d，特征：%s）！",
 		item.Name, item.RarityTier, item.PatternSeed, item.SpecialTag))

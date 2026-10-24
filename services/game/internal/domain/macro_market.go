@@ -72,7 +72,7 @@ func PlaceMarketOrder(w *WorldState, p *PlayerState, itemKey, side string, price
 	if priceBasis < MacroBalance.MinOrderPriceBasis || priceBasis > MacroBalance.MaxOrderPriceBasis {
 		return ErrInvalidInput("单价超出允许范围（0.0100 - 10,000.0000 金币）")
 	}
-	if quantityMilli < MacroBalance.MinOrderQtyMilli || quantityMilli > 1_000_000_000_000 || quantityMilli%ResourceScale != 0 {
+	if quantityMilli < MacroBalance.MinOrderQtyMilli || quantityMilli > MacroBalance.MaxOrderQtyMilli || quantityMilli%ResourceScale != 0 {
 		return ErrInvalidInput("挂单数量必须为至少 1.000 的整数单位")
 	}
 	validItem := false
@@ -178,8 +178,8 @@ func MatchOrder(w *WorldState, taker *PlayerState, incoming *MarketOrder, now ti
 		if err != nil {
 			return err
 		}
-		taxTotal := tradeGold / 100
-		taxBurn := taxTotal / 2
+		taxTotal := (tradeGold/10000)*MarketTaxBps + ((tradeGold%10000)*MarketTaxBps)/10000
+		taxBurn := (taxTotal * MarketBurnShareBps) / MarketTaxBps
 		taxTreasury := taxTotal - taxBurn
 
 		var buyerHandle, sellerHandle string
@@ -204,6 +204,12 @@ func MatchOrder(w *WorldState, taker *PlayerState, incoming *MarketOrder, now ti
 		}
 		if !resting.IsNPC && (buyer == nil || seller == nil) {
 			return ErrPrecondition("invalid_order_owner", "订单账户不存在")
+		}
+		if buyer != nil && buyer != taker {
+			SettleProduction(buyer, now)
+		}
+		if seller != nil && seller != taker {
+			SettleProduction(seller, now)
 		}
 		deltas := []balanceDelta{{&w.PermanentlyBurnedBasis, taxBurn}, {&w.TotalIssuedBasis, -taxBurn}, {&w.TreasuryHeldBasis, taxTreasury}}
 		var buyerStock, sellerFrozen int64

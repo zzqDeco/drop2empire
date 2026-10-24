@@ -248,6 +248,38 @@ func TestEveryFillAuditedAndAuditFailureRollsBackAssets(t *testing.T) {
 	}
 }
 
+func TestPendingCollectiblesAuditedIncrementally(t *testing.T) {
+	s := integrationStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	if err := s.WithinTx(ctx, func(tx context.Context) error {
+		w, err := s.LoadWorld(tx, now)
+		if err != nil {
+			return err
+		}
+		p := w.Players["archon_demo"]
+		p.ResourcesMilli[domain.ResSeasonChest] = domain.ResourceScale
+		if err := domain.OpenSeasonChest(w, p, 0, now); err != nil {
+			return err
+		}
+		if len(w.PendingCollectibles) != 1 {
+			t.Fatalf("expected 1 pending collectible, got %d", len(w.PendingCollectibles))
+		}
+		return s.SaveWorld(tx, w)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var count int
+	if err := s.db.QueryRow(ctx, `SELECT count(*) FROM d2e_collectibles_audit`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 audited collectible, got %d", count)
+	}
+}
+
 func TestRaidPlayerLockDoesNotBlockOtherPlayersOrRequireRealmLock(t *testing.T) {
 	s := integrationStore(t)
 	seedRegressionWorld(t, s, 2)

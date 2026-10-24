@@ -12,6 +12,7 @@ var MacroBalance = struct {
 	MinOrderPriceBasis int64
 	MaxOrderPriceBasis int64
 	MinOrderQtyMilli   int64
+	MaxOrderQtyMilli   int64
 
 	// Guild progression & donation parameters:
 	GuildXPPerLevel            int64
@@ -63,6 +64,7 @@ var MacroBalance = struct {
 	MinOrderPriceBasis: 100,
 	MaxOrderPriceBasis: 100_000_000,
 	MinOrderQtyMilli:   1000,
+	MaxOrderQtyMilli:   1_000_000_000_000,
 
 	GuildXPPerLevel:            500,
 	GuildMaxLevel:              10,

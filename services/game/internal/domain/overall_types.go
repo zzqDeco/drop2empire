@@ -561,6 +561,7 @@ type SeasonNotice struct {
 type WorldState struct {
 	LastWarPeriod          string                  `json:"lastWarPeriod"`
 	PendingTrades          []MarketTrade           `json:"-"`
+	PendingCollectibles    []CollectibleItem       `json:"-"`
 	ActiveHandle           string                  `json:"activeHandle"`
 	AdminMode              bool                    `json:"-"`
 	Players                map[string]*PlayerState `json:"players"`

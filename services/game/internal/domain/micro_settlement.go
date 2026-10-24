@@ -348,6 +348,10 @@ func changeProductionStock(p *PlayerState, key string, delta int64) {
 }
 
 func produceSecond(p *PlayerState) {
+	activeEdicts := make(map[string]bool, len(EdictCatalog))
+	for _, ed := range EdictCatalog {
+		activeEdicts[ed.Code] = isEdictEffectivelyActive(p, ed)
+	}
 	jobs := ComputeJobs(p)
 	byproductMult := int64(1)
 	for _, bp := range BlueprintCatalog {
@@ -382,7 +386,7 @@ func produceSecond(p *PlayerState) {
 	}
 	perPop := SettlementBalance.BaseWaterDrainPerPop
 	for _, ed := range EdictCatalog {
-		if !isEdictEffectivelyActive(p, ed) {
+		if !activeEdicts[ed.Code] {
 			continue
 		}
 		perPop += ed.PerResidentWaterDrainMod
@@ -415,14 +419,25 @@ func produceSecond(p *PlayerState) {
 			continue
 		}
 		workMs := int64(job.Assigned) * 1000
-		inputs := make(map[string]int64, len(spec.InputsPerWorkerMilli))
-		for key, rate := range spec.InputsPerWorkerMilli {
-			if job.JobKey == JobSmeltIron && key == ResCharcoal && productionStock(p, ResCharcoal) == 0 {
-				key = ResWood
+		if job.JobKey == JobSmeltIron {
+			stoneRate := spec.InputsPerWorkerMilli[ResStone]
+			fuelRate := spec.InputsPerWorkerMilli[ResCharcoal]
+			if availStone := productionStock(p, ResStone) / stoneRate; availStone < workMs {
+				workMs = availStone
 			}
-			inputs[key] += rate
+			coalMs := min(workMs, productionStock(p, ResCharcoal)/fuelRate)
+			woodMs := min(workMs-coalMs, productionStock(p, ResWood)/fuelRate)
+			workMs = coalMs + woodMs
+			if workMs <= 0 {
+				continue
+			}
+			changeProductionStock(p, ResStone, -stoneRate*workMs)
+			changeProductionStock(p, ResCharcoal, -fuelRate*coalMs)
+			changeProductionStock(p, ResWood, -fuelRate*woodMs)
+			changeProductionStock(p, job.OutputResourceKey, job.EffectiveRateMilli*workMs)
+			continue
 		}
-		for key, rate := range inputs {
+		for key, rate := range spec.InputsPerWorkerMilli {
 			if available := productionStock(p, key) / rate; available < workMs {
 				workMs = available
 			}
@@ -430,7 +445,7 @@ func produceSecond(p *PlayerState) {
 		if workMs <= 0 {
 			continue
 		}
-		for key, rate := range inputs {
+		for key, rate := range spec.InputsPerWorkerMilli {
 			if key == ResWater {
 				waterDemand += rate * workMs
 			}
