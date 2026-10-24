@@ -221,6 +221,12 @@ func NewDefaultWorld(now time.Time) *WorldState {
 	for _, bp := range BlueprintCatalog {
 		veteran.UnlockedBlueprints[bp.Code] = true
 	}
+	for _, tech := range TechnologyCatalog {
+		veteran.ResearchedTechnologies[tech.Code] = true
+	}
+	for bCode, cnt := range OverallBalance.VeteranBuildings {
+		veteran.BuildingCounts[bCode] = cnt
+	}
 	veteran.Phase = OverallBalance.VeteranPhase
 	veteran.Profession = ProfScientist
 	veteran.ArtifactName = "阿基米德水力核"
@@ -233,7 +239,6 @@ func NewDefaultWorld(now time.Time) *WorldState {
 		"held_relic": ResCosAlchLantern,
 		"companion":  ResCosMechOwl,
 	}
-	veteran.SettlementVersion = 0
 	EnsureSettlementState(veteran)
 	EnsureRaidState(veteran)
 	for eqKey, stacks := range OverallBalance.VeteranInstalledEquips {
@@ -270,7 +275,6 @@ func NewBlankPlayer(handle string, now time.Time) *PlayerState {
 		ResourcesMilli:          res,
 		FrozenResourcesMilli:    frozen,
 		UnlockedBlueprints:      map[string]bool{},
-		SettlementVersion:       SettlementRulesVersion,
 		ActiveEdicts:            map[string]bool{},
 		InstalledEquipments:     map[string]int32{},
 		Presets:                 []AllocationPreset{},

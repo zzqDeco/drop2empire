@@ -152,48 +152,49 @@ func TestHousingAllAllocationModesAndZeroStockRecovery(t *testing.T) {
 	}
 }
 
-func TestLegacyMigrationPreservesPaidRightsAndIsIdempotent(t *testing.T) {
+func TestSiphonSluiceRationOrderAndForageEdictsAndGuideProgression(t *testing.T) {
 	p := constructionPlayer()
-	p.SettlementVersion = 0
-	p.PopulationTotal = 40
-	p.Workers = map[string]int32{JobWater: 10, JobWood: 20, JobStone: 8, JobCharcoal: 2}
-	for _, code := range []string{BPAxeBlueprint, BPQuarryTech, BPCharcoalKiln, BPLumberYard, BPBasicWorkshop, BPScoutCamp, BPMysteryTreasure} {
-		p.UnlockedBlueprints[code] = true
-	}
-	p.Presets = []AllocationPreset{{Name: "stone", Allocations: map[string]int32{JobStone: 35, JobWater: 5}}}
-	p.GoldBasis = 500 * GoldScale
-	stock, _ := json.Marshal(p.ResourcesMilli)
-	workers, _ := json.Marshal(p.Workers)
+	p.PopulationTotal = 4
+	p.BuildingCounts[BPColonyEdicts] = 1
+	p.BuildingCounts[BPWaterWheel1] = 1
+	p.BuildingCounts[BPSiphonSluice] = 1
+	p.UnlockedBlueprints[BPBasicWorkshop] = true
+	p.UnlockedBlueprints[BPMysteryTreasure] = true
 	EnsureSettlementState(p)
-	if ResourceCapacityMilli(p, ResWater) != 30000*ResourceScale || ResourceCapacityMilli(p, ResWood) != 15000*ResourceScale {
-		t.Fatal("old warehouse rights lost")
+
+	// Before choosing a profession, guide points to "trade"
+	if g := CurrentSettlementGuide(p); g.Code != "trade" {
+		t.Fatalf("expected trade guide before profession choice, got %s", g.Code)
 	}
-	if p.BuildingCounts[BPWaterCistern] > 1 {
-		t.Fatal("old storage turned into exponentially priced cisterns")
+	p.Profession = ProfAlchemist
+	// After choosing a profession, guide transitions to "empire"
+	if g := CurrentSettlementGuide(p); g.Code != "empire" {
+		t.Fatalf("expected empire guide after profession choice, got %s", g.Code)
 	}
-	if JobCapacity(p, JobWood) < 20 || JobCapacity(p, JobStone) < 35 || HousingCapacity(p) < 40 {
-		t.Fatal("migration cannot sustain current workers/presets")
+
+	// EdictNightShift stays active with only JobForage assigned and boosts JobForage by +45%
+	p.Workers = map[string]int32{JobWater: 3, JobForage: 1}
+	p.ResourcesMilli[ResWater] = 100 * ResourceScale
+	p.ResourcesMilli[ResWood] = 10 * ResourceScale
+	p.ActiveEdicts[EdictNightShift] = true
+	gross, _, _ := ComputeResourceFlows(p)
+	// Base forage is 150 milli/s; +45% = 217 milli/s
+	if gross[ResWood] != 217 {
+		t.Fatalf("expected night shift to boost forage to 217 milli/s, got %d", gross[ResWood])
 	}
-	if !p.ResearchedTechnologies[TechMechanics] || p.BuildingCounts[BPBasicWorkshop] != 1 || p.BuildingCounts[BuildingCaravan] != 1 || !p.UnlockedBlueprints["charcoal_improvement"] {
-		t.Fatal("paid capability lost")
-	}
-	newStock, _ := json.Marshal(p.ResourcesMilli)
-	newWorkers, _ := json.Marshal(p.Workers)
-	if string(stock) != string(newStock) || string(workers) != string(newWorkers) || p.GoldBasis != 500*GoldScale {
-		t.Fatal("migration charged resources or changed staff/reward")
-	}
-	before, _ := json.Marshal(p)
-	EnsureSettlementState(p)
-	after, _ := json.Marshal(p)
-	if string(before) != string(after) {
-		t.Fatal("migration is not idempotent")
-	}
-	p.ResourcesMilli[ResWater] = 30000 * ResourceScale
-	if err := ConstructBuilding(p, BPWaterCistern, 1, 1, time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	if ResourceCapacityMilli(p, ResWater) != 30500*ResourceScale {
-		t.Fatal("legacy capacity prevents future additive expansion")
+
+	// Siphon Sluice + JobPrepRation at full water cap: ComputeResourceFlows and AdvancePlayerSeconds must agree
+	p.ActiveEdicts = map[string]bool{EdictSiphonSluice: true}
+	p.Workers = map[string]int32{JobWater: 3, JobPrepRation: 1}
+	p.ResourcesMilli[ResWater] = ResourceCapacityMilli(p, ResWater)
+	p.ResourcesMilli[ResWood] = 10 * ResourceScale
+	p.ResourcesMilli[ResStone] = 0
+	p.ResourcesMilli[ResRation] = 0
+	_, _, net := ComputeResourceFlows(p)
+	AdvancePlayerSeconds(p, 1)
+	if p.ResourcesMilli[ResStone] != net[ResStone] || p.ResourcesMilli[ResRation] != net[ResRation] {
+		t.Fatalf("siphon + ration mismatch between preview and simulation: stone=%d/%d ration=%d/%d",
+			p.ResourcesMilli[ResStone], net[ResStone], p.ResourcesMilli[ResRation], net[ResRation])
 	}
 }
 
@@ -227,7 +228,6 @@ func TestParallelProjectsRewardOnceAndSeasonReset(t *testing.T) {
 	assertMacroLedgerIdentity(t, w)
 	p.BuildingCounts[BuildingHouse] = 2
 	p.ResearchedTechnologies[TechWoodworking] = true
-	p.LegacyHousing = 20
 	p.SettlementCommandSeq = 7
 	p.ResourcesMilli[ResCosSteamCrown] = ResourceScale
 	RolloverSeason(w, "test", now)

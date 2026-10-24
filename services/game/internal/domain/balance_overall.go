@@ -32,6 +32,7 @@ var OverallBalance = struct {
 	VeteranGrantGoldBasis  int64
 	VeteranSimElapsedSec   int64
 	VeteranWorkers         map[string]int32
+	VeteranBuildings       map[string]int32
 	VeteranResourcesUnits  map[string]int64
 	VeteranInstalledEquips map[string]int32
 }{
@@ -51,6 +52,20 @@ var OverallBalance = struct {
 		JobStone:      8,
 		JobSmeltIron:  4,
 		JobPrepRation: 3,
+	},
+	VeteranBuildings: map[string]int32{
+		BuildingLumberCamp: 4,
+		BuildingHouse:      11,
+		BPWaterCistern:     15,
+		BPLumberYard:       10,
+		BuildingQuarry:     3,
+		BPCharcoalKiln:     2,
+		BPColonyEdicts:     1,
+		BuildingCaravan:    1,
+		BPWaterWheel1:      1,
+		BPSiphonSluice:     1,
+		BPBasicWorkshop:    1,
+		BPScoutCamp:        1,
 	},
 	VeteranResourcesUnits: map[string]int64{
 		ResWater:           12500,

@@ -121,7 +121,7 @@ func TestColonyDepthSystemsConversionEdictsExpeditionsAndCaravan(t *testing.T) {
 		t.Fatalf("expected initial water cap 250000, got %d", cap)
 	}
 
-	// Unlock prerequisites up to Scout Camp, Charcoal Kiln, Siphon Sluice, and Colony Edicts
+	// Unlock prerequisites and construct buildings up to Scout Camp, Charcoal Kiln, Siphon Sluice, and Colony Edicts
 	p.PopulationTotal = 18
 	p.Workers[JobWater] = 10
 	p.Workers[JobWood] = 5
@@ -132,19 +132,26 @@ func TestColonyDepthSystemsConversionEdictsExpeditionsAndCaravan(t *testing.T) {
 	} {
 		p.UnlockedBlueprints[code] = true
 	}
+	p.BuildingCounts[BuildingHouse] = 4
+	p.BuildingCounts[BuildingLumberCamp] = 2
+	p.BuildingCounts[BPCharcoalKiln] = 2
+	p.BuildingCounts[BPWaterCistern] = 4
+	p.BuildingCounts[BuildingCaravan] = 1
+	p.BuildingCounts[BPScoutCamp] = 1
+	p.BuildingCounts[BPColonyEdicts] = 1
+	p.BuildingCounts[BPWaterWheel1] = 1
+	p.BuildingCounts[BPSiphonSluice] = 1
 	p.ActiveEdicts[EdictSiphonSluice] = true
 
-	// A migrated save preserves the old paid water-wheel capacity.
-	p.SettlementVersion = 0
 	EnsureSettlementState(p)
-	// Water cap should now be 2400 (from WaterWheel1)
-	if cap := ResourceCapacityMilli(p, ResWater); cap != 2400*ResourceScale {
-		t.Fatalf("expected water wheel cap 2400000, got %d", cap)
+	// Water cap should now be 2250 (250 base + 4 * 500 water cisterns)
+	if cap := ResourceCapacityMilli(p, ResWater); cap != 2250*ResourceScale {
+		t.Fatalf("expected water cap 2250000, got %d", cap)
 	}
 
 	// Fill water to cap and advance 10 seconds: Siphon Sluice should convert overflow water into Stone + Flint,
 	// while Charcoal Kiln converts Wood into Charcoal.
-	p.ResourcesMilli[ResWater] = 2400 * ResourceScale
+	p.ResourcesMilli[ResWater] = 2250 * ResourceScale
 	p.ResourcesMilli[ResWood] = 200 * ResourceScale
 	AdvancePlayerSeconds(p, 10)
 

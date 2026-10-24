@@ -95,9 +95,8 @@ func (s *Service) ControlSimulation(ctx context.Context, action string, speedMul
 			for _, building := range domain.BuildingCatalog {
 				target.BuildingCounts[building.Code] = max(1, target.BuildingCounts[building.Code])
 			}
-			houses := min(domain.MaxBuildingCount, (target.PopulationTotal-domain.InitialHousing+3)/4)
+			houses := min(domain.MaxBuildingCount, max(int32(0), (target.PopulationTotal-domain.InitialHousing+3)/4))
 			target.BuildingCounts[domain.BuildingHouse] = max(houses, target.BuildingCounts[domain.BuildingHouse])
-			target.LegacyHousing += max(0, target.PopulationTotal-domain.HousingCapacity(target))
 			target.SettlementCommandSeq++
 			target.LastSettlementCommand = ""
 			domain.RefreshSettlementDiscovery(target)

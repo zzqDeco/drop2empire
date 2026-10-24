@@ -50,18 +50,20 @@ func mapSettlement(p *domain.PlayerState, rates map[string]int64) *empire.Settle
 			continue
 		}
 		tech, _ := domain.FindTechnology(b.TechnologyCode)
-		costs, err := domain.BuildingCosts(b, owned, 1)
-		reason := domain.CostsBlockReason(p, costs)
-		if err != nil {
-			reason = err.Error()
+		var costs map[string]int64
+		var err error
+		reason := "已建成"
+		if owned < b.Limit {
+			costs, err = domain.BuildingCosts(b, owned, 1)
+			reason = domain.CostsBlockReason(p, costs)
+			if err != nil {
+				reason = err.Error()
+			}
+			if !available {
+				reason = "请先研究技术并完成前置建设"
+			}
 		}
-		if owned >= b.Limit {
-			reason = "已建成"
-		}
-		if !available {
-			reason = "请先研究技术并完成前置建设"
-		}
-		out.Buildings = append(out.Buildings, &empire.BuildingNodeDTO{Code: b.Code, Name: b.Name, TechnologyName: tech.Name, EffectSummary: b.EffectSummary, Costs: settlementCosts(p, costs, rates), Owned: owned, Limit: b.Limit, Visible: true, Researched: p.ResearchedTechnologies[b.TechnologyCode], CanBuild: available && err == nil && reason == "", BlockedReason: reason, JobKey: b.JobKey, Assigned: p.Workers[b.JobKey], TotalSlots: domain.JobCapacity(p, b.JobKey)})
+		out.Buildings = append(out.Buildings, &empire.BuildingNodeDTO{Code: b.Code, Name: b.Name, TechnologyName: tech.Name, EffectSummary: b.EffectSummary, Costs: settlementCosts(p, costs, rates), Owned: owned, Limit: b.Limit, Visible: true, Researched: p.ResearchedTechnologies[b.TechnologyCode], CanBuild: owned < b.Limit && available && err == nil && reason == "", BlockedReason: reason, JobKey: b.JobKey, Assigned: p.Workers[b.JobKey], TotalSlots: domain.JobCapacity(p, b.JobKey)})
 	}
 	return out
 }

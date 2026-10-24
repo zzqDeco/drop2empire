@@ -1191,6 +1191,7 @@ export function App() {
                             data-pop={
                               ed.active ? `关闭 ${ed.name}` : `✓ 开启 ${ed.name}`
                             }
+                            disabled={busy}
                             onClick={() =>
                               void runAction(() =>
                                 api.toggleEdict({ code: ed.code }),
@@ -1218,6 +1219,7 @@ export function App() {
                             type="button"
                             className="btn-chip"
                             data-pop={`套用 ${pr.name}`}
+                            disabled={busy}
                             onClick={() =>
                               void runAction(() =>
                                 api.allocateWorkers({
@@ -1255,6 +1257,7 @@ export function App() {
                         type="submit"
                         className="btn-outline"
                         data-pop="✓ 保存方案"
+                        disabled={busy}
                       >
                         保存
                       </button>

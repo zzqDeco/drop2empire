@@ -421,12 +421,8 @@ type PlayerState struct {
 	ResourcesMilli          map[string]int64       `json:"resourcesMilli"`
 	FrozenResourcesMilli    map[string]int64       `json:"frozenResourcesMilli"`
 	UnlockedBlueprints      map[string]bool        `json:"unlockedBlueprints"`
-	SettlementVersion       int32                  `json:"settlementVersion"`
 	ResearchedTechnologies  map[string]bool        `json:"researchedTechnologies"`
 	BuildingCounts          map[string]int32       `json:"buildingCounts"`
-	LegacyCapacityMilli     map[string]int64       `json:"legacyCapacityMilli"`
-	LegacyJobSlots          map[string]int32       `json:"legacyJobSlots"`
-	LegacyHousing           int32                  `json:"legacyHousing"`
 	DiscoveredResources     map[string]bool        `json:"discoveredResources"`
 	SettlementCommandSeq    int64                  `json:"settlementCommandSeq"`
 	LastSettlementCommand   string                 `json:"lastSettlementCommand"`

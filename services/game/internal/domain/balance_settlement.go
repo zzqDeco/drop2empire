@@ -189,6 +189,7 @@ var EdictCatalog = []EdictSpec{
 		DrawbackSummary:       "居民耗水 +0.14/秒，且每秒燃烧 0.40 木材（缺木时自动失效）",
 		MutuallyExclusiveWith: EdictWaterRation,
 		JobEfficiencyBonusPct: map[string]int64{
+			JobForage:     45,
 			JobWater:      45,
 			JobWood:       45,
 			JobCharcoal:   45,
@@ -208,6 +209,7 @@ var EdictCatalog = []EdictSpec{
 		DrawbackSummary:       "全岗位基础作业效率 -15%",
 		MutuallyExclusiveWith: EdictNightShift,
 		JobEfficiencyBonusPct: map[string]int64{
+			JobForage:     -15,
 			JobWater:      -15,
 			JobWood:       -15,
 			JobCharcoal:   -15,

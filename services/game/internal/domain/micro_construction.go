@@ -25,7 +25,7 @@ func FindTechnology(code string) (TechnologySpec, bool) {
 }
 
 func HousingCapacity(p *PlayerState) int32 {
-	return InitialHousing + p.BuildingCounts[BuildingHouse]*4 + p.LegacyHousing
+	return InitialHousing + p.BuildingCounts[BuildingHouse]*4
 }
 
 func JobCapacity(p *PlayerState, job string) int32 {
@@ -43,7 +43,7 @@ func JobCapacity(p *PlayerState, job string) int32 {
 		}
 		return 0
 	}
-	slots := p.LegacyJobSlots[job]
+	var slots int32
 	for _, b := range BuildingCatalog {
 		if b.JobKey == job {
 			slots += p.BuildingCounts[b.Code] * b.Slots
@@ -214,20 +214,13 @@ func CaravanOfferVisible(p *PlayerState, offer CaravanOfferSpec) bool {
 }
 
 func ResetSettlementProgress(p *PlayerState) {
-	p.SettlementVersion = SettlementRulesVersion
 	p.ResearchedTechnologies = map[string]bool{}
 	p.BuildingCounts = map[string]int32{}
-	p.LegacyCapacityMilli = map[string]int64{}
-	p.LegacyJobSlots = map[string]int32{}
-	p.LegacyHousing = 0
 	p.DiscoveredResources = map[string]bool{ResWater: true}
 	p.SettlementCommandSeq++
 	p.LastSettlementCommand = ""
 }
 
-// EnsureSettlementState is an idempotent, per-player JSON migration. Old paid
-// unlocks become constructed assets. Capacity/production rights are preserved
-// without converting large old warehouse overrides into exponential quantities.
 func EnsureSettlementState(p *PlayerState) {
 	if p.ResearchedTechnologies == nil {
 		p.ResearchedTechnologies = map[string]bool{}
@@ -235,73 +228,10 @@ func EnsureSettlementState(p *PlayerState) {
 	if p.BuildingCounts == nil {
 		p.BuildingCounts = map[string]int32{}
 	}
-	if p.LegacyCapacityMilli == nil {
-		p.LegacyCapacityMilli = map[string]int64{}
-	}
-	if p.LegacyJobSlots == nil {
-		p.LegacyJobSlots = map[string]int32{}
-	}
-	if p.SettlementVersion >= SettlementRulesVersion {
-		RefreshSettlementDiscovery(p)
-		return
-	}
-	oldCaps := map[string]int64{}
-	for key, base := range BaseResourceCapacityUnits {
-		oldCaps[key] = base * ResourceScale
-	}
-	legacyOverrides := map[string]map[string]int64{
-		BPWaterCistern: {ResWater: 1200}, BPLumberYard: {ResWood: 1500, ResCharcoal: 800},
-		BPWaterWheel1: {ResWater: 2400}, BPStoneVault: {ResWater: 6000, ResWood: 2500, ResStone: 1500},
-		BPBasicWorkshop: {ResWater: 30000, ResWood: 15000, ResCharcoal: 4000, ResStone: 10000},
-	}
-	for code, caps := range legacyOverrides {
-		if p.UnlockedBlueprints[code] {
-			for key, units := range caps {
-				if units*ResourceScale > oldCaps[key] {
-					oldCaps[key] = units * ResourceScale
-				}
-			}
-		}
-	}
-	if p.UnlockedBlueprints[BPLumberYard] {
-		p.UnlockedBlueprints["charcoal_improvement"] = true
-	}
 	for _, b := range BuildingCatalog {
-		if b.EffectCode != "" && p.UnlockedBlueprints[b.EffectCode] {
-			p.BuildingCounts[b.Code] = 1
-			p.ResearchedTechnologies[b.TechnologyCode] = true
+		if p.BuildingCounts[b.Code] > 0 && b.EffectCode != "" {
+			p.UnlockedBlueprints[b.EffectCode] = true
 		}
-	}
-	if p.UnlockedBlueprints[BPScoutCamp] {
-		p.BuildingCounts[BuildingCaravan] = 1
-		p.ResearchedTechnologies[TechWoodworking] = true
-	}
-	if p.PopulationTotal > InitialHousing {
-		houses := (p.PopulationTotal - InitialHousing + 3) / 4
-		if houses > MaxBuildingCount {
-			houses = MaxBuildingCount
-		}
-		p.BuildingCounts[BuildingHouse] = houses
-		p.LegacyHousing = max(0, p.PopulationTotal-InitialHousing-houses*4)
-		p.ResearchedTechnologies[TechWoodworking] = true
-	}
-	for _, b := range BuildingCatalog {
-		if b.Slots <= 0 {
-			continue
-		}
-		wanted := p.Workers[b.JobKey]
-		for _, preset := range p.Presets {
-			wanted = max(wanted, preset.Allocations[b.JobKey])
-		}
-		if wanted > 0 && p.UnlockedBlueprints[b.EffectCode] {
-			count := min(MaxBuildingCount, (wanted+b.Slots-1)/b.Slots)
-			p.BuildingCounts[b.Code] = max(p.BuildingCounts[b.Code], count)
-			p.LegacyJobSlots[b.JobKey] = max(0, wanted-p.BuildingCounts[b.Code]*b.Slots)
-		}
-	}
-	p.SettlementVersion = SettlementRulesVersion
-	for key, oldCap := range oldCaps {
-		p.LegacyCapacityMilli[key] = max(0, oldCap-ResourceCapacityMilli(p, key))
 	}
 	RefreshSettlementDiscovery(p)
 }
@@ -310,6 +240,8 @@ type SettlementGuide struct{ Code, Title, Text string }
 
 func CurrentSettlementGuide(p *PlayerState) SettlementGuide {
 	switch {
+	case p.Profession != ProfNone:
+		return SettlementGuide{"empire", "专精与帝国", "已择定终身职业。可在工坊制造专精物资，或前往世界舆图参与现货交易、商会战区与荒原探索。"}
 	case p.UnlockedBlueprints[BPMysteryTreasure]:
 		return SettlementGuide{"trade", "专精与贸易", "古代装置已经复苏。了解四个职业的产品与分工，选择自己的长期生产方向。"}
 	case p.UnlockedBlueprints[BPBasicWorkshop]:

@@ -254,9 +254,12 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		}
 
 		canUnlock := bp.Kind != "building" && !unlocked && prereqOK && allResourcesOK
-		reason := domain.CostsBlockReason(p, bp.CostsMilli)
-		if !prereqOK {
-			reason = "请完成前置设施或全部工程部件"
+		reason := ""
+		if !unlocked {
+			reason = domain.CostsBlockReason(p, bp.CostsMilli)
+			if !prereqOK {
+				reason = "请完成前置设施或全部工程部件"
+			}
 		}
 		blueprintsDTO = append(blueprintsDTO, &empire.BlueprintNodeDTO{
 			Code:               bp.Code,

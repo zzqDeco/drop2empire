@@ -34,7 +34,7 @@
 - [`design/02-macro/chamber-war-macro.md`](design/02-macro/chamber-war-macro.md) — 黑曜 vs 白银双商会 8 节点图拓扑领土战争、补给线校验、三兵种克制矩阵与每日 20:00 权威结算
 
 ### D. 03 · 微观设计层 (`design/03-micro/`)
-- [`design/03-micro/settlement-production-and-edicts.md`](design/03-micro/settlement-production-and-edicts.md) — 聚落八大物资、伴生副产物、饮水维持费、上下游转化岗位、仓储阶梯与 10:1 虹吸冲矿、技术与建设目录、旧存档迁移、4 大政令与游商易物契约
+- [`design/03-micro/settlement-production-and-edicts.md`](design/03-micro/settlement-production-and-edicts.md) — 聚落八大物资、伴生副产物、饮水维持费、上下游转化岗位、仓储阶梯与 10:1 虹吸冲矿、技术与建设目录、4 大政令与游商易物契约
 - [`design/03-micro/wasteland-2d-extraction-roguelite.md`](design/03-micro/wasteland-2d-extraction-roguelite.md) — 荒原 2D 多区块传送门搜打撤肉鸽机制、实时沙暴倒计时、移速频率限制、五档宝箱读条、安全保险箱保底、一次性蓝图研习/销毁与 54 种行前增益卡轮抽池
 - [`design/03-micro/avatar-and-procedural-relics.md`](design/03-micro/avatar-and-procedural-relics.md) — 领主常驻动态卡通形象 (`LordAvatarSVG` 在 Profile 衣橱与 2D 地图实机棋子的双场景渲染) 与 CS 式唯一编号 UV 蚀刻藏品
 

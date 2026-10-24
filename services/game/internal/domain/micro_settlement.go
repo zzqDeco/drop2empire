@@ -21,9 +21,9 @@ func NextResidentCostMilli(n int32) int64 {
 	return int64(cost) * ResourceScale
 }
 
-// ResourceCapacityMilli derives storage from built assets and preserved legacy rights.
+// ResourceCapacityMilli derives storage from built assets.
 func ResourceCapacityMilli(p *PlayerState, resKey string) int64 {
-	capMilli := BaseResourceCapacityUnits[resKey]*ResourceScale + p.LegacyCapacityMilli[resKey]
+	capMilli := BaseResourceCapacityUnits[resKey] * ResourceScale
 	multiplier := int64(1)
 	if p.UnlockedBlueprints[BPStoneVault] {
 		multiplier = 2
@@ -80,7 +80,7 @@ func isEdictEffectivelyActive(p *PlayerState, ed EdictSpec) bool {
 	if ed.PrerequisiteCode != "" && !p.UnlockedBlueprints[ed.PrerequisiteCode] {
 		return false
 	}
-	if ed.Code == EdictNightShift && p.ResourcesMilli[ResWood] <= 0 && p.Workers[JobWood] <= 0 {
+	if ed.Code == EdictNightShift && p.ResourcesMilli[ResWood] <= 0 && p.Workers[JobWood] <= 0 && p.Workers[JobForage] <= 0 {
 		return false
 	}
 	if ed.Code == EdictHydroSaw && p.ResourcesMilli[ResWater] <= 0 {
@@ -390,14 +390,6 @@ func produceSecond(p *PlayerState) {
 		waterDemand += int64(p.PopulationTotal) * perPop * 1000
 		changeProductionStock(p, ResWater, -int64(p.PopulationTotal)*perPop*1000)
 	}
-	waterCeiling := max(waterBefore, ResourceCapacityMilli(p, ResWater)*1000)
-	if overflow := productionStock(p, ResWater) - waterCeiling; overflow > 0 {
-		changeProductionStock(p, ResWater, -overflow)
-		if p.ActiveEdicts[EdictSiphonSluice] && p.UnlockedBlueprints[BPSiphonSluice] {
-			changeProductionStock(p, ResStone, overflow/SettlementBalance.SiphonStoneDivisor)
-			changeProductionStock(p, ResFlint, overflow/SettlementBalance.SiphonFlintDivisor)
-		}
-	}
 	// JobCatalog order is the documented conversion priority: charcoal, iron, ration.
 	for i, job := range jobs {
 		spec := JobCatalog[i]
@@ -438,6 +430,14 @@ func produceSecond(p *PlayerState) {
 			changeProductionStock(p, key, -rate*workMs)
 		}
 		changeProductionStock(p, job.OutputResourceKey, job.EffectiveRateMilli*workMs)
+	}
+	waterCeiling := max(waterBefore, ResourceCapacityMilli(p, ResWater)*1000)
+	if overflow := productionStock(p, ResWater) - waterCeiling; overflow > 0 {
+		changeProductionStock(p, ResWater, -overflow)
+		if p.ActiveEdicts[EdictSiphonSluice] && p.UnlockedBlueprints[BPSiphonSluice] {
+			changeProductionStock(p, ResStone, overflow/SettlementBalance.SiphonStoneDivisor)
+			changeProductionStock(p, ResFlint, overflow/SettlementBalance.SiphonFlintDivisor)
+		}
 	}
 	p.HydrationWarning = p.PopulationTotal >= SettlementBalance.MinPopForHydrationDrain && productionStock(p, ResWater) == 0 && waterProduced < waterDemand
 }
@@ -794,11 +794,8 @@ func UnlockBlueprint(w *WorldState, p *PlayerState, code string, now time.Time) 
 	if p.PopulationTotal < spec.RequiredPopulation {
 		return ErrPrecondition("insufficient_population", fmt.Sprintf("需要人口达到 %d 人（当前 %d 人）", spec.RequiredPopulation, p.PopulationTotal))
 	}
-	for resKey, reqMilli := range spec.CostsMilli {
-		if p.ResourcesMilli[resKey] < reqMilli {
-			return ErrPrecondition("insufficient_resource", fmt.Sprintf("%s不足：需要 %.1f，当前 %.1f",
-				ResourceName(resKey), float64(reqMilli)/1000.0, float64(p.ResourcesMilli[resKey])/1000.0))
-		}
+	if reason := CostsBlockReason(p, spec.CostsMilli); reason != "" {
+		return ErrPrecondition("insufficient_resource", reason)
 	}
 	for resKey, reqMilli := range spec.CostsMilli {
 		p.ResourcesMilli[resKey] -= reqMilli

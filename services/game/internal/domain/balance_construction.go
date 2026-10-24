@@ -1,10 +1,9 @@
 package domain
 
 const (
-	SettlementRulesVersion int32 = 2
-	InitialHousing         int32 = 4
-	MaxBuildingCount       int32 = 128
-	TechWoodworking              = "woodworking"
+	InitialHousing     int32 = 4
+	MaxBuildingCount   int32 = 128
+	TechWoodworking          = "woodworking"
 	TechMining                   = "mining"
 	TechCharcoal                 = "charcoal"
 	TechHydraulics               = "hydraulics"

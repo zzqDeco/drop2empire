@@ -227,6 +227,16 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 	if err := json.Unmarshal(startRaidRec.Body.Bytes(), &raidStartState); err != nil {
 		t.Fatal(err)
 	}
+	for _, b := range raidStartState.Settlement.Buildings {
+		if b.Code == "basic_workshop" && (b.CanBuild || b.BlockedReason != "已建成") {
+			t.Fatalf("expected completed unique building basic_workshop to have BlockedReason='已建成' and CanBuild=false, got %+v", b)
+		}
+	}
+	for _, bp := range raidStartState.Blueprints {
+		if bp.Unlocked && bp.BlockedReason != "" {
+			t.Fatalf("expected unlocked blueprint %s to have empty BlockedReason, got %q", bp.Code, bp.BlockedReason)
+		}
+	}
 	sess := raidStartState.RaidLoadout.ActiveSession
 	if sess == nil || len(sess.Zones) != 4 {
 		t.Fatalf("expected activeSession with 4 zones, got %+v", sess)
