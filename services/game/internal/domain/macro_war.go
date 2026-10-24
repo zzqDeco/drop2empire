@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -90,10 +91,13 @@ func addOrUpdateGuildMember(g *GuildState, handle, role string, contribDelta int
 }
 
 func PerformGuildAction(w *WorldState, p *PlayerState, action, guildID, name, tag, faction, rallyNodeID string, now time.Time) error {
+	action = strings.ToLower(strings.TrimSpace(action))
+	if p.DailyWarBudgetUsed > 0 && (action == "join" || action == "create") {
+		return ErrPrecondition("war_faction_locked", "本期已出兵，结算前不能切换公会阵营")
+	}
 	EnsureGuildState(w)
-	act := strings.ToLower(strings.TrimSpace(action))
 
-	switch act {
+	switch action {
 	case "join":
 		g := FindGuild(w, strings.TrimSpace(guildID))
 		if g == nil {
@@ -307,7 +311,11 @@ func DeployWarTroops(w *WorldState, p *PlayerState, nodeID string, infDelta, arc
 	if infDelta < 0 || arcDelta < 0 || cavDelta < 0 {
 		return ErrInvalidInput("部署军备数量必须为非负整数")
 	}
-	totalAdd := infDelta + arcDelta + cavDelta
+	total64 := int64(infDelta) + int64(arcDelta) + int64(cavDelta)
+	if total64 > int64(DailyWarBudgetCap) {
+		return ErrInvalidInput("部署数量超过每日军备上限")
+	}
+	totalAdd := int32(total64)
 	if totalAdd <= 0 {
 		return ErrInvalidInput("请至少选择 1 单位军备进行部署")
 	}
@@ -427,7 +435,23 @@ func ApplyAttrition(t Troops, lossPct int32) Troops {
 	}
 }
 
+// WarPeriod is the most recent 20:00 Asia/Shanghai boundary (12:00 UTC).
+func WarPeriod(now time.Time) string {
+	shifted := now.UTC().Add(-12 * time.Hour)
+	return shifted.Format("2006-01-02")
+}
+
 func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
+	period := WarPeriod(now)
+	if w.LastWarPeriod == "" {
+		// Upgrade old snapshots conservatively; never back-pay an unaudited period.
+		w.LastWarPeriod = period
+		return
+	}
+	if period <= w.LastWarPeriod {
+		return
+	}
+	w.LastWarPeriod = period
 	for i := range w.WarNodes {
 		n := &w.WarNodes[i]
 		if reinf, ok := WarDailyNPCReinforcements[n.NodeID]; ok {
@@ -566,7 +590,18 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 
 	var activeEarned int32
 	activeSubmitted := activePlayer.DailyWarBudgetUsed
-	for _, p := range w.Players {
+	// Stable handle order makes a limited treasury deterministic.
+	handles := make([]string, 0, len(w.Players))
+	for handle := range w.Players {
+		handles = append(handles, handle)
+	}
+	sort.Strings(handles)
+	for _, handle := range handles {
+		p := w.Players[handle]
+		if p.DailyWarBudgetUsed <= 0 || p.Profession == ProfNone || FindGuild(w, p.JoinedGuildID) == nil {
+			p.DailyWarBudgetUsed = 0
+			continue
+		}
 		basePts := MacroBalance.WarLoserBasePts
 		if (p.GuildCode == GuildObsidian && obsDelta >= argDelta) || (p.GuildCode == GuildArgent && argDelta > obsDelta) {
 			basePts = MacroBalance.WarWinnerBasePts
@@ -603,6 +638,9 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 	AppendLog(activePlayer, now, "WAR", fmt.Sprintf("★ 第 D%d 晚 20:00 商会战争结算完成！黑曜 +%d 分 / 白银 +%d 分，你获得 +%d 活动点数与财政军饷补贴。",
 		w.WarDay, obsDelta, argDelta, activeEarned))
 
+	for i := range w.WarNodes {
+		w.WarNodes[i].PlayerDeployed = map[string]Troops{}
+	}
 	w.WarDay++
 	if w.WarDay > 7 {
 		w.WarDay = 1

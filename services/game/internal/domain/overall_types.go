@@ -295,6 +295,9 @@ type RaidZoneState struct {
 }
 
 type RaidSettlementReport struct {
+	RaidID        string         `json:"raidId"`
+	CommandSeq    int64          `json:"commandSeq"`
+	CommandDigest string         `json:"commandDigest"`
 	Status        string         `json:"status"`
 	BackpackItems []RaidLootItem `json:"backpackItems"`
 	SafeBoxItems  []RaidLootItem `json:"safeBoxItems"`
@@ -305,6 +308,10 @@ type RaidSettlementReport struct {
 }
 
 type ActiveRaidSession struct {
+	RaidID               string          `json:"raidId"`
+	LastCommandSeq       int64           `json:"lastCommandSeq"`
+	LastCommandDigest    string          `json:"lastCommandDigest"`
+	ChannelReadyAt       time.Time       `json:"channelReadyAt"`
 	Seed                 int64           `json:"seed"`
 	StartedAt            time.Time       `json:"startedAt"`
 	ExpiresAt            time.Time       `json:"expiresAt"`
@@ -336,16 +343,17 @@ type ActiveRaidSession struct {
 }
 
 type RaidLoadoutState struct {
-	WeaponKey            string                `json:"weaponKey"`
-	ArmorKey             string                `json:"armorKey"`
-	BootsKey             string                `json:"bootsKey"`
-	SafeBoxKey           string                `json:"safeBoxKey"`
-	EquippedPotions      []string              `json:"equippedPotions"`
-	EquippedBuffCards    []string              `json:"equippedBuffCards"`
-	DraftPoolCards       []string              `json:"draftPoolCards"`
-	ActiveRaidSeed       int64                 `json:"activeRaidSeed"`
-	ActiveSession        *ActiveRaidSession    `json:"activeSession,omitempty"`
-	LastSettlementReport *RaidSettlementReport `json:"lastSettlementReport,omitempty"`
+	CompletedRaids       []RaidSettlementReport `json:"completedRaids,omitempty"`
+	WeaponKey            string                 `json:"weaponKey"`
+	ArmorKey             string                 `json:"armorKey"`
+	BootsKey             string                 `json:"bootsKey"`
+	SafeBoxKey           string                 `json:"safeBoxKey"`
+	EquippedPotions      []string               `json:"equippedPotions"`
+	EquippedBuffCards    []string               `json:"equippedBuffCards"`
+	DraftPoolCards       []string               `json:"draftPoolCards"`
+	ActiveRaidSeed       int64                  `json:"activeRaidSeed"`
+	ActiveSession        *ActiveRaidSession     `json:"activeSession,omitempty"`
+	LastSettlementReport *RaidSettlementReport  `json:"lastSettlementReport,omitempty"`
 }
 
 type AllocationPreset struct {
@@ -395,6 +403,9 @@ type CollectibleItem struct {
 }
 
 type PlayerState struct {
+	Revision                int64                  `json:"revision"`
+	ProductionRemainders    map[string]int64       `json:"productionRemainders,omitempty"`
+	SimulatedRemainderMs    int64                  `json:"simulatedRemainderMs"`
 	ID                      string                 `json:"id"`
 	Handle                  string                 `json:"handle"`
 	PasswordHash            string                 `json:"passwordHash"`
@@ -548,6 +559,8 @@ type SeasonNotice struct {
 }
 
 type WorldState struct {
+	LastWarPeriod          string                  `json:"lastWarPeriod"`
+	PendingTrades          []MarketTrade           `json:"-"`
 	ActiveHandle           string                  `json:"activeHandle"`
 	AdminMode              bool                    `json:"-"`
 	Players                map[string]*PlayerState `json:"players"`
@@ -591,4 +604,16 @@ type TxManager interface {
 type WorldRepository interface {
 	LoadWorld(ctx context.Context, now time.Time) (*WorldState, error)
 	SaveWorld(ctx context.Context, world *WorldState) error
+}
+
+// PlayerRepository isolates high-frequency raid commands from realm-wide transactions.
+// The player must be locked for the duration of the surrounding transaction.
+type PlayerRepository interface {
+	LoadSessionPlayer(ctx context.Context, token string) (*PlayerState, bool, error)
+	SavePlayer(ctx context.Context, player *PlayerState) error
+}
+
+type GameRepository interface {
+	WorldRepository
+	PlayerRepository
 }

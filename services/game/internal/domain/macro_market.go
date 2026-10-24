@@ -3,6 +3,8 @@ package domain
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -37,7 +39,7 @@ func SeedNPCMarket(w *WorldState, now time.Time) {
 
 	for _, st := range NPCMarketSeedTrades {
 		w.NextTradeSeq++
-		totalGold := (st.QuantityMilli * st.PriceBasis) / ResourceScale
+		totalGold := (st.QuantityMilli / ResourceScale) * st.PriceBasis
 		tax := (totalGold * MarketTaxBps) / 10000
 		burn := (tax * MarketBurnShareBps) / MarketTaxBps
 		treas := tax - burn
@@ -70,7 +72,7 @@ func PlaceMarketOrder(w *WorldState, p *PlayerState, itemKey, side string, price
 	if priceBasis < MacroBalance.MinOrderPriceBasis || priceBasis > MacroBalance.MaxOrderPriceBasis {
 		return ErrInvalidInput("单价超出允许范围（0.0100 - 10,000.0000 金币）")
 	}
-	if quantityMilli < MacroBalance.MinOrderQtyMilli || quantityMilli%ResourceScale != 0 {
+	if quantityMilli < MacroBalance.MinOrderQtyMilli || quantityMilli > 1_000_000_000_000 || quantityMilli%ResourceScale != 0 {
 		return ErrInvalidInput("挂单数量必须为至少 1.000 的整数单位")
 	}
 	validItem := false
@@ -84,16 +86,23 @@ func PlaceMarketOrder(w *WorldState, p *PlayerState, itemKey, side string, price
 		return ErrInvalidInput("该商品不支持现货交易")
 	}
 
-	totalEscrowGold := (quantityMilli * priceBasis) / ResourceScale
+	totalEscrowGold, err := marketValue(quantityMilli, priceBasis)
+	if err != nil {
+		return err
+	}
 	if side == "BID" {
 		if p.GoldBasis < totalEscrowGold {
 			return ErrPrecondition("insufficient_gold", fmt.Sprintf("可用金币不足：买单需冻结 %.4f 金币", float64(totalEscrowGold)/float64(GoldScale)))
 		}
-		p.GoldBasis -= totalEscrowGold
-		p.GoldFrozenBasis += totalEscrowGold
+		if err := applyMarketDeltas([]balanceDelta{{&p.GoldBasis, -totalEscrowGold}, {&p.GoldFrozenBasis, totalEscrowGold}}); err != nil {
+			return err
+		}
 	} else {
 		if p.ResourcesMilli[itemKey] < quantityMilli {
 			return ErrPrecondition("insufficient_resource", fmt.Sprintf("可用【%s】库存不足：卖单需冻结 %.1f 单位", ResourceName(itemKey), float64(quantityMilli)/1000.0))
+		}
+		if !validBalanceDelta(p.FrozenResourcesMilli[itemKey], quantityMilli) {
+			return ErrInvalidInput("冻结资源超出记账范围")
 		}
 		p.ResourcesMilli[itemKey] -= quantityMilli
 		p.FrozenResourcesMilli[itemKey] += quantityMilli
@@ -115,12 +124,14 @@ func PlaceMarketOrder(w *WorldState, p *PlayerState, itemKey, side string, price
 		CreatedAt:      now.UTC().Format("15:04:05"),
 	}
 
-	MatchOrder(w, p, &newOrd, now)
+	if err := MatchOrder(w, p, &newOrd, now); err != nil {
+		return err
+	}
 	w.Orders = append([]MarketOrder{newOrd}, w.Orders...)
 	return nil
 }
 
-func MatchOrder(w *WorldState, taker *PlayerState, incoming *MarketOrder, now time.Time) {
+func MatchOrder(w *WorldState, taker *PlayerState, incoming *MarketOrder, now time.Time) error {
 	var candidateIdx []int
 	for i := range w.Orders {
 		o := &w.Orders[i]
@@ -149,7 +160,7 @@ func MatchOrder(w *WorldState, taker *PlayerState, incoming *MarketOrder, now ti
 				return oa.PriceBasis > ob.PriceBasis
 			}
 		}
-		return oa.ID < ob.ID
+		return orderSequence(oa.ID) < orderSequence(ob.ID)
 	})
 
 	ts := now.UTC().Format("15:04:05")
@@ -163,48 +174,64 @@ func MatchOrder(w *WorldState, taker *PlayerState, incoming *MarketOrder, now ti
 			fillMilli = resting.RemainingMilli
 		}
 		execPrice := resting.PriceBasis
-		tradeGold := (fillMilli * execPrice) / ResourceScale
-		taxTotal := (tradeGold * MarketTaxBps) / 10000
-		taxBurn := (taxTotal * MarketBurnShareBps) / MarketTaxBps
+		tradeGold, err := marketValue(fillMilli, execPrice)
+		if err != nil {
+			return err
+		}
+		taxTotal := tradeGold / 100
+		taxBurn := taxTotal / 2
 		taxTreasury := taxTotal - taxBurn
 
 		var buyerHandle, sellerHandle string
+		var buyer, seller *PlayerState
+		lockedForFill := tradeGold
 		if incoming.Side == "BID" {
-			buyerHandle = incoming.MakerHandle
-			sellerHandle = resting.MakerHandle
-
-			lockedForFill := (fillMilli * incoming.PriceBasis) / ResourceScale
-			refund := lockedForFill - tradeGold
-			taker.GoldFrozenBasis -= lockedForFill
-			if refund > 0 {
-				taker.GoldBasis += refund
+			buyerHandle, sellerHandle = incoming.MakerHandle, resting.MakerHandle
+			buyer = taker
+			if !resting.IsNPC {
+				seller = w.Players[sellerHandle]
 			}
-			taker.ResourcesMilli[incoming.ItemKey] += fillMilli
-
-			if resting.IsNPC {
-				w.NPCHeldBasis += (tradeGold - taxTotal)
-			} else if seller, ok := w.Players[resting.MakerHandle]; ok {
-				seller.FrozenResourcesMilli[incoming.ItemKey] -= fillMilli
-				seller.GoldBasis += (tradeGold - taxTotal)
+			lockedForFill, err = marketValue(fillMilli, incoming.PriceBasis)
+			if err != nil {
+				return err
 			}
 		} else {
-			sellerHandle = incoming.MakerHandle
-			buyerHandle = resting.MakerHandle
-
-			taker.FrozenResourcesMilli[incoming.ItemKey] -= fillMilli
-			taker.GoldBasis += (tradeGold - taxTotal)
-
-			if resting.IsNPC {
-				w.NPCHeldBasis -= tradeGold
-			} else if buyer, ok := w.Players[resting.MakerHandle]; ok {
-				buyer.GoldFrozenBasis -= tradeGold
-				buyer.ResourcesMilli[incoming.ItemKey] += fillMilli
+			buyerHandle, sellerHandle = resting.MakerHandle, incoming.MakerHandle
+			seller = taker
+			if !resting.IsNPC {
+				buyer = w.Players[buyerHandle]
 			}
 		}
+		if !resting.IsNPC && (buyer == nil || seller == nil) {
+			return ErrPrecondition("invalid_order_owner", "订单账户不存在")
+		}
+		deltas := []balanceDelta{{&w.PermanentlyBurnedBasis, taxBurn}, {&w.TotalIssuedBasis, -taxBurn}, {&w.TreasuryHeldBasis, taxTreasury}}
+		var buyerStock, sellerFrozen int64
+		if buyer != nil {
+			buyerStock = buyer.ResourcesMilli[incoming.ItemKey]
+			deltas = append(deltas, balanceDelta{&buyer.GoldFrozenBasis, -lockedForFill}, balanceDelta{&buyer.GoldBasis, lockedForFill - tradeGold}, balanceDelta{&buyerStock, fillMilli})
+		} else {
+			if w.NPCHeldBasis < tradeGold {
+				continue
+			}
+			deltas = append(deltas, balanceDelta{&w.NPCHeldBasis, -tradeGold})
+		}
+		if seller != nil {
+			sellerFrozen = seller.FrozenResourcesMilli[incoming.ItemKey]
+			deltas = append(deltas, balanceDelta{&seller.GoldBasis, tradeGold - taxTotal}, balanceDelta{&sellerFrozen, -fillMilli})
+		} else {
+			deltas = append(deltas, balanceDelta{&w.NPCHeldBasis, tradeGold - taxTotal})
+		}
+		if err := applyMarketDeltas(deltas); err != nil {
+			return err
+		}
+		if buyer != nil {
+			buyer.ResourcesMilli[incoming.ItemKey] = buyerStock
+		}
+		if seller != nil {
+			seller.FrozenResourcesMilli[incoming.ItemKey] = sellerFrozen
+		}
 
-		w.PermanentlyBurnedBasis += taxBurn
-		w.TotalIssuedBasis -= taxBurn
-		w.TreasuryHeldBasis += taxTreasury
 		w.LastPricesBasis[incoming.ItemKey] = execPrice
 
 		incoming.FilledMilli += fillMilli
@@ -228,6 +255,7 @@ func MatchOrder(w *WorldState, taker *PlayerState, incoming *MarketOrder, now ti
 			SellerHandle:     sellerHandle,
 			ExecutedAt:       ts,
 		}
+		w.PendingTrades = append(w.PendingTrades, trd)
 		w.Trades = append([]MarketTrade{trd}, w.Trades...)
 		if len(w.Trades) > 60 {
 			w.Trades = w.Trades[:60]
@@ -245,6 +273,7 @@ func MatchOrder(w *WorldState, taker *PlayerState, incoming *MarketOrder, now ti
 		AppendLog(taker, now, "MARKET", fmt.Sprintf("已挂出限价单【%s %s】%.1f 单位 @ %.4f 金币。",
 			incoming.Side, ResourceName(incoming.ItemKey), float64(incoming.QuantityMilli)/1000.0, float64(incoming.PriceBasis)/float64(GoldScale)))
 	}
+	return nil
 }
 
 func CancelMarketOrder(w *WorldState, p *PlayerState, orderID string, now time.Time) error {
@@ -261,17 +290,18 @@ func CancelMarketOrder(w *WorldState, p *PlayerState, orderID string, now time.T
 		}
 		rem := o.RemainingMilli
 		if o.Side == "BID" {
-			refundGold := (rem * o.PriceBasis) / ResourceScale
-			p.GoldFrozenBasis -= refundGold
-			if p.GoldFrozenBasis < 0 {
-				p.GoldFrozenBasis = 0
+			refundGold, err := marketValue(rem, o.PriceBasis)
+			if err != nil {
+				return err
 			}
-			p.GoldBasis += refundGold
+			if err := applyMarketDeltas([]balanceDelta{{&p.GoldFrozenBasis, -refundGold}, {&p.GoldBasis, refundGold}}); err != nil {
+				return err
+			}
 		} else {
-			p.FrozenResourcesMilli[o.ItemKey] -= rem
-			if p.FrozenResourcesMilli[o.ItemKey] < 0 {
-				p.FrozenResourcesMilli[o.ItemKey] = 0
+			if p.FrozenResourcesMilli[o.ItemKey] < rem || !validBalanceDelta(p.ResourcesMilli[o.ItemKey], rem) {
+				return ErrPrecondition("invalid_escrow", "订单托管余额异常，撤单未执行")
 			}
+			p.FrozenResourcesMilli[o.ItemKey] -= rem
 			p.ResourcesMilli[o.ItemKey] += rem
 		}
 		o.RemainingMilli = 0
@@ -280,4 +310,37 @@ func CancelMarketOrder(w *WorldState, p *PlayerState, orderID string, now time.T
 		return nil
 	}
 	return ErrNotFound("未找到该挂单")
+}
+
+// The HTTP integer wire format must remain exactly representable by JS clients.
+const maxAccountAmount int64 = 1<<53 - 1
+
+type balanceDelta struct {
+	value *int64
+	delta int64
+}
+
+func validBalanceDelta(value, delta int64) bool {
+	return value >= 0 && value <= maxAccountAmount && delta >= -value && delta <= maxAccountAmount-value
+}
+func applyMarketDeltas(deltas []balanceDelta) error {
+	for _, d := range deltas {
+		if !validBalanceDelta(*d.value, d.delta) {
+			return ErrPrecondition("invalid_escrow", "资产余额或托管金额超出安全范围，交易未执行")
+		}
+	}
+	for _, d := range deltas {
+		*d.value += d.delta
+	}
+	return nil
+}
+func marketValue(qty, price int64) (int64, error) {
+	if qty <= 0 || qty%ResourceScale != 0 || price <= 0 || qty/ResourceScale > maxAccountAmount/price {
+		return 0, ErrInvalidInput("订单总金额超出安全记账范围")
+	}
+	return (qty / ResourceScale) * price, nil
+}
+func orderSequence(id string) uint64 {
+	n, _ := strconv.ParseUint(strings.TrimPrefix(id, "ord_"), 10, 64)
+	return n
 }

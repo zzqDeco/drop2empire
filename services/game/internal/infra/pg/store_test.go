@@ -20,6 +20,9 @@ func TestPostgresStoreRoundTrip(t *testing.T) {
 
 	db, err := postgres.OpenDB(ctx, dbURL)
 	if err != nil || db.Ping(ctx) != nil {
+		if os.Getenv("DATABASE_URL_TEST") != "" {
+			t.Fatalf("configured PostgreSQL unavailable: %v", err)
+		}
 		t.Skipf("skipping PostgreSQL integration test: %v", err)
 	}
 	defer db.Close()

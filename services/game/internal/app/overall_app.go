@@ -30,16 +30,18 @@ func IsPublicSurface(ctx context.Context) bool {
 }
 
 type Service struct {
-	tx   domain.TxManager
-	repo domain.WorldRepository
-	now  func() time.Time
+	tx      domain.TxManager
+	repo    domain.WorldRepository
+	players domain.PlayerRepository
+	now     func() time.Time
 }
 
-func NewService(tx domain.TxManager, repo domain.WorldRepository) *Service {
+func NewService(tx domain.TxManager, repo domain.GameRepository) *Service {
 	return &Service{
-		tx:   tx,
-		repo: repo,
-		now:  func() time.Time { return time.Now().UTC() },
+		tx:      tx,
+		repo:    repo,
+		players: repo,
+		now:     func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -82,6 +84,7 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 		if err != nil {
 			return err
 		}
+		now = s.now()
 		domain.EnsureDefaultAccounts(w, now)
 		p, isAdmin, ok := resolveSession(w, token)
 		if !ok || p == nil {
@@ -92,9 +95,8 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 		}
 		w.ActiveHandle = p.Handle
 		w.AdminMode = isAdmin
-		for _, pl := range w.Players {
-			domain.SettleProduction(pl, now)
-		}
+		domain.SettleProduction(p, now)
+		domain.SettleWarDay(w, p, now)
 		if fn != nil {
 			if err := fn(w, p, now); err != nil {
 				return err
@@ -129,6 +131,7 @@ func (s *Service) RegisterAccount(ctx context.Context, handle, password, inviteC
 		if err != nil {
 			return err
 		}
+		now = s.now()
 		domain.EnsureDefaultAccounts(w, now)
 		if _, exists := w.Players[clean]; exists {
 			return domain.ErrPrecondition("handle_taken", "该领主名号已被注册，请直接登录或更换名称")
@@ -146,9 +149,7 @@ func (s *Service) RegisterAccount(ctx context.Context, handle, password, inviteC
 		w.ActiveHandle = clean
 		w.AdminMode = false
 
-		for _, pl := range w.Players {
-			domain.SettleProduction(pl, now)
-		}
+		domain.SettleProduction(p, now)
 		if err := s.repo.SaveWorld(txCtx, w); err != nil {
 			return err
 		}
@@ -172,6 +173,7 @@ func (s *Service) LoginAccount(ctx context.Context, handle, password string) (*d
 		if err != nil {
 			return err
 		}
+		now = s.now()
 		domain.EnsureDefaultAccounts(w, now)
 		p, exists := w.Players[clean]
 		if !exists || p == nil {
@@ -190,9 +192,7 @@ func (s *Service) LoginAccount(ctx context.Context, handle, password string) (*d
 		w.ActiveHandle = clean
 		w.AdminMode = p.IsAdmin
 
-		for _, pl := range w.Players {
-			domain.SettleProduction(pl, now)
-		}
+		domain.SettleProduction(p, now)
 		if err := s.repo.SaveWorld(txCtx, w); err != nil {
 			return err
 		}
@@ -241,6 +241,7 @@ func (s *Service) LogoutAccount(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		now = s.now()
 		domain.EnsureDefaultAccounts(w, now)
 		delete(w.Sessions, token)
 		return s.repo.SaveWorld(txCtx, w)

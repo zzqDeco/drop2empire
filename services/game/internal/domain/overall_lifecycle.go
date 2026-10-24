@@ -168,6 +168,7 @@ func NewDefaultWorld(now time.Time) *WorldState {
 	npcInit := OverallBalance.NPCInitialGoldBasis
 
 	w := &WorldState{
+		LastWarPeriod:          WarPeriod(now),
 		ActiveHandle:           "pioneer",
 		Players:                make(map[string]*PlayerState),
 		Sessions:               make(map[string]string),

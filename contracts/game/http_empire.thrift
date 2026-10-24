@@ -182,6 +182,7 @@ struct RaidZoneViewDTO {
 }
 
 struct RaidSettlementReportDTO {
+  8: required string raidId (api.body="raidId")
   1: required string status (api.body="status")
   2: required list<RaidLootItemDTO> backpackItems (api.body="backpackItems")
   3: required list<RaidLootItemDTO> safeBoxItems (api.body="safeBoxItems")
@@ -192,7 +193,9 @@ struct RaidSettlementReportDTO {
 }
 
 struct RaidSessionDTO {
-  1: required i64 seed (api.body="seed")
+  25: required string raidId (api.body="raidId")
+  26: required i64 lastCommandSeq (api.body="lastCommandSeq")
+  27: required i64 channelRemainingMs (api.body="channelRemainingMs")
   2: required i32 currentZoneId (api.body="currentZoneId")
   3: required i32 playerX (api.body="playerX")
   4: required i32 playerY (api.body="playerY")
@@ -235,7 +238,6 @@ struct RaidLoadoutStateDTO {
   14: required i32 moveCooldownMs (api.body="moveCooldownMs")
   15: required i32 raidDurationSeconds (api.body="raidDurationSeconds")
   16: required i32 backpackCapacity (api.body="backpackCapacity")
-  17: required i64 activeRaidSeed (api.body="activeRaidSeed")
   18: optional RaidSessionDTO activeSession (api.body="activeSession")
   19: optional RaidSettlementReportDTO lastSettlementReport (api.body="lastSettlementReport")
 }
@@ -510,6 +512,7 @@ struct PlayerProfileDTO {
 }
 
 struct DashboardStateResp {
+  32: required i64 revision (api.body="revision")
   1: required string serverTime (api.body="serverTime")
   2: required PlayerProfileDTO player (api.body="player")
   3: required list<string> availableHandles (api.body="availableHandles")
@@ -541,6 +544,12 @@ struct DashboardStateResp {
   29: required list<RaidGearSpecDTO> raidGears (api.body="raidGears")
   30: required RaidLoadoutStateDTO raidLoadout (api.body="raidLoadout")
   31: required SeasonStateDTO currentSeason (api.body="currentSeason")
+}
+
+struct RaidUpdateResp {
+  1: required string playerHandle (api.body="playerHandle")
+  2: required i64 revision (api.body="revision")
+  3: required RaidLoadoutStateDTO raidLoadout (api.body="raidLoadout")
 }
 
 struct GetDashboardReq {}
@@ -642,6 +651,8 @@ struct PublishNoticeReq {
 }
 
 struct RaidActionReq {
+  8: required string raidId (api.body="raidId")
+  9: required i64 commandSeq (api.body="commandSeq")
   1: required string action (api.body="action")
   2: optional i32 dx (api.body="dx")
   3: optional i32 dy (api.body="dy")
@@ -652,6 +663,8 @@ struct RaidActionReq {
 }
 
 struct FinishRaidReq {
+  2: required string raidId (api.body="raidId")
+  3: required i64 commandSeq (api.body="commandSeq")
   1: required string status (api.body="status")
 }
 
@@ -776,8 +789,8 @@ service EmpireService {
   DashboardStateResp ManageRaidGear(1: ManageRaidGearReq req) (api.post="/api/v1/empire/colony/raid/gear")
   DashboardStateResp DraftRaidBuff(1: DraftRaidBuffReq req) (api.post="/api/v1/empire/colony/raid/buff")
   DashboardStateResp StartRaid(1: StartRaidReq req) (api.post="/api/v1/empire/colony/raid/start")
-  DashboardStateResp RaidAction(1: RaidActionReq req) (api.post="/api/v1/empire/colony/raid/action")
-  DashboardStateResp FinishRaid(1: FinishRaidReq req) (api.post="/api/v1/empire/colony/raid/finish")
+  RaidUpdateResp RaidAction(1: RaidActionReq req) (api.post="/api/v1/empire/colony/raid/action")
+  RaidUpdateResp FinishRaid(1: FinishRaidReq req) (api.post="/api/v1/empire/colony/raid/finish")
   DashboardStateResp RolloverSeason(1: RolloverSeasonReq req) (api.post="/api/v1/empire/admin/season/rollover")
   DashboardStateResp PublishNotice(1: PublishNoticeReq req) (api.post="/api/v1/empire/admin/notices")
 }

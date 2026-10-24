@@ -108,8 +108,8 @@ var EmpireServiceRoutes = []RouteSpec{
 	{Name: "ManageRaidGear", Method: "POST", Path: "/api/v1/empire/colony/raid/gear", MuxPattern: PatternManageRaidGear, RequestType: "ManageRaidGearReq", ResponseType: "DashboardStateResp"},
 	{Name: "DraftRaidBuff", Method: "POST", Path: "/api/v1/empire/colony/raid/buff", MuxPattern: PatternDraftRaidBuff, RequestType: "DraftRaidBuffReq", ResponseType: "DashboardStateResp"},
 	{Name: "StartRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/start", MuxPattern: PatternStartRaid, RequestType: "StartRaidReq", ResponseType: "DashboardStateResp"},
-	{Name: "RaidAction", Method: "POST", Path: "/api/v1/empire/colony/raid/action", MuxPattern: PatternRaidAction, RequestType: "RaidActionReq", ResponseType: "DashboardStateResp"},
-	{Name: "FinishRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/finish", MuxPattern: PatternFinishRaid, RequestType: "FinishRaidReq", ResponseType: "DashboardStateResp"},
+	{Name: "RaidAction", Method: "POST", Path: "/api/v1/empire/colony/raid/action", MuxPattern: PatternRaidAction, RequestType: "RaidActionReq", ResponseType: "RaidUpdateResp"},
+	{Name: "FinishRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/finish", MuxPattern: PatternFinishRaid, RequestType: "FinishRaidReq", ResponseType: "RaidUpdateResp"},
 	{Name: "RolloverSeason", Method: "POST", Path: "/api/v1/empire/admin/season/rollover", MuxPattern: PatternRolloverSeason, RequestType: "RolloverSeasonReq", ResponseType: "DashboardStateResp"},
 	{Name: "PublishNotice", Method: "POST", Path: "/api/v1/empire/admin/notices", MuxPattern: PatternPublishNotice, RequestType: "PublishNoticeReq", ResponseType: "DashboardStateResp"},
 }
@@ -946,7 +946,7 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			m.WriteOKHTTP(w, r, http.StatusOK, resp)
 		})
 		if hasMW {
-			fn = mw.WrapRoute(RouteSpec{Name: "RaidAction", Method: "POST", Path: "/api/v1/empire/colony/raid/action", MuxPattern: PatternRaidAction, RequestType: "RaidActionReq", ResponseType: "DashboardStateResp"}, fn)
+			fn = mw.WrapRoute(RouteSpec{Name: "RaidAction", Method: "POST", Path: "/api/v1/empire/colony/raid/action", MuxPattern: PatternRaidAction, RequestType: "RaidActionReq", ResponseType: "RaidUpdateResp"}, fn)
 		}
 		h.RaidAction = fn
 	}
@@ -965,7 +965,7 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 			m.WriteOKHTTP(w, r, http.StatusOK, resp)
 		})
 		if hasMW {
-			fn = mw.WrapRoute(RouteSpec{Name: "FinishRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/finish", MuxPattern: PatternFinishRaid, RequestType: "FinishRaidReq", ResponseType: "DashboardStateResp"}, fn)
+			fn = mw.WrapRoute(RouteSpec{Name: "FinishRaid", Method: "POST", Path: "/api/v1/empire/colony/raid/finish", MuxPattern: PatternFinishRaid, RequestType: "FinishRaidReq", ResponseType: "RaidUpdateResp"}, fn)
 		}
 		h.FinishRaid = fn
 	}

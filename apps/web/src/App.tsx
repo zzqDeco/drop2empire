@@ -1,3 +1,4 @@
+import { belongsToSession, mergeServerUpdate, type ServerUpdate } from "./serverState";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api,
@@ -92,27 +93,30 @@ export function App() {
     applyTheme(theme);
   }, [theme]);
 
-  const applyServerState = useCallback((next: DashboardStateResp) => {
-    setState(next);
-    setLastSyncAtMs(Date.now());
-    setNowTickMs(Date.now());
+  const applyServerState = useCallback((next: ServerUpdate) => {
+    setState(current => mergeServerUpdate(current, next));
+    if ("player" in next) {
+      setLastSyncAtMs(Date.now());
+      setNowTickMs(Date.now());
+    }
   }, []);
 
   useEffect(() => {
     let active = true;
-    if (!api.getSessionToken()) {
+    const token = api.getSessionToken();
+    if (!token) {
       setLoading(false);
       return;
     }
     api
       .getDashboard()
       .then((res) => {
-        if (!active) return;
+        if (!active || api.getSessionToken() !== token) return;
         applyServerState(res);
         setLoading(false);
       })
       .catch((err: unknown) => {
-        if (!active) return;
+        if (!active || api.getSessionToken() !== token) return;
         if (err instanceof ApiError && err.status === 401) {
           api.setSessionToken(null);
           setState(null);
@@ -129,27 +133,30 @@ export function App() {
   const hasState = state !== null;
   const hasActivePopulation = (state?.player.populationTotal ?? 0) > 0;
   const activeHandle = state?.player.handle ?? "";
+  const raidActive = !!state?.raidLoadout.activeSession;
 
   useEffect(() => {
-    if (!hasState || !hasActivePopulation) return;
+    if (!hasState || !hasActivePopulation || raidActive) return;
+    let active = true;
+    const token = api.getSessionToken();
     const timer = window.setInterval(() => {
       api
         .getDashboard()
         .then((res) => {
-          applyServerState(res);
+          if (active && api.getSessionToken() === token) applyServerState(res);
         })
         .catch(() => {});
     }, SETTLEMENT_UI_CONFIG.syncPollIntervalMs);
-    return () => window.clearInterval(timer);
-  }, [hasState, hasActivePopulation, activeHandle, applyServerState]);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [hasState, hasActivePopulation, activeHandle, raidActive, applyServerState]);
 
   useEffect(() => {
-    if (!hasState || !hasActivePopulation) return;
+    if (!hasState || !hasActivePopulation || raidActive || activeScene !== "settlement") return;
     const id = window.setInterval(() => {
       setNowTickMs(Date.now());
     }, SETTLEMENT_UI_CONFIG.interpTickMs);
     return () => window.clearInterval(id);
-  }, [hasState, hasActivePopulation]);
+  }, [hasState, hasActivePopulation, raidActive, activeScene]);
 
   useEffect(() => {
     if (!hasState || !hasActivePopulation || isAdminRoute) return;
@@ -167,18 +174,21 @@ export function App() {
 
   const runAction = useCallback(
     async (
-      fn: () => Promise<DashboardStateResp>,
+      fn: () => Promise<ServerUpdate>,
       successMsg?: string,
     ) => {
       setErrorBanner(null);
       setBusy(true);
+      const token = api.getSessionToken();
       try {
         const next = await fn();
+        if (!belongsToSession(next, token, api.getSessionToken())) return;
         applyServerState(next);
         if (successMsg) {
           setNoticeBanner(successMsg);
         }
       } catch (err: unknown) {
+        if (api.getSessionToken() !== token) return;
         if (err instanceof ApiError && err.status === 401) {
           api.setSessionToken(null);
           setState(null);
@@ -432,6 +442,7 @@ export function App() {
   const totalClicks = player.totalManualClicks + inFlightClicks;
 
   const handleGatherWater = () => {
+    const token = api.getSessionToken();
     setErrorBanner(null);
     const burstId = Date.now() + Math.random();
     const label = `+${firstResBpUnlocked ? 2 : 1}`;
@@ -445,6 +456,7 @@ export function App() {
       .gatherWater({ clicks: 1 })
       .then((next) => {
         setInFlightClicks((prev) => Math.max(0, prev - 1));
+        if (api.getSessionToken() !== token) return;
         applyServerState(next);
       })
       .catch((err: unknown) => {

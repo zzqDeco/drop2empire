@@ -43,6 +43,9 @@ func (s *Service) SwitchGuild(ctx context.Context, guildCode string) (*domain.Wo
 		return nil, domain.ErrInvalidInput("商会标识必须为 OBSIDIAN（黑曜商会）或 ARGENT（白银同盟）")
 	}
 	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+		if p.DailyWarBudgetUsed > 0 {
+			return domain.ErrPrecondition("war_faction_locked", "本期已出兵，结算前不能切换阵营")
+		}
 		p.GuildCode = guildCode
 		name := "黑曜商会 (OBSIDIAN)"
 		if guildCode == domain.GuildArgent {

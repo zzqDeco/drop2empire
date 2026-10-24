@@ -43,8 +43,8 @@ All player endpoints authenticate via the `Authorization: Bearer <session_token>
 | `POST /api/v1/empire/raid/gear/manage` | `ManageRaidGear` | Crafts (`action="craft"`) or equips (`action="equip"`) out-of-raid weapons, armor, boots, seasonal safeboxes (`1 -> 3 -> 5` slots), and tactical potions using settlement resources. |
 | `POST /api/v1/empire/raid/draft` | `DraftRaidBuff` | Selects (`action="pick"`) one of the 3 offered pre-departure buff cards (from the 54-card pool, max 4 carried) or spends settlement resources to reroll (`action="reroll"`). |
 | `POST /api/v1/empire/colony/raid/start` | `StartRaid` | Generates an authoritative 4-zone 2D extraction session (`ActiveRaidSession`) on the server with fog-of-war clipping and real-time sandstorm expiration. |
-| `POST /api/v1/empire/colony/raid/action` | `RaidAction` | Executes a step-by-step authoritative in-raid intent (`move`, `open_chest`, `use_portal`, `transfer_loot`, `loot_all`, `drink_potion`, `merchant_buy`), resolving combat, fog reveal, and CSPRNG chest drops on the server. |
-| `POST /api/v1/empire/colony/raid/finish` | `FinishRaid` | Authoritatively settles raid extraction (`EXTRACTED`, verified against extraction beacon proximity and expiration) or death/timeout (`MIA`), awarding only server-recorded `SafeBox` / `Backpack` loot and destroying equipped weapon/armor/boots on `MIA`. |
+| `POST /api/v1/empire/colony/raid/action` | `RaidAction` | Requires `raidId` and `commandSeq`; returns `RaidUpdateResp` with the current zone and authoritative loadout. Executes an in-raid intent (`move`, `open_chest`, `use_portal`, `transfer_loot`, `loot_all`, `drink_potion`, `merchant_buy`), resolving combat, fog reveal, and CSPRNG chest drops on the server. |
+| `POST /api/v1/empire/colony/raid/finish` | `FinishRaid` | Requires `raidId` and `commandSeq`; returns `RaidUpdateResp`. Authoritatively settles raid extraction (`EXTRACTED`, verified against the exact beacon tile, full channel deadline and expiration) or death/timeout (`MIA`), awarding only server-recorded `SafeBox` / `Backpack` loot and destroying equipped weapon/armor/boots on `MIA`. |
 
 ---
 
@@ -79,3 +79,13 @@ Protected by Caddy loopback port isolation and `X-D2E-Admin-Tunnel: 1`:
 | `POST /api/v1/empire/admin/season/rollover` | `RolloverSeason` | Executes cross-season settlement (`S1 -> S2`): resets settlement population/resources/blueprints, profession, gold, and learned raid blueprints (`bp_*`), while permanently retaining `cos_*` seasonal animated cosmetics and minted `Collectibles`. |
 | `POST /api/v1/empire/admin/notices` | `PublishNotice` | Publishes an official Imperial Announcement (`title`, `effectiveIn`, `summary`, `demandShifts`) to all players' `seasonNotices` feed. |
 | `GET /api/v1/empire/admin/benchmark-30m` | `RunBenchmark30m` | Runs the deterministic 30-minute Phase 1 progression simulator across 3 reference strategies. |
+
+## 6. Revision and raid command semantics
+
+`DashboardStateResp.revision` and `RaidUpdateResp.revision` are monotonic per player, including resets. A raid update carries `playerHandle` and `raidLoadout`; `activeSession.zones` contains only the current zone. Merge zones by ID within the same `raidId`, reject older revisions and other-player patches. Fetch a full dashboard once after terminal settlement to refresh inventory. No map seed is sent in either response.
+
+Every active session exposes an opaque `raidId`, `lastCommandSeq` and `channelRemainingMs`. The next command must use `lastCommandSeq + 1`. Retrying the latest command with identical content returns the current state without applying it again. A reused sequence with changed content, skipped sequence or different raid ID is rejected. The last 16 terminal command receipts are retained, so a delayed finish retry cannot settle a later raid. Older receipts outside that window fail closed. Missing IDs from obsolete clients are rejected; publish the generated SDK and server together.
+
+The SDK retries a network-failed command once with identical content, then refreshes the dashboard if its result is still uncertain or the server reports a sequence conflict. A committed terminal receipt remains usable if the subsequent inventory refresh fails; normal settlement polling recovers that inventory. Session changes fence late responses.
+
+`StartRaid` refuses to replace any active session, including an expired one: settle it as `MIA` first. Gear crafting/equipping/unequipping and buff drafting are locked until settlement. Movement refills at the full effective cooldown with at most one second of burst credit. Channels start on tile entry, reset on movement and use a frozen server deadline; exact sandstorm expiry is terminal. Unknown loot containers fail before removing items. Admission control precedes DB reads (20 commands/s per session with one second burst credit, 500/s per process, bounded 4096-entry cache, 4096-byte body limit).

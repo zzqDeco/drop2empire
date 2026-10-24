@@ -927,6 +927,7 @@ func (p *RaidZoneViewDTO) String() string {
 }
 
 type RaidSettlementReportDTO struct {
+	RaidId        string             `thrift:"raidId,8,required" json:"raidId"`
 	Status        string             `thrift:"status,1,required" json:"status"`
 	BackpackItems []*RaidLootItemDTO `thrift:"backpackItems,2,required,list<RaidLootItemDTO>" json:"backpackItems"`
 	SafeBoxItems  []*RaidLootItemDTO `thrift:"safeBoxItems,3,required,list<RaidLootItemDTO>" json:"safeBoxItems"`
@@ -941,6 +942,10 @@ func NewRaidSettlementReportDTO() *RaidSettlementReportDTO {
 }
 
 func (p *RaidSettlementReportDTO) InitDefault() {
+}
+
+func (p *RaidSettlementReportDTO) GetRaidId() (v string) {
+	return p.RaidId
 }
 
 func (p *RaidSettlementReportDTO) GetStatus() (v string) {
@@ -979,7 +984,9 @@ func (p *RaidSettlementReportDTO) String() string {
 }
 
 type RaidSessionDTO struct {
-	Seed                    int64              `thrift:"seed,1,required" json:"seed"`
+	RaidId                  string             `thrift:"raidId,25,required" json:"raidId"`
+	LastCommandSeq          int64              `thrift:"lastCommandSeq,26,required" json:"lastCommandSeq"`
+	ChannelRemainingMs      int64              `thrift:"channelRemainingMs,27,required" json:"channelRemainingMs"`
 	CurrentZoneId           int32              `thrift:"currentZoneId,2,required" json:"currentZoneId"`
 	PlayerX                 int32              `thrift:"playerX,3,required" json:"playerX"`
 	PlayerY                 int32              `thrift:"playerY,4,required" json:"playerY"`
@@ -1012,8 +1019,16 @@ func NewRaidSessionDTO() *RaidSessionDTO {
 func (p *RaidSessionDTO) InitDefault() {
 }
 
-func (p *RaidSessionDTO) GetSeed() (v int64) {
-	return p.Seed
+func (p *RaidSessionDTO) GetRaidId() (v string) {
+	return p.RaidId
+}
+
+func (p *RaidSessionDTO) GetLastCommandSeq() (v int64) {
+	return p.LastCommandSeq
+}
+
+func (p *RaidSessionDTO) GetChannelRemainingMs() (v int64) {
+	return p.ChannelRemainingMs
 }
 
 func (p *RaidSessionDTO) GetCurrentZoneId() (v int32) {
@@ -1132,7 +1147,6 @@ type RaidLoadoutStateDTO struct {
 	MoveCooldownMs       int32                    `thrift:"moveCooldownMs,14,required" json:"moveCooldownMs"`
 	RaidDurationSeconds  int32                    `thrift:"raidDurationSeconds,15,required" json:"raidDurationSeconds"`
 	BackpackCapacity     int32                    `thrift:"backpackCapacity,16,required" json:"backpackCapacity"`
-	ActiveRaidSeed       int64                    `thrift:"activeRaidSeed,17,required" json:"activeRaidSeed"`
 	ActiveSession        *RaidSessionDTO          `thrift:"activeSession,18,optional" json:"activeSession,omitempty"`
 	LastSettlementReport *RaidSettlementReportDTO `thrift:"lastSettlementReport,19,optional" json:"lastSettlementReport,omitempty"`
 }
@@ -1206,10 +1220,6 @@ func (p *RaidLoadoutStateDTO) GetRaidDurationSeconds() (v int32) {
 
 func (p *RaidLoadoutStateDTO) GetBackpackCapacity() (v int32) {
 	return p.BackpackCapacity
-}
-
-func (p *RaidLoadoutStateDTO) GetActiveRaidSeed() (v int64) {
-	return p.ActiveRaidSeed
 }
 
 var RaidLoadoutStateDTO_ActiveSession_DEFAULT *RaidSessionDTO
@@ -2658,6 +2668,7 @@ func (p *PlayerProfileDTO) String() string {
 }
 
 type DashboardStateResp struct {
+	Revision            int64                    `thrift:"revision,32,required" json:"revision"`
 	ServerTime          string                   `thrift:"serverTime,1,required" json:"serverTime"`
 	Player              *PlayerProfileDTO        `thrift:"player,2,required" json:"player"`
 	AvailableHandles    []string                 `thrift:"availableHandles,3,required,list<string>" json:"availableHandles"`
@@ -2696,6 +2707,10 @@ func NewDashboardStateResp() *DashboardStateResp {
 }
 
 func (p *DashboardStateResp) InitDefault() {
+}
+
+func (p *DashboardStateResp) GetRevision() (v int64) {
+	return p.Revision
 }
 
 func (p *DashboardStateResp) GetServerTime() (v string) {
@@ -2908,6 +2923,47 @@ func (p *DashboardStateResp) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("DashboardStateResp(%+v)", *p)
+}
+
+type RaidUpdateResp struct {
+	PlayerHandle string               `thrift:"playerHandle,1,required" json:"playerHandle"`
+	Revision     int64                `thrift:"revision,2,required" json:"revision"`
+	RaidLoadout  *RaidLoadoutStateDTO `thrift:"raidLoadout,3,required" json:"raidLoadout"`
+}
+
+func NewRaidUpdateResp() *RaidUpdateResp {
+	return &RaidUpdateResp{}
+}
+
+func (p *RaidUpdateResp) InitDefault() {
+}
+
+func (p *RaidUpdateResp) GetPlayerHandle() (v string) {
+	return p.PlayerHandle
+}
+
+func (p *RaidUpdateResp) GetRevision() (v int64) {
+	return p.Revision
+}
+
+var RaidUpdateResp_RaidLoadout_DEFAULT *RaidLoadoutStateDTO
+
+func (p *RaidUpdateResp) GetRaidLoadout() (v *RaidLoadoutStateDTO) {
+	if !p.IsSetRaidLoadout() {
+		return RaidUpdateResp_RaidLoadout_DEFAULT
+	}
+	return p.RaidLoadout
+}
+
+func (p *RaidUpdateResp) IsSetRaidLoadout() bool {
+	return p.RaidLoadout != nil
+}
+
+func (p *RaidUpdateResp) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("RaidUpdateResp(%+v)", *p)
 }
 
 type GetDashboardReq struct {
@@ -3546,6 +3602,8 @@ func (p *PublishNoticeReq) String() string {
 }
 
 type RaidActionReq struct {
+	RaidId        string  `thrift:"raidId,8,required" json:"raidId"`
+	CommandSeq    int64   `thrift:"commandSeq,9,required" json:"commandSeq"`
 	Action        string  `thrift:"action,1,required" json:"action"`
 	Dx            *int32  `thrift:"dx,2,optional" json:"dx,omitempty"`
 	Dy            *int32  `thrift:"dy,3,optional" json:"dy,omitempty"`
@@ -3560,6 +3618,14 @@ func NewRaidActionReq() *RaidActionReq {
 }
 
 func (p *RaidActionReq) InitDefault() {
+}
+
+func (p *RaidActionReq) GetRaidId() (v string) {
+	return p.RaidId
+}
+
+func (p *RaidActionReq) GetCommandSeq() (v int64) {
+	return p.CommandSeq
 }
 
 func (p *RaidActionReq) GetAction() (v string) {
@@ -3652,7 +3718,9 @@ func (p *RaidActionReq) String() string {
 }
 
 type FinishRaidReq struct {
-	Status string `thrift:"status,1,required" json:"status"`
+	RaidId     string `thrift:"raidId,2,required" json:"raidId"`
+	CommandSeq int64  `thrift:"commandSeq,3,required" json:"commandSeq"`
+	Status     string `thrift:"status,1,required" json:"status"`
 }
 
 func NewFinishRaidReq() *FinishRaidReq {
@@ -3660,6 +3728,14 @@ func NewFinishRaidReq() *FinishRaidReq {
 }
 
 func (p *FinishRaidReq) InitDefault() {
+}
+
+func (p *FinishRaidReq) GetRaidId() (v string) {
+	return p.RaidId
+}
+
+func (p *FinishRaidReq) GetCommandSeq() (v int64) {
+	return p.CommandSeq
 }
 
 func (p *FinishRaidReq) GetStatus() (v string) {
@@ -4295,9 +4371,9 @@ type EmpireService interface {
 
 	StartRaid(ctx context.Context, req *StartRaidReq) (r *DashboardStateResp, err error)
 
-	RaidAction(ctx context.Context, req *RaidActionReq) (r *DashboardStateResp, err error)
+	RaidAction(ctx context.Context, req *RaidActionReq) (r *RaidUpdateResp, err error)
 
-	FinishRaid(ctx context.Context, req *FinishRaidReq) (r *DashboardStateResp, err error)
+	FinishRaid(ctx context.Context, req *FinishRaidReq) (r *RaidUpdateResp, err error)
 
 	RolloverSeason(ctx context.Context, req *RolloverSeasonReq) (r *DashboardStateResp, err error)
 

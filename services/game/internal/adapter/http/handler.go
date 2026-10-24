@@ -25,6 +25,7 @@ func NewHTTPHandler(svc *app.Service, ready func(context.Context) error) http.Ha
 	mux := http.NewServeMux()
 	httpx.OperationsContext(mux, ready)
 	srv := NewServer(svc)
+	limiter := &raidLimiter{}
 	empire.RegisterEmpireServer(mux, srv, httpx.Responder{})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := strings.TrimSpace(r.Header.Get("X-Session-Token"))
@@ -43,6 +44,16 @@ func NewHTTPHandler(svc *app.Service, ready func(context.Context) error) http.Ha
 		}
 		if tunnel := strings.TrimSpace(r.Header.Get("X-Admin-Tunnel")); tunnel != "" {
 			r = r.WithContext(app.WithAdminTunnel(r.Context(), tunnel))
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/v1/empire/colony/raid/") {
+			r.Body = http.MaxBytesReader(w, r.Body, 4096)
+			if token != "" && !limiter.allow(token, time.Now()) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("Retry-After", "1")
+				w.WriteHeader(http.StatusTooManyRequests)
+				_, _ = w.Write([]byte(`{"error":{"code":"raid_rate_limit","message":"远征指令过于频繁，请稍后重试"}}`))
+				return
+			}
 		}
 		mux.ServeHTTP(w, r)
 	})
@@ -237,8 +248,8 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 				maxETA = eta
 			}
 			costsDTO = append(costsDTO, &empire.CostItemDTO{
-				ResourceKey:  rKey,
-				ResourceName: domain.ResourceName(rKey),
+				ResourceKey:   rKey,
+				ResourceName:  domain.ResourceName(rKey),
 				RequiredMilli: reqMilli,
 				CurrentMilli:  curMilli,
 				EtaSeconds:    eta,
@@ -755,332 +766,11 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 
 	hydrationWarn := p.HydrationWarning
 
-	domain.EnsureRaidState(p)
-	equippedCosDTO := &empire.EquippedCosmeticsDTO{
-		Headgear:  p.EquippedCosmetics["headgear"],
-		Mantle:    p.EquippedCosmetics["mantle"],
-		HeldRelic: p.EquippedCosmetics["held_relic"],
-		Companion: p.EquippedCosmetics["companion"],
-	}
-
-	cosmeticsDTO := make([]*empire.CosmeticSpecDTO, 0, len(domain.CosmeticCatalog))
-	for _, cs := range domain.CosmeticCatalog {
-		owned := int32(p.ResourcesMilli[cs.ItemKey] / domain.ResourceScale)
-		eq := p.EquippedCosmetics[cs.Slot] == cs.ItemKey
-		cosmeticsDTO = append(cosmeticsDTO, &empire.CosmeticSpecDTO{
-			ItemKey:      cs.ItemKey,
-			Name:         cs.Name,
-			Slot:         cs.Slot,
-			Rarity:       cs.Rarity,
-			SeasonTag:    cs.SeasonTag,
-			VisualEffect: cs.VisualEffect,
-			OwnedCount:   owned,
-			Equipped:     eq,
-		})
-	}
-
-	raidGearsDTO := make([]*empire.RaidGearSpecDTO, 0, len(domain.RaidGearCatalog))
-	for _, rg := range domain.RaidGearCatalog {
-		bpOwned := int32(0)
-		recipeUnlocked := rg.BlueprintKey == ""
-		if rg.BlueprintKey != "" {
-			bpOwned = int32(p.ResourcesMilli[rg.BlueprintKey] / domain.ResourceScale)
-			recipeUnlocked = p.LearnedRaidBlueprints[rg.BlueprintKey]
-		}
-		owned := p.RaidGearInventory[rg.ItemKey]
-		eq := false
-		switch rg.Category {
-		case "weapon":
-			eq = p.RaidLoadout.WeaponKey == rg.ItemKey && owned > 0
-		case "armor":
-			eq = p.RaidLoadout.ArmorKey == rg.ItemKey && owned > 0
-		case "boots":
-			eq = p.RaidLoadout.BootsKey == rg.ItemKey && owned > 0
-		case "safe_box":
-			eq = p.RaidLoadout.SafeBoxKey == rg.ItemKey && owned > 0
-		case "potion":
-			for _, pk := range p.RaidLoadout.EquippedPotions {
-				if pk == rg.ItemKey && owned > 0 {
-					eq = true
-					break
-				}
-			}
-		}
-
-		costsDTO := make([]*empire.CostItemDTO, 0, len(rg.CostsMilli))
-		canCraft := recipeUnlocked && !(rg.Category == "safe_box" && owned > 0)
-		for _, rKey := range costOrderAll {
-			reqMilli, exists := rg.CostsMilli[rKey]
-			if !exists {
-				continue
-			}
-			curMilli := p.ResourcesMilli[rKey]
-			if curMilli < reqMilli {
-				canCraft = false
-			}
-			costsDTO = append(costsDTO, &empire.CostItemDTO{
-				ResourceKey:   rKey,
-				ResourceName:  domain.ResourceName(rKey),
-				RequiredMilli: reqMilli,
-				CurrentMilli:  curMilli,
-				EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
-			})
-		}
-
-		raidGearsDTO = append(raidGearsDTO, &empire.RaidGearSpecDTO{
-			ItemKey:            rg.ItemKey,
-			Name:               rg.Name,
-			Category:           rg.Category,
-			Tier:               rg.Tier,
-			BlueprintKey:       rg.BlueprintKey,
-			BlueprintName:      rg.BlueprintName,
-			BlueprintOwnedCount: bpOwned,
-			RecipeUnlocked:     recipeUnlocked,
-			OwnedCount:         owned,
-			Equipped:           eq,
-			StatSummary:        rg.StatSummary,
-			AtkBonus:           rg.AtkBonus,
-			HpBonus:            rg.HpBonus,
-			DefBonus:           rg.DefBonus,
-			MoveCooldownMs:     rg.MoveCooldownMs,
-			SafeSlots:          rg.SafeSlots,
-			Costs:              costsDTO,
-			CanCraft:           canCraft,
-		})
-	}
-
-	mapBuffCardDTO := func(code string) *empire.RaidBuffCardDTO {
-		spec, ok := domain.FindRaidBuffCardSpec(code)
-		if !ok {
-			return nil
-		}
-		costsDTO := make([]*empire.CostItemDTO, 0, len(spec.CostsMilli))
-		canBuy := true
-		for _, rKey := range costOrderAll {
-			reqMilli, exists := spec.CostsMilli[rKey]
-			if !exists {
-				continue
-			}
-			curMilli := p.ResourcesMilli[rKey]
-			if curMilli < reqMilli {
-				canBuy = false
-			}
-			costsDTO = append(costsDTO, &empire.CostItemDTO{
-				ResourceKey:   rKey,
-				ResourceName:  domain.ResourceName(rKey),
-				RequiredMilli: reqMilli,
-				CurrentMilli:  curMilli,
-				EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
-			})
-		}
-		return &empire.RaidBuffCardDTO{
-			CardCode:      spec.CardCode,
-			Name:          spec.Name,
-			Category:      spec.Category,
-			Rarity:        spec.Rarity,
-			EffectSummary: spec.EffectSummary,
-			Costs:         costsDTO,
-			CanBuy:        canBuy,
-		}
-	}
-
-	equippedBuffsDTO := make([]*empire.RaidBuffCardDTO, 0, len(p.RaidLoadout.EquippedBuffCards))
-	for _, code := range p.RaidLoadout.EquippedBuffCards {
-		if dto := mapBuffCardDTO(code); dto != nil {
-			equippedBuffsDTO = append(equippedBuffsDTO, dto)
-		}
-	}
-	draftPoolDTO := make([]*empire.RaidBuffCardDTO, 0, len(p.RaidLoadout.DraftPoolCards))
-	for _, code := range p.RaidLoadout.DraftPoolCards {
-		if dto := mapBuffCardDTO(code); dto != nil {
-			draftPoolDTO = append(draftPoolDTO, dto)
-		}
-	}
-
-	rerollCostsDTO := make([]*empire.CostItemDTO, 0, len(domain.RaidRerollCostsMilli))
-	canReroll := true
-	for _, rKey := range costOrderAll {
-		reqMilli, exists := domain.RaidRerollCostsMilli[rKey]
-		if !exists {
-			continue
-		}
-		curMilli := p.ResourcesMilli[rKey]
-		if curMilli < reqMilli {
-			canReroll = false
-		}
-		rerollCostsDTO = append(rerollCostsDTO, &empire.CostItemDTO{
-			ResourceKey:   rKey,
-			ResourceName:  domain.ResourceName(rKey),
-			RequiredMilli: reqMilli,
-			CurrentMilli:  curMilli,
-			EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
-		})
-	}
-
-	maxHP, atk, def, moveCD, durSec, bagCap, safeSlots := domain.ComputeRaidLoadoutStats(p)
-	eqPotions := make([]string, 0, len(p.RaidLoadout.EquippedPotions))
-	for _, pk := range p.RaidLoadout.EquippedPotions {
-		if p.RaidGearInventory[pk] > 0 {
-			eqPotions = append(eqPotions, pk)
-		}
-	}
-
-	mapLootSlice := func(items []domain.RaidLootItem) []*empire.RaidLootItemDTO {
-		out := make([]*empire.RaidLootItemDTO, 0, len(items))
-		for _, it := range items {
-			out = append(out, &empire.RaidLootItemDTO{
-				ID:       it.ID,
-				Key:      it.Key,
-				Name:     it.Name,
-				Rarity:   it.Rarity,
-				Category: it.Category,
-			})
-		}
-		return out
-	}
-
-	var activeSessionDTO *empire.RaidSessionDTO
-	if sess := p.RaidLoadout.ActiveSession; sess != nil {
-		nowUTC := time.Now().UTC()
-		remMs := sess.ExpiresAt.Sub(nowUTC).Milliseconds()
-		if remMs < 0 {
-			remMs = 0
-		}
-		galeRemMs := sess.GaleEndsAt.Sub(nowUTC).Milliseconds()
-		if galeRemMs < 0 {
-			galeRemMs = 0
-		}
-		scavRemMs := sess.ScavEndsAt.Sub(nowUTC).Milliseconds()
-		if scavRemMs < 0 {
-			scavRemMs = 0
-		}
-		effMoveCD := sess.BaseMoveCooldownMs
-		if galeRemMs > 0 {
-			effMoveCD = (effMoveCD * 65) / 100
-			if effMoveCD < domain.RaidBalance.MinMoveCooldownMs {
-				effMoveCD = domain.RaidBalance.MinMoveCooldownMs
-			}
-		}
-
-		zonesDTO := make([]*empire.RaidZoneViewDTO, 0, len(sess.Zones))
-		for _, zn := range sess.Zones {
-			tilesDTO := make([]*empire.RaidTileViewDTO, 0, len(zn.Tiles))
-			var exploredCount int32
-			for _, t := range zn.Tiles {
-				if !t.Explored {
-					// Zero-Trust Fog-of-War clipping: hide unexplored tile contents from wire DTO
-					tilesDTO = append(tilesDTO, &empire.RaidTileViewDTO{
-						X:                t.X,
-						Y:                t.Y,
-						Kind:             "fog",
-						Explored:         false,
-						Looted:           false,
-						EnemyName:        "",
-						EnemyHp:          0,
-						EnemyMaxHp:       0,
-						EnemyAtk:         0,
-						PortalTargetZone: -1,
-						PortalLabel:      "",
-						ChannelMs:        0,
-					})
-				} else {
-					exploredCount++
-					chMs := domain.RaidChannelDurationMs[t.Kind]
-					if scavRemMs > 0 && chMs > 0 {
-						chMs = chMs / 2
-					}
-					tilesDTO = append(tilesDTO, &empire.RaidTileViewDTO{
-						X:                t.X,
-						Y:                t.Y,
-						Kind:             t.Kind,
-						Explored:         true,
-						Looted:           t.Looted,
-						EnemyName:        t.EnemyName,
-						EnemyHp:          t.EnemyHP,
-						EnemyMaxHp:       t.EnemyMaxHP,
-						EnemyAtk:         t.EnemyAtk,
-						PortalTargetZone: t.PortalTargetZone,
-						PortalLabel:      t.PortalLabel,
-						ChannelMs:        chMs,
-					})
-				}
-			}
-			zonesDTO = append(zonesDTO, &empire.RaidZoneViewDTO{
-				ID:            zn.ID,
-				Name:          zn.Name,
-				Subtitle:      zn.Subtitle,
-				Width:         zn.Width,
-				Height:        zn.Height,
-				Visited:       zn.Visited,
-				ExploredCount: exploredCount,
-				Tiles:         tilesDTO,
-			})
-		}
-		activeSessionDTO = &empire.RaidSessionDTO{
-			Seed:                    sess.Seed,
-			CurrentZoneId:           sess.CurrentZoneID,
-			PlayerX:                 sess.PlayerX,
-			PlayerY:                 sess.PlayerY,
-			Facing:                  sess.Facing,
-			Hp:                      sess.HP,
-			MaxHp:                   sess.MaxHP,
-			Atk:                     sess.Atk,
-			Def:                     sess.Def,
-			CheatDeathActive:        sess.CheatDeathActive,
-			TimeRemainingMs:         remMs,
-			EffectiveMoveCooldownMs: effMoveCD,
-			GaleRemainingMs:         galeRemMs,
-			ScavRemainingMs:         scavRemMs,
-			UsedPotionKeys:          append([]string{}, sess.UsedPotionKeys...),
-			Backpack:                mapLootSlice(sess.Backpack),
-			SafeBox:                 mapLootSlice(sess.SafeBox),
-			ActiveChestDrops:        mapLootSlice(sess.ActiveChestDrops),
-			ActiveContainerTitle:    sess.ActiveContainerTitle,
-			Logs:                    append([]string{}, sess.Logs...),
-			ZonesVisitedCount:       sess.ZonesVisitedCount,
-			ChestsOpenedCount:       sess.ChestsOpenedCount,
-			BossesKilledCount:       sess.BossesKilledCount,
-			Zones:                   zonesDTO,
-		}
-	}
-
-	var lastSettlementDTO *empire.RaidSettlementReportDTO
-	if rep := p.RaidLoadout.LastSettlementReport; rep != nil {
-		lastSettlementDTO = &empire.RaidSettlementReportDTO{
-			Status:        rep.Status,
-			BackpackItems: mapLootSlice(rep.BackpackItems),
-			SafeBoxItems:  mapLootSlice(rep.SafeBoxItems),
-			LostGearNames: append([]string{}, rep.LostGearNames...),
-			ZonesVisited:  rep.ZonesVisited,
-			ChestsOpened:  rep.ChestsOpened,
-			BossesKilled:  rep.BossesKilled,
-		}
-	}
-
-	raidLoadoutDTO := &empire.RaidLoadoutStateDTO{
-		WeaponKey:            p.RaidLoadout.WeaponKey,
-		ArmorKey:             p.RaidLoadout.ArmorKey,
-		BootsKey:             p.RaidLoadout.BootsKey,
-		SafeBoxKey:           p.RaidLoadout.SafeBoxKey,
-		SafeSlotCount:        safeSlots,
-		EquippedPotions:      eqPotions,
-		EquippedBuffCards:    equippedBuffsDTO,
-		DraftPoolCards:       draftPoolDTO,
-		RerollCosts:          rerollCostsDTO,
-		CanReroll:            canReroll,
-		TotalMaxHp:           maxHP,
-		TotalAtk:             atk,
-		TotalDef:             def,
-		MoveCooldownMs:       moveCD,
-		RaidDurationSeconds:  durSec,
-		BackpackCapacity:     bagCap,
-		ActiveRaidSeed:       p.RaidLoadout.ActiveRaidSeed,
-		ActiveSession:        activeSessionDTO,
-		LastSettlementReport: lastSettlementDTO,
-	}
+	equippedCosDTO, cosmeticsDTO, raidGearsDTO, raidLoadoutDTO := mapRaidPresentation(p)
 
 	return &empire.DashboardStateResp{
-		ServerTime:          time.Now().UTC().Format(time.RFC3339),
+		ServerTime:          time.Now().UTC().Format(time.RFC3339Nano),
+		Revision:            p.Revision,
 		Player:              playerDTO,
 		AvailableHandles:    handles,
 		Resources:           resourcesDTO,
@@ -1339,7 +1029,7 @@ func (s *Server) StartRaid(ctx context.Context, _ *empire.StartRaidReq) (*empire
 	return mapDashboardResp(w), nil
 }
 
-func (s *Server) RaidAction(ctx context.Context, req *empire.RaidActionReq) (*empire.DashboardStateResp, error) {
+func (s *Server) RaidAction(ctx context.Context, req *empire.RaidActionReq) (*empire.RaidUpdateResp, error) {
 	var dx, dy int32
 	if req.Dx != nil {
 		dx = *req.Dx
@@ -1360,19 +1050,19 @@ func (s *Server) RaidAction(ctx context.Context, req *empire.RaidActionReq) (*em
 	if req.ItemKey != nil {
 		itemKey = *req.ItemKey
 	}
-	w, err := s.svc.RaidAction(ctx, req.Action, dx, dy, itemID, fromContainer, toContainer, itemKey)
+	p, err := s.svc.RaidCommand(ctx, req.RaidId, req.CommandSeq, domain.RaidCommand{Action: req.Action, DX: dx, DY: dy, ItemID: itemID, FromContainer: fromContainer, ToContainer: toContainer, ItemKey: itemKey})
 	if err != nil {
 		return nil, err
 	}
-	return mapDashboardResp(w), nil
+	return mapRaidUpdate(p), nil
 }
 
-func (s *Server) FinishRaid(ctx context.Context, req *empire.FinishRaidReq) (*empire.DashboardStateResp, error) {
-	w, err := s.svc.FinishRaid(ctx, req.Status)
+func (s *Server) FinishRaid(ctx context.Context, req *empire.FinishRaidReq) (*empire.RaidUpdateResp, error) {
+	p, err := s.svc.RaidCommand(ctx, req.RaidId, req.CommandSeq, domain.RaidCommand{Action: "finish", Status: req.Status})
 	if err != nil {
 		return nil, err
 	}
-	return mapDashboardResp(w), nil
+	return mapRaidUpdate(p), nil
 }
 
 func (s *Server) ChooseProfession(ctx context.Context, req *empire.ChooseProfessionReq) (*empire.DashboardStateResp, error) {
@@ -1533,4 +1223,343 @@ func (s *Server) RunBenchmark30m(ctx context.Context, _ *empire.RunBenchmark30mR
 		Runs: runsDTO,
 		Note: "模拟步长 0.5 秒，整数工人分配，仅开局手点 10 次水。V1 推荐策略通过引入引水轮、石刃锯台与宝藏三部件，彻底消除了第 9–30 分钟的纯挂机空窗期。",
 	}, nil
+}
+
+func mapRaidPresentation(p *domain.PlayerState) (*empire.EquippedCosmeticsDTO, []*empire.CosmeticSpecDTO, []*empire.RaidGearSpecDTO, *empire.RaidLoadoutStateDTO) {
+	costOrderAll := []string{domain.ResWater, domain.ResWood, domain.ResCharcoal, domain.ResStone, domain.ResFlint, domain.ResAncientShard, domain.ResMeteorOre, domain.ResIronIngot, domain.ResRation}
+	rates := domain.NetResourceRatesPerSecMilli(p)
+	domain.EnsureRaidState(p)
+	equippedCosDTO := &empire.EquippedCosmeticsDTO{
+		Headgear:  p.EquippedCosmetics["headgear"],
+		Mantle:    p.EquippedCosmetics["mantle"],
+		HeldRelic: p.EquippedCosmetics["held_relic"],
+		Companion: p.EquippedCosmetics["companion"],
+	}
+
+	cosmeticsDTO := make([]*empire.CosmeticSpecDTO, 0, len(domain.CosmeticCatalog))
+	for _, cs := range domain.CosmeticCatalog {
+		owned := int32(p.ResourcesMilli[cs.ItemKey] / domain.ResourceScale)
+		eq := p.EquippedCosmetics[cs.Slot] == cs.ItemKey
+		cosmeticsDTO = append(cosmeticsDTO, &empire.CosmeticSpecDTO{
+			ItemKey:      cs.ItemKey,
+			Name:         cs.Name,
+			Slot:         cs.Slot,
+			Rarity:       cs.Rarity,
+			SeasonTag:    cs.SeasonTag,
+			VisualEffect: cs.VisualEffect,
+			OwnedCount:   owned,
+			Equipped:     eq,
+		})
+	}
+
+	raidGearsDTO := make([]*empire.RaidGearSpecDTO, 0, len(domain.RaidGearCatalog))
+	for _, rg := range domain.RaidGearCatalog {
+		bpOwned := int32(0)
+		recipeUnlocked := rg.BlueprintKey == ""
+		if rg.BlueprintKey != "" {
+			bpOwned = int32(p.ResourcesMilli[rg.BlueprintKey] / domain.ResourceScale)
+			recipeUnlocked = p.LearnedRaidBlueprints[rg.BlueprintKey]
+		}
+		owned := p.RaidGearInventory[rg.ItemKey]
+		eq := false
+		switch rg.Category {
+		case "weapon":
+			eq = p.RaidLoadout.WeaponKey == rg.ItemKey && owned > 0
+		case "armor":
+			eq = p.RaidLoadout.ArmorKey == rg.ItemKey && owned > 0
+		case "boots":
+			eq = p.RaidLoadout.BootsKey == rg.ItemKey && owned > 0
+		case "safe_box":
+			eq = p.RaidLoadout.SafeBoxKey == rg.ItemKey && owned > 0
+		case "potion":
+			for _, pk := range p.RaidLoadout.EquippedPotions {
+				if pk == rg.ItemKey && owned > 0 {
+					eq = true
+					break
+				}
+			}
+		}
+
+		costsDTO := make([]*empire.CostItemDTO, 0, len(rg.CostsMilli))
+		canCraft := recipeUnlocked && !(rg.Category == "safe_box" && owned > 0)
+		for _, rKey := range costOrderAll {
+			reqMilli, exists := rg.CostsMilli[rKey]
+			if !exists {
+				continue
+			}
+			curMilli := p.ResourcesMilli[rKey]
+			if curMilli < reqMilli {
+				canCraft = false
+			}
+			costsDTO = append(costsDTO, &empire.CostItemDTO{
+				ResourceKey:   rKey,
+				ResourceName:  domain.ResourceName(rKey),
+				RequiredMilli: reqMilli,
+				CurrentMilli:  curMilli,
+				EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
+			})
+		}
+
+		raidGearsDTO = append(raidGearsDTO, &empire.RaidGearSpecDTO{
+			ItemKey:             rg.ItemKey,
+			Name:                rg.Name,
+			Category:            rg.Category,
+			Tier:                rg.Tier,
+			BlueprintKey:        rg.BlueprintKey,
+			BlueprintName:       rg.BlueprintName,
+			BlueprintOwnedCount: bpOwned,
+			RecipeUnlocked:      recipeUnlocked,
+			OwnedCount:          owned,
+			Equipped:            eq,
+			StatSummary:         rg.StatSummary,
+			AtkBonus:            rg.AtkBonus,
+			HpBonus:             rg.HpBonus,
+			DefBonus:            rg.DefBonus,
+			MoveCooldownMs:      rg.MoveCooldownMs,
+			SafeSlots:           rg.SafeSlots,
+			Costs:               costsDTO,
+			CanCraft:            canCraft,
+		})
+	}
+
+	mapBuffCardDTO := func(code string) *empire.RaidBuffCardDTO {
+		spec, ok := domain.FindRaidBuffCardSpec(code)
+		if !ok {
+			return nil
+		}
+		costsDTO := make([]*empire.CostItemDTO, 0, len(spec.CostsMilli))
+		canBuy := true
+		for _, rKey := range costOrderAll {
+			reqMilli, exists := spec.CostsMilli[rKey]
+			if !exists {
+				continue
+			}
+			curMilli := p.ResourcesMilli[rKey]
+			if curMilli < reqMilli {
+				canBuy = false
+			}
+			costsDTO = append(costsDTO, &empire.CostItemDTO{
+				ResourceKey:   rKey,
+				ResourceName:  domain.ResourceName(rKey),
+				RequiredMilli: reqMilli,
+				CurrentMilli:  curMilli,
+				EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
+			})
+		}
+		return &empire.RaidBuffCardDTO{
+			CardCode:      spec.CardCode,
+			Name:          spec.Name,
+			Category:      spec.Category,
+			Rarity:        spec.Rarity,
+			EffectSummary: spec.EffectSummary,
+			Costs:         costsDTO,
+			CanBuy:        canBuy,
+		}
+	}
+
+	equippedBuffsDTO := make([]*empire.RaidBuffCardDTO, 0, len(p.RaidLoadout.EquippedBuffCards))
+	for _, code := range p.RaidLoadout.EquippedBuffCards {
+		if dto := mapBuffCardDTO(code); dto != nil {
+			equippedBuffsDTO = append(equippedBuffsDTO, dto)
+		}
+	}
+	draftPoolDTO := make([]*empire.RaidBuffCardDTO, 0, len(p.RaidLoadout.DraftPoolCards))
+	for _, code := range p.RaidLoadout.DraftPoolCards {
+		if dto := mapBuffCardDTO(code); dto != nil {
+			draftPoolDTO = append(draftPoolDTO, dto)
+		}
+	}
+
+	rerollCostsDTO := make([]*empire.CostItemDTO, 0, len(domain.RaidRerollCostsMilli))
+	canReroll := true
+	for _, rKey := range costOrderAll {
+		reqMilli, exists := domain.RaidRerollCostsMilli[rKey]
+		if !exists {
+			continue
+		}
+		curMilli := p.ResourcesMilli[rKey]
+		if curMilli < reqMilli {
+			canReroll = false
+		}
+		rerollCostsDTO = append(rerollCostsDTO, &empire.CostItemDTO{
+			ResourceKey:   rKey,
+			ResourceName:  domain.ResourceName(rKey),
+			RequiredMilli: reqMilli,
+			CurrentMilli:  curMilli,
+			EtaSeconds:    computeETASeconds(reqMilli, curMilli, rates[rKey]),
+		})
+	}
+
+	maxHP, atk, def, moveCD, durSec, bagCap, safeSlots := domain.ComputeRaidLoadoutStats(p)
+	eqPotions := make([]string, 0, len(p.RaidLoadout.EquippedPotions))
+	for _, pk := range p.RaidLoadout.EquippedPotions {
+		if p.RaidGearInventory[pk] > 0 {
+			eqPotions = append(eqPotions, pk)
+		}
+	}
+
+	mapLootSlice := func(items []domain.RaidLootItem) []*empire.RaidLootItemDTO {
+		out := make([]*empire.RaidLootItemDTO, 0, len(items))
+		for _, it := range items {
+			out = append(out, &empire.RaidLootItemDTO{
+				ID:       it.ID,
+				Key:      it.Key,
+				Name:     it.Name,
+				Rarity:   it.Rarity,
+				Category: it.Category,
+			})
+		}
+		return out
+	}
+
+	var activeSessionDTO *empire.RaidSessionDTO
+	if sess := p.RaidLoadout.ActiveSession; sess != nil {
+		nowUTC := time.Now().UTC()
+		remMs := sess.ExpiresAt.Sub(nowUTC).Milliseconds()
+		if remMs < 0 {
+			remMs = 0
+		}
+		galeRemMs := sess.GaleEndsAt.Sub(nowUTC).Milliseconds()
+		if galeRemMs < 0 {
+			galeRemMs = 0
+		}
+		scavRemMs := sess.ScavEndsAt.Sub(nowUTC).Milliseconds()
+		if scavRemMs < 0 {
+			scavRemMs = 0
+		}
+		effMoveCD := domain.RaidMoveCooldownMs(sess, nowUTC)
+
+		zonesDTO := make([]*empire.RaidZoneViewDTO, 0, len(sess.Zones))
+		for _, zn := range sess.Zones {
+			tilesDTO := make([]*empire.RaidTileViewDTO, 0, len(zn.Tiles))
+			var exploredCount int32
+			for _, t := range zn.Tiles {
+				if !t.Explored {
+					// Zero-Trust Fog-of-War clipping: hide unexplored tile contents from wire DTO
+					tilesDTO = append(tilesDTO, &empire.RaidTileViewDTO{
+						X:                t.X,
+						Y:                t.Y,
+						Kind:             "fog",
+						Explored:         false,
+						Looted:           false,
+						EnemyName:        "",
+						EnemyHp:          0,
+						EnemyMaxHp:       0,
+						EnemyAtk:         0,
+						PortalTargetZone: -1,
+						PortalLabel:      "",
+						ChannelMs:        0,
+					})
+				} else {
+					exploredCount++
+					chMs := domain.RaidChannelDurationMs[t.Kind]
+
+					tilesDTO = append(tilesDTO, &empire.RaidTileViewDTO{
+						X:                t.X,
+						Y:                t.Y,
+						Kind:             t.Kind,
+						Explored:         true,
+						Looted:           t.Looted,
+						EnemyName:        t.EnemyName,
+						EnemyHp:          t.EnemyHP,
+						EnemyMaxHp:       t.EnemyMaxHP,
+						EnemyAtk:         t.EnemyAtk,
+						PortalTargetZone: t.PortalTargetZone,
+						PortalLabel:      t.PortalLabel,
+						ChannelMs:        chMs,
+					})
+				}
+			}
+			zonesDTO = append(zonesDTO, &empire.RaidZoneViewDTO{
+				ID:            zn.ID,
+				Name:          zn.Name,
+				Subtitle:      zn.Subtitle,
+				Width:         zn.Width,
+				Height:        zn.Height,
+				Visited:       zn.Visited,
+				ExploredCount: exploredCount,
+				Tiles:         tilesDTO,
+			})
+		}
+		activeSessionDTO = &empire.RaidSessionDTO{
+			RaidId:                  sess.RaidID,
+			LastCommandSeq:          sess.LastCommandSeq,
+			ChannelRemainingMs:      max(int64(0), sess.ChannelReadyAt.Sub(nowUTC).Milliseconds()),
+			CurrentZoneId:           sess.CurrentZoneID,
+			PlayerX:                 sess.PlayerX,
+			PlayerY:                 sess.PlayerY,
+			Facing:                  sess.Facing,
+			Hp:                      sess.HP,
+			MaxHp:                   sess.MaxHP,
+			Atk:                     sess.Atk,
+			Def:                     sess.Def,
+			CheatDeathActive:        sess.CheatDeathActive,
+			TimeRemainingMs:         remMs,
+			EffectiveMoveCooldownMs: effMoveCD,
+			GaleRemainingMs:         galeRemMs,
+			ScavRemainingMs:         scavRemMs,
+			UsedPotionKeys:          append([]string{}, sess.UsedPotionKeys...),
+			Backpack:                mapLootSlice(sess.Backpack),
+			SafeBox:                 mapLootSlice(sess.SafeBox),
+			ActiveChestDrops:        mapLootSlice(sess.ActiveChestDrops),
+			ActiveContainerTitle:    sess.ActiveContainerTitle,
+			Logs:                    append([]string{}, sess.Logs...),
+			ZonesVisitedCount:       sess.ZonesVisitedCount,
+			ChestsOpenedCount:       sess.ChestsOpenedCount,
+			BossesKilledCount:       sess.BossesKilledCount,
+			Zones:                   zonesDTO,
+		}
+	}
+
+	var lastSettlementDTO *empire.RaidSettlementReportDTO
+	if rep := p.RaidLoadout.LastSettlementReport; rep != nil {
+		lastSettlementDTO = &empire.RaidSettlementReportDTO{
+			Status:        rep.Status,
+			RaidId:        rep.RaidID,
+			BackpackItems: mapLootSlice(rep.BackpackItems),
+			SafeBoxItems:  mapLootSlice(rep.SafeBoxItems),
+			LostGearNames: append([]string{}, rep.LostGearNames...),
+			ZonesVisited:  rep.ZonesVisited,
+			ChestsOpened:  rep.ChestsOpened,
+			BossesKilled:  rep.BossesKilled,
+		}
+	}
+
+	raidLoadoutDTO := &empire.RaidLoadoutStateDTO{
+		WeaponKey:           p.RaidLoadout.WeaponKey,
+		ArmorKey:            p.RaidLoadout.ArmorKey,
+		BootsKey:            p.RaidLoadout.BootsKey,
+		SafeBoxKey:          p.RaidLoadout.SafeBoxKey,
+		SafeSlotCount:       safeSlots,
+		EquippedPotions:     eqPotions,
+		EquippedBuffCards:   equippedBuffsDTO,
+		DraftPoolCards:      draftPoolDTO,
+		RerollCosts:         rerollCostsDTO,
+		CanReroll:           canReroll,
+		TotalMaxHp:          maxHP,
+		TotalAtk:            atk,
+		TotalDef:            def,
+		MoveCooldownMs:      moveCD,
+		RaidDurationSeconds: durSec,
+		BackpackCapacity:    bagCap,
+
+		ActiveSession:        activeSessionDTO,
+		LastSettlementReport: lastSettlementDTO,
+	}
+
+	return equippedCosDTO, cosmeticsDTO, raidGearsDTO, raidLoadoutDTO
+}
+
+func mapRaidUpdate(p *domain.PlayerState) *empire.RaidUpdateResp {
+	_, _, _, loadout := mapRaidPresentation(p)
+	if sess := loadout.ActiveSession; sess != nil {
+		// Previous zones remain in the client cache; only the current zone can change.
+		for _, zone := range sess.Zones {
+			if zone.ID == sess.CurrentZoneId {
+				sess.Zones = []*empire.RaidZoneViewDTO{zone}
+				break
+			}
+		}
+	}
+	return &empire.RaidUpdateResp{PlayerHandle: p.Handle, Revision: p.Revision, RaidLoadout: loadout}
 }

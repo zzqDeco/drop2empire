@@ -2,24 +2,22 @@ package domain
 
 // RaidBalance centralizes all numerical parameters for the 2D Wasteland Extraction Roguelite.
 var RaidBalance = struct {
-	BaseMaxHP                 int32
-	BaseAtk                   int32
-	BaseDef                   int32
-	BaseMoveCooldownMs        int32
-	MinMoveCooldownMs         int32
-	GalePotionCooldownMs      int32
-	MaxBuffSpeedPct           int32
-	BaseDurationSec           int32
-	BaseBackpackCap           int32
-	BaseSafeSlots             int32
-	VisionRadius              int32
-	MaxEquippedBuffCards      int
-	MaxEquippedPotions        int
-	MoveCooldownJitterPct     int32 // Server tolerance percentage on step intervals
-	MoveBurstAllowanceMs      int64 // Leaky-bucket burst window for rapid WASD/test steps
-	ChannelJitterTolerancePct int32 // Server tolerance percentage on chest channeling duration
-	EarlyExtractCutoffSec     int32 // Early extraction beacon closes when < 60s remain
-	EarlyExtractGraceSec      int32 // Network jitter grace seconds for early extraction
+	BaseMaxHP             int32
+	BaseAtk               int32
+	BaseDef               int32
+	BaseMoveCooldownMs    int32
+	MinMoveCooldownMs     int32
+	GalePotionCooldownMs  int32
+	MaxBuffSpeedPct       int32
+	BaseDurationSec       int32
+	BaseBackpackCap       int32
+	BaseSafeSlots         int32
+	VisionRadius          int32
+	MaxEquippedBuffCards  int
+	MaxEquippedPotions    int
+	MoveBurstAllowanceMs  int64 // Leaky-bucket burst window for rapid WASD/test steps
+	EarlyExtractCutoffSec int32 // Early extraction beacon closes when < 60s remain
+	EarlyExtractGraceSec  int32 // Network jitter grace seconds for early extraction
 
 	// Combat floor & revive parameters:
 	CombatMinPlayerDmg int32
@@ -45,24 +43,22 @@ var RaidBalance = struct {
 	PotionBerserkAtkBonus  int32
 	PotionBerserkDefBonus  int32
 }{
-	BaseMaxHP:                 100,
-	BaseAtk:                   12,
-	BaseDef:                   2,
-	BaseMoveCooldownMs:        360,
-	MinMoveCooldownMs:         110,
-	GalePotionCooldownMs:      105,
-	MaxBuffSpeedPct:           45,
-	BaseDurationSec:           180,
-	BaseBackpackCap:           6,
-	BaseSafeSlots:             1,
-	VisionRadius:              2,
-	MaxEquippedBuffCards:      4,
-	MaxEquippedPotions:        3,
-	MoveCooldownJitterPct:     50,
-	MoveBurstAllowanceMs:      1000,
-	ChannelJitterTolerancePct: 65,
-	EarlyExtractCutoffSec:     60,
-	EarlyExtractGraceSec:      5,
+	BaseMaxHP:             100,
+	BaseAtk:               12,
+	BaseDef:               2,
+	BaseMoveCooldownMs:    360,
+	MinMoveCooldownMs:     110,
+	GalePotionCooldownMs:  105,
+	MaxBuffSpeedPct:       45,
+	BaseDurationSec:       180,
+	BaseBackpackCap:       6,
+	BaseSafeSlots:         1,
+	VisionRadius:          2,
+	MaxEquippedBuffCards:  4,
+	MaxEquippedPotions:    3,
+	MoveBurstAllowanceMs:  1000,
+	EarlyExtractCutoffSec: 60,
+	EarlyExtractGraceSec:  5,
 
 	CombatMinPlayerDmg: 6,
 	CombatMinEnemyDmg:  2,

@@ -28,6 +28,7 @@ import {
   type ManageRaidGearReq,
   type DraftRaidBuffReq,
   type RaidActionReq,
+  type RaidUpdateResp,
   type FinishRaidReq,
   type RolloverSeasonReq,
   type PublishNoticeReq,
@@ -251,14 +252,44 @@ export class EmpireClient {
       body: JSON.stringify({}),
     });
 
+  async #raidRequest(path: string, init: RequestInit): Promise<RaidUpdateResp | DashboardStateResp> {
+    const token = this.getSessionToken();
+    let update: RaidUpdateResp;
+    try {
+      try {
+        update = await this.#request<RaidUpdateResp>(path, init);
+      } catch (error) {
+        if (!(error instanceof TypeError) || this.getSessionToken() !== token) throw error;
+        update = await this.#request<RaidUpdateResp>(path, init);
+      }
+    } catch (error) {
+      const needsResync = error instanceof TypeError ||
+        (error instanceof ApiError && ["raid_sequence_conflict", "stale_raid"].includes(error.code));
+      if (needsResync && this.getSessionToken() === token) return this.getDashboard();
+      throw error;
+    }
+    // Refresh settlement inventory once at the terminal transition, never per step.
+    if (!update.raidLoadout.activeSession && this.getSessionToken() === token) {
+      try {
+        return await this.getDashboard();
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) throw error;
+        // The finish already committed. Keep that receipt even if the refresh
+        // fails; normal settlement polling will recover the rest of the state.
+        return update;
+      }
+    }
+    return update;
+  }
+
   raidAction = (req: RaidActionReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.RaidAction.clientPath, {
+    this.#raidRequest(IDL_ROUTES.RaidAction.clientPath, {
       method: IDL_ROUTES.RaidAction.method,
       body: JSON.stringify(req),
     });
 
   finishRaid = (req: FinishRaidReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.FinishRaid.clientPath, {
+    this.#raidRequest(IDL_ROUTES.FinishRaid.clientPath, {
       method: IDL_ROUTES.FinishRaid.method,
       body: JSON.stringify(req),
     });

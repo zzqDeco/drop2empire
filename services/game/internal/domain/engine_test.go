@@ -92,7 +92,7 @@ func TestFullLoopProgressionMarketWarAndCollectibles(t *testing.T) {
 	}
 
 	// 4. Trigger 20:00 War Settlement
-	SettleWarDay(w, vet, now)
+	SettleWarDay(w, vet, now.Add(24*time.Hour))
 	assertMacroLedgerIdentity(t, w)
 	if len(w.WarHistory) != 1 {
 		t.Fatalf("expected 1 war history record, got %d", len(w.WarHistory))
@@ -258,7 +258,8 @@ func TestColonyDepthSystemsConversionEdictsExpeditionsAndCaravan(t *testing.T) {
 	// Move player to extraction beacon at (10, 1) in Zone 0 before extracting
 	p.RaidLoadout.ActiveSession.PlayerX = 10
 	p.RaidLoadout.ActiveSession.PlayerY = 1
-	if err := FinishRaid(p, "EXTRACTED", now); err != nil {
+	setRaidChannel(p.RaidLoadout.ActiveSession, "extract_early", now)
+	if err := FinishRaid(p, "EXTRACTED", now.Add(3*time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if p.ResourcesMilli[ResCosObsidianCrown] < ResourceScale {
@@ -428,17 +429,17 @@ func TestRaidServerAntiCheatCooldownChannelingAndEarlyExtract(t *testing.T) {
 	if err := PerformRaidAction(p, "move", 1, 0, "", "", "", "", tStep); err != nil {
 		t.Fatalf("expected move onto chest to succeed, got %v", err)
 	}
-	// Attempting to open chest_abyss (5400ms base, 3510ms server tolerance) only 50ms after stepping on it must be rejected
+	// Attempting to open chest_abyss (5400ms server duration) only 50ms after stepping on it must be rejected
 	if err := PerformRaidAction(p, "open_chest", 0, 0, "", "", "", "", tStep.Add(50*time.Millisecond)); err == nil {
 		t.Fatal("expected unchanneled open_chest after 50ms to be rejected by server channeling check")
 	}
-	// After 4000ms of channeling, open_chest succeeds
-	if err := PerformRaidAction(p, "open_chest", 0, 0, "", "", "", "", tStep.Add(4000*time.Millisecond)); err != nil {
-		t.Fatalf("expected open_chest after 4000ms channeling to succeed, got %v", err)
+	// After 5400ms of channeling, open_chest succeeds
+	if err := PerformRaidAction(p, "open_chest", 0, 0, "", "", "", "", tStep.Add(5400*time.Millisecond)); err != nil {
+		t.Fatalf("expected open_chest after 5400ms channeling to succeed, got %v", err)
 	}
 
 	// 2. Speed-hack script spamming 15 moves within 10ms must hit move_cooldown rate limit
-	tSpam := tStep.Add(5 * time.Second)
+	tSpam := tStep.Add(6 * time.Second)
 	rateLimited := false
 	for i := 0; i < 15; i++ {
 		dx := int32(1)
@@ -457,7 +458,7 @@ func TestRaidServerAntiCheatCooldownChannelingAndEarlyExtract(t *testing.T) {
 
 	// 3. Early extraction cutoff check: when < 55s remain on the sandstorm countdown, extract_early is closed
 	sess.PlayerX = 10
-	sess.PlayerY = 1 // (10, 1) is extract_early in Zone 0
+	sess.PlayerY = 1                               // (10, 1) is extract_early in Zone 0
 	tLate := sess.ExpiresAt.Add(-30 * time.Second) // Only 30s remaining (< 60s cutoff)
 	if err := PerformRaidAction(p, "interact", 0, 0, "", "", "", "", tLate); err == nil {
 		t.Fatal("expected interact on extract_early with 30s remaining to be rejected as early_extract_closed")

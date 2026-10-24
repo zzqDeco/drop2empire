@@ -182,6 +182,7 @@ export interface RaidZoneViewDTO {
 }
 
 export interface RaidSettlementReportDTO {
+  raidId: string;
   status: string;
   backpackItems: RaidLootItemDTO[];
   safeBoxItems: RaidLootItemDTO[];
@@ -192,7 +193,9 @@ export interface RaidSettlementReportDTO {
 }
 
 export interface RaidSessionDTO {
-  seed: number;
+  raidId: string;
+  lastCommandSeq: number;
+  channelRemainingMs: number;
   currentZoneId: number;
   playerX: number;
   playerY: number;
@@ -235,7 +238,6 @@ export interface RaidLoadoutStateDTO {
   moveCooldownMs: number;
   raidDurationSeconds: number;
   backpackCapacity: number;
-  activeRaidSeed: number;
   activeSession?: RaidSessionDTO;
   lastSettlementReport?: RaidSettlementReportDTO;
 }
@@ -510,6 +512,7 @@ export interface PlayerProfileDTO {
 }
 
 export interface DashboardStateResp {
+  revision: number;
   serverTime: string;
   player: PlayerProfileDTO;
   availableHandles: string[];
@@ -541,6 +544,12 @@ export interface DashboardStateResp {
   raidGears: RaidGearSpecDTO[];
   raidLoadout: RaidLoadoutStateDTO;
   currentSeason: SeasonStateDTO;
+}
+
+export interface RaidUpdateResp {
+  playerHandle: string;
+  revision: number;
+  raidLoadout: RaidLoadoutStateDTO;
 }
 
 export type GetDashboardReq = Record<string, never>;
@@ -642,6 +651,8 @@ export interface PublishNoticeReq {
 }
 
 export interface RaidActionReq {
+  raidId: string;
+  commandSeq: number;
   action: string;
   dx?: number;
   dy?: number;
@@ -652,6 +663,8 @@ export interface RaidActionReq {
 }
 
 export interface FinishRaidReq {
+  raidId: string;
+  commandSeq: number;
   status: string;
 }
 
@@ -1059,7 +1072,7 @@ export const IDL_ROUTES = {
     path: "/api/v1/empire/colony/raid/action",
     clientPath: "/empire/colony/raid/action",
     requestType: "RaidActionReq",
-    responseType: "DashboardStateResp",
+    responseType: "RaidUpdateResp",
   },
   FinishRaid: {
     service: "EmpireService",
@@ -1068,7 +1081,7 @@ export const IDL_ROUTES = {
     path: "/api/v1/empire/colony/raid/finish",
     clientPath: "/empire/colony/raid/finish",
     requestType: "FinishRaidReq",
-    responseType: "DashboardStateResp",
+    responseType: "RaidUpdateResp",
   },
   RolloverSeason: {
     service: "EmpireService",

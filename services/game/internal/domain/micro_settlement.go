@@ -49,6 +49,11 @@ func addResourceWithCap(p *PlayerState, resKey string, deltaMilli int64) int64 {
 		p.ResourcesMilli[resKey] = cur + deltaMilli
 		return 0
 	}
+	// Market purchases can legitimately exceed production capacity. Never destroy
+	// existing inventory when passive production resumes.
+	if cur >= capMilli {
+		return deltaMilli
+	}
 	if cur+deltaMilli <= capMilli {
 		p.ResourcesMilli[resKey] = cur + deltaMilli
 		return 0
@@ -299,40 +304,145 @@ func NetResourceRatesPerSecMilli(p *PlayerState) map[string]int64 {
 	return net
 }
 
+// Production uses deterministic one-second simulation ticks. The fractional
+// clock and sub-milli output remainders are persisted, so request frequency cannot
+// change output. Each conversion spends actual available inputs before producing.
 func applyElapsedSimMs(p *PlayerState, simMs int64) {
 	if simMs <= 0 {
 		return
 	}
-	_, _, net := ComputeResourceFlows(p)
-	siphonOn := p.ActiveEdicts[EdictSiphonSluice] && p.UnlockedBlueprints[BPSiphonSluice]
-
-	for _, r := range ResourceCatalog {
-		rate := net[r.Key]
-		if rate == 0 {
-			continue
-		}
-		delta := (rate * simMs) / 1000
-		if delta > 0 {
-			overflow := addResourceWithCap(p, r.Key, delta)
-			if r.Key == ResWater && overflow > 0 && siphonOn {
-				addResourceWithCap(p, ResStone, overflow/SettlementBalance.SiphonStoneDivisor)
-				addResourceWithCap(p, ResFlint, overflow/SettlementBalance.SiphonFlintDivisor)
-			}
-		} else if delta < 0 {
-			rem := p.ResourcesMilli[r.Key] + delta
-			if rem < 0 {
-				rem = 0
-			}
-			p.ResourcesMilli[r.Key] = rem
-		}
+	if p.ProductionRemainders == nil {
+		p.ProductionRemainders = map[string]int64{}
 	}
-
-	grossAfter, drainAfter, _ := ComputeResourceFlows(p)
-	p.HydrationWarning = p.PopulationTotal >= SettlementBalance.MinPopForHydrationDrain &&
-		p.ResourcesMilli[ResWater] == 0 && grossAfter[ResWater] < drainAfter[ResWater]
+	total := p.SimulatedRemainderMs + simMs
+	ticks := total / 1000
+	p.SimulatedRemainderMs = total % 1000
+	for i := int64(0); i < ticks; i++ {
+		produceSecond(p)
+	}
+	p.SimulatedElapsedSeconds += ticks
 }
 
-// SettleProduction performs tickless authoritative production settlement for the elapsed interval [LastSettledAt, now].
+func productionStock(p *PlayerState, key string) int64 {
+	return p.ResourcesMilli[key]*1000 + p.ProductionRemainders[key]
+}
+
+func changeProductionStock(p *PlayerState, key string, delta int64) {
+	stock := productionStock(p, key)
+	next := stock + delta
+	if delta > 0 {
+		cap := ResourceCapacityMilli(p, key) * 1000
+		if cap > 0 {
+			// Do not truncate stock brought in through trading or rewards.
+			if stock >= cap {
+				next = stock
+			} else if next > cap {
+				next = cap
+			}
+		}
+	}
+	if next < 0 {
+		next = 0
+	}
+	p.ResourcesMilli[key], p.ProductionRemainders[key] = next/1000, next%1000
+}
+
+func produceSecond(p *PlayerState) {
+	jobs := ComputeJobs(p)
+	byproductMult := int64(1)
+	for _, bp := range BlueprintCatalog {
+		if p.UnlockedBlueprints[bp.Code] && bp.DoublesByproductProc {
+			byproductMult = 2
+			break
+		}
+	}
+	waterBefore := productionStock(p, ResWater)
+	var waterProduced, waterDemand int64
+	// Gather, pay upkeep, then route only net water overflow into the siphon.
+	for _, job := range jobs {
+		if job.JobKey != JobWater && job.JobKey != JobWood && job.JobKey != JobStone {
+			continue
+		}
+		output := job.TotalOutputPerSecMilli * 1000
+		if job.JobKey == JobWater {
+			waterProduced = output
+			next := productionStock(p, ResWater) + output
+			p.ResourcesMilli[ResWater], p.ProductionRemainders[ResWater] = next/1000, next%1000
+		} else {
+			changeProductionStock(p, job.OutputResourceKey, output)
+		}
+
+		if job.JobKey == JobWood {
+			changeProductionStock(p, ResFlint, output*byproductMult/SettlementBalance.WoodToFlintDivisor)
+		}
+		if job.JobKey == JobStone {
+			changeProductionStock(p, ResFlint, output*byproductMult/SettlementBalance.StoneToFlintDivisor)
+			changeProductionStock(p, ResAncientShard, output*byproductMult/SettlementBalance.StoneToAncientShardDivisor)
+		}
+	}
+	perPop := SettlementBalance.BaseWaterDrainPerPop
+	for _, ed := range EdictCatalog {
+		if !isEdictEffectivelyActive(p, ed) {
+			continue
+		}
+		perPop += ed.PerResidentWaterDrainMod
+		for key, rate := range ed.FlatResourceDrainMilliSec {
+			if key == ResWater {
+				waterDemand += rate * 1000
+			}
+			changeProductionStock(p, key, -rate*1000)
+		}
+	}
+	if perPop < 0 {
+		perPop = 0
+	}
+	if p.PopulationTotal >= SettlementBalance.MinPopForHydrationDrain {
+		waterDemand += int64(p.PopulationTotal) * perPop * 1000
+		changeProductionStock(p, ResWater, -int64(p.PopulationTotal)*perPop*1000)
+	}
+	waterCeiling := max(waterBefore, ResourceCapacityMilli(p, ResWater)*1000)
+	if overflow := productionStock(p, ResWater) - waterCeiling; overflow > 0 {
+		changeProductionStock(p, ResWater, -overflow)
+		if p.ActiveEdicts[EdictSiphonSluice] && p.UnlockedBlueprints[BPSiphonSluice] {
+			changeProductionStock(p, ResStone, overflow/SettlementBalance.SiphonStoneDivisor)
+			changeProductionStock(p, ResFlint, overflow/SettlementBalance.SiphonFlintDivisor)
+		}
+	}
+	// JobCatalog order is the documented conversion priority: charcoal, iron, ration.
+	for i, job := range jobs {
+		spec := JobCatalog[i]
+		if len(spec.InputsPerWorkerMilli) == 0 || job.Assigned <= 0 || job.EffectiveRateMilli <= 0 {
+			continue
+		}
+		workMs := int64(job.Assigned) * 1000
+		inputs := make(map[string]int64, len(spec.InputsPerWorkerMilli))
+		for key, rate := range spec.InputsPerWorkerMilli {
+			if job.JobKey == JobSmeltIron && key == ResCharcoal && productionStock(p, ResCharcoal) == 0 {
+				key = ResWood
+			}
+			inputs[key] += rate
+		}
+		for key, rate := range inputs {
+			if available := productionStock(p, key) / rate; available < workMs {
+				workMs = available
+			}
+		}
+		if workMs <= 0 {
+			continue
+		}
+		for key, rate := range inputs {
+			if key == ResWater {
+				waterDemand += rate * workMs
+			}
+			changeProductionStock(p, key, -rate*workMs)
+		}
+		changeProductionStock(p, job.OutputResourceKey, job.EffectiveRateMilli*workMs)
+	}
+	p.HydrationWarning = p.PopulationTotal >= SettlementBalance.MinPopForHydrationDrain && productionStock(p, ResWater) == 0 && waterProduced < waterDemand
+}
+
+// SettleProduction lazily advances deterministic one-second production ticks,
+// retaining fractional time for the next request.
 func SettleProduction(p *PlayerState, now time.Time) {
 	nowUTC := now.UTC()
 	if p.LastSettledAt.IsZero() {
@@ -356,8 +466,7 @@ func SettleProduction(p *PlayerState, now time.Time) {
 	}
 
 	applyElapsedSimMs(p, simMs)
-	p.SimulatedElapsedSeconds += simMs / 1000
-	p.LastSettledAt = nowUTC
+	p.LastSettledAt = p.LastSettledAt.Add(time.Duration(elapsedMs) * time.Millisecond)
 	if capped {
 		p.LastOfflineSummary = "离线产出已达单次 8 小时封顶上限（GDD 6.4）。"
 	}
@@ -372,7 +481,6 @@ func AdvancePlayerSeconds(p *PlayerState, sec int64) {
 		sec = OfflineCapSeconds
 	}
 	applyElapsedSimMs(p, sec*1000)
-	p.SimulatedElapsedSeconds += sec
 }
 
 func AssignedPopulation(p *PlayerState) int32 {

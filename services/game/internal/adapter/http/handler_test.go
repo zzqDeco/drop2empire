@@ -3,6 +3,7 @@ package httpadapter
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -31,6 +32,22 @@ func (f *fakeMemStore) LoadWorld(_ context.Context, now time.Time) (*domain.Worl
 
 func (f *fakeMemStore) SaveWorld(_ context.Context, world *domain.WorldState) error {
 	f.w = world
+	return nil
+}
+
+func (f *fakeMemStore) LoadSessionPlayer(_ context.Context, token string) (*domain.PlayerState, bool, error) {
+	raw := f.w.Sessions[token]
+	admin := raw == "admin" || strings.HasPrefix(raw, "admin::")
+	handle := strings.TrimPrefix(raw, "admin::")
+	p := f.w.Players[handle]
+	if p == nil {
+		return nil, false, domain.ErrUnauthorized("invalid session")
+	}
+	return p, admin || p.IsAdmin, nil
+}
+func (f *fakeMemStore) SavePlayer(_ context.Context, p *domain.PlayerState) error {
+	p.Revision++
+	f.w.Players[p.Handle] = p
 	return nil
 }
 
@@ -222,7 +239,7 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 	}
 
 	// Verify teleport move (dx=5, dy=0) is rejected with 400 Bad Request
-	teleReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/colony/raid/action", strings.NewReader(`{"action":"move","dx":5,"dy":0}`))
+	teleReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/colony/raid/action", strings.NewReader(fmt.Sprintf(`{"action":"move","dx":5,"dy":0,"raidId":%q,"commandSeq":1}`, sess.RaidId)))
 	teleReq.Header.Set("X-Session-Token", adminToken)
 	teleReq.Header.Set("X-Admin-Tunnel", "1")
 	teleRec := httptest.NewRecorder()
@@ -232,7 +249,7 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 	}
 
 	// Valid 1-tile move (dx=1, dy=0) -> player moves from (1,3) to (2,3)
-	moveReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/colony/raid/action", strings.NewReader(`{"action":"move","dx":1,"dy":0}`))
+	moveReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/colony/raid/action", strings.NewReader(fmt.Sprintf(`{"action":"move","dx":1,"dy":0,"raidId":%q,"commandSeq":1}`, sess.RaidId)))
 	moveReq.Header.Set("X-Session-Token", adminToken)
 	moveReq.Header.Set("X-Admin-Tunnel", "1")
 	moveRec := httptest.NewRecorder()
@@ -251,7 +268,7 @@ func TestHTTPAdapterEndToEndFlow(t *testing.T) {
 
 	// Attempt to claim "EXTRACTED" while standing at (2,3) (far from extraction beacon at (10,1)):
 	// Server must enforce MIA!
-	finReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/colony/raid/finish", strings.NewReader(`{"status":"EXTRACTED"}`))
+	finReq := httptest.NewRequest(http.MethodPost, "/api/v1/empire/colony/raid/finish", strings.NewReader(fmt.Sprintf(`{"status":"EXTRACTED","raidId":%q,"commandSeq":2}`, sess.RaidId)))
 	finReq.Header.Set("X-Session-Token", adminToken)
 	finReq.Header.Set("X-Admin-Tunnel", "1")
 	finRec := httptest.NewRecorder()

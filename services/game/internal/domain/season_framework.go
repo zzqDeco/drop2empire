@@ -148,6 +148,7 @@ func RolloverSeason(w *WorldState, nextSeasonTitle string, now time.Time) {
 	w.Orders = []MarketOrder{}
 	w.Trades = []MarketTrade{}
 	w.WarDay = 1
+	w.LastWarPeriod = WarPeriod(now)
 	w.ObsidianScore = 35
 	w.ArgentScore = 35
 	w.WarNodes = DefaultWarNodes()
@@ -211,6 +212,8 @@ func RolloverSeason(w *WorldState, nextSeasonTitle string, now time.Time) {
 		p.DailyWarBudgetUsed = 0
 		p.TotalManualClicks = 0
 		p.SimulatedElapsedSeconds = 0
+		p.SimulatedRemainderMs = 0
+		p.ProductionRemainders = nil
 		p.LastSettledAt = now.UTC()
 		p.LastOfflineSummary = ""
 

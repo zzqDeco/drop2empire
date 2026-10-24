@@ -37,14 +37,30 @@ func (s *Service) StartRaid(ctx context.Context) (*domain.WorldState, error) {
 	})
 }
 
-func (s *Service) RaidAction(ctx context.Context, action string, dx, dy int32, itemID, fromContainer, toContainer, itemKey string) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
-		return domain.PerformRaidAction(p, action, dx, dy, itemID, fromContainer, toContainer, itemKey, now)
+// Raid commands persist one player and do not advance unrelated settlement clocks.
+func (s *Service) RaidCommand(ctx context.Context, raidID string, seq int64, cmd domain.RaidCommand) (*domain.PlayerState, error) {
+	token := SessionTokenFromContext(ctx)
+	if token == "" {
+		return nil, domain.ErrUnauthorized("请先登录")
+	}
+	var out *domain.PlayerState
+	err := s.tx.WithinTx(ctx, func(txCtx context.Context) error {
+		p, admin, err := s.players.LoadSessionPlayer(txCtx, token)
+		if err != nil {
+			return err
+		}
+		if admin && IsPublicSurface(ctx) {
+			return domain.ErrForbidden("管理后台仅限 SSH 隧道访问")
+		}
+		now := s.now() // Capture authoritative time after acquiring the player lock.
+		if err := domain.ApplyRaidCommand(p, raidID, seq, cmd, now); err != nil {
+			return err
+		}
+		if err := s.players.SavePlayer(txCtx, p); err != nil {
+			return err
+		}
+		out = p
+		return nil
 	})
-}
-
-func (s *Service) FinishRaid(ctx context.Context, status string) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
-		return domain.FinishRaid(p, status, now)
-	})
+	return out, err
 }

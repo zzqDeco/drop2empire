@@ -22,7 +22,7 @@ func main() {
 	defer cancel()
 
 	var txMgr domain.TxManager
-	var repo domain.WorldRepository
+	var repo domain.GameRepository
 	var readyFn func(context.Context) error
 
 	db, err := postgres.OpenDB(ctx, dbURL)
@@ -32,17 +32,17 @@ func main() {
 			slog.Error("database migration failed", "error", migErr)
 			os.Exit(1)
 		}
-		slog.Info("connected to PostgreSQL authoritative store", "url", dbURL)
+		slog.Info("connected to PostgreSQL authoritative store")
 		txMgr = pgStore
 		repo = pgStore
 		readyFn = db.Ping
 		defer db.Close()
 	} else {
-		slog.Warn("PostgreSQL unavailable, falling back to in-memory transactional store", "error", err)
-		mem := pg.NewMemoryStore()
-		txMgr = mem
-		repo = mem
-		readyFn = func(context.Context) error { return nil }
+		slog.Error("PostgreSQL unavailable; refusing to start without durable state")
+		if db != nil {
+			db.Close()
+		}
+		os.Exit(1)
 	}
 
 	svc := app.NewService(txMgr, repo)

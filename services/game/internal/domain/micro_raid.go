@@ -3,6 +3,7 @@ package domain
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"time"
 )
@@ -57,6 +58,12 @@ func rollThreeBuffCards(seed uint64) []string {
 }
 
 func EnsureRaidState(p *PlayerState) {
+	// Legacy raids exposed their map seed and have no command identity. Abort them
+	// without minting loot or destroying entry gear when loading an old snapshot.
+	if sess := p.RaidLoadout.ActiveSession; sess != nil && sess.RaidID == "" {
+		p.RaidLoadout.ActiveSession = nil
+		p.RaidLoadout.ActiveRaidSeed = 0
+	}
 	if p.EquippedCosmetics == nil {
 		p.EquippedCosmetics = map[string]string{}
 	}
@@ -179,6 +186,10 @@ func LearnRaidBlueprint(p *PlayerState, blueprintKey string, now time.Time) erro
 }
 
 func ManageRaidGear(p *PlayerState, action, itemKey string, now time.Time) error {
+	if p.RaidLoadout.ActiveSession != nil {
+		return ErrPrecondition("raid_loadout_locked", "远征期间整备已锁定，请先完成本局结算")
+	}
+
 	EnsureRaidState(p)
 	spec, ok := FindRaidGearSpec(itemKey)
 	if !ok {
@@ -293,6 +304,10 @@ func ManageRaidGear(p *PlayerState, action, itemKey string, now time.Time) error
 }
 
 func DraftRaidBuff(p *PlayerState, action, cardCode string, replaceSlot int32, now time.Time) error {
+	if p.RaidLoadout.ActiveSession != nil {
+		return ErrPrecondition("raid_loadout_locked", "远征期间整备已锁定，请先完成本局结算")
+	}
+
 	EnsureRaidState(p)
 	switch action {
 	case "reroll":
@@ -547,6 +562,14 @@ func prependRaidLog(sess *ActiveRaidSession, msg string) {
 }
 
 func StartRaid(p *PlayerState, now time.Time) error {
+	if p.RaidLoadout.ActiveSession != nil {
+		return ErrPrecondition("raid_already_active", "已有进行中的远征，请继续本局或先结算迷失")
+	}
+	var idBytes [16]byte
+	if _, err := rand.Read(idBytes[:]); err != nil {
+		return err
+	}
+
 	EnsureRaidState(p)
 	if !p.UnlockedBlueprints[BPScoutCamp] {
 		return ErrPrecondition("scout_camp_locked", "尚未解锁【荒原斥候营】")
@@ -561,8 +584,8 @@ func StartRaid(p *PlayerState, now time.Time) error {
 	revealServerZoneAround(&zones[0], 1, 3, visRadius, revealBeacons)
 
 	p.RaidLoadout.ActiveRaidSeed = seed
-	p.RaidLoadout.LastSettlementReport = nil
 	p.RaidLoadout.ActiveSession = &ActiveRaidSession{
+		RaidID:               hex.EncodeToString(idBytes[:]),
 		Seed:                 seed,
 		StartedAt:            now,
 		ExpiresAt:            now.Add(time.Duration(durationSec) * time.Second),
@@ -606,7 +629,7 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 	}
 
 	// Enforce server-side real-time sandstorm timer expiration
-	if now.After(sess.ExpiresAt) {
+	if !now.Before(sess.ExpiresAt) {
 		return FinishRaid(p, "MIA", now)
 	}
 
@@ -632,14 +655,7 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 		}
 
 		// Server-side leaky-bucket move cooldown check (prevents speed-hack scripts while tolerating rapid WASD bursts)
-		effMoveCdMs := int64(sess.BaseMoveCooldownMs)
-		if effMoveCdMs <= 0 {
-			effMoveCdMs = int64(RaidBalance.BaseMoveCooldownMs)
-		}
-		if now.Before(sess.GaleEndsAt) && int64(RaidBalance.GalePotionCooldownMs) < effMoveCdMs {
-			effMoveCdMs = int64(RaidBalance.GalePotionCooldownMs)
-		}
-		stepInterval := time.Duration((effMoveCdMs*int64(RaidBalance.MoveCooldownJitterPct))/100) * time.Millisecond
+		stepInterval := time.Duration(RaidMoveCooldownMs(sess, now)) * time.Millisecond
 		burstWindow := time.Duration(RaidBalance.MoveBurstAllowanceMs) * time.Millisecond
 		baseTime := sess.LastMoveAt
 		if baseTime.Before(now.Add(-burstWindow)) {
@@ -672,6 +688,7 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 
 		sess.LastMoveAt = nextAllowed
 		sess.SteppedOnTileAt = now
+		setRaidChannel(sess, dest.Kind, now)
 		sess.ActiveChestDrops = nil
 		sess.PlayerX = nx
 		sess.PlayerY = ny
@@ -766,16 +783,8 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 		if curTile.Looted {
 			return nil
 		}
-		// Server-side chest channeling duration verification when real wall-clock time advances between move and open_chest
-		if baseChannelMs, ok := RaidChannelDurationMs[curTile.Kind]; ok && !sess.SteppedOnTileAt.IsZero() && now.After(sess.SteppedOnTileAt) {
-			reqMs := int64(baseChannelMs)
-			if now.Before(sess.ScavEndsAt) {
-				reqMs = (reqMs * int64(100-RaidBalance.PotionScavSpeedPct)) / 100
-			}
-			minElapsedMs := (reqMs * int64(RaidBalance.ChannelJitterTolerancePct)) / 100
-			if now.Sub(sess.SteppedOnTileAt) < time.Duration(minElapsedMs)*time.Millisecond {
-				return ErrPrecondition("channeling_incomplete", "宝箱搜索读条尚未完成")
-			}
+		if err := verifyRaidChannel(sess, now); err != nil {
+			return err
 		}
 
 		curTile.Looted = true
@@ -806,6 +815,7 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 		sess.PlayerX = tx
 		sess.PlayerY = ty
 		sess.SteppedOnTileAt = now
+		setRaidChannel(sess, sess.Zones[tz].Tiles[ty*sess.Zones[tz].Width+tx].Kind, now)
 		sess.ActiveChestDrops = nil
 		if !sess.Zones[tz].Visited {
 			sess.Zones[tz].Visited = true
@@ -816,61 +826,30 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 		return nil
 
 	case "transfer_loot", "loot_transfer":
-		if fromContainer == toContainer {
+		containers := map[string]*[]RaidLootItem{"chest": &sess.ActiveChestDrops, "backpack": &sess.Backpack, "safebox": &sess.SafeBox}
+		src, srcOK := containers[fromContainer]
+		dst, dstOK := containers[toContainer]
+		if !srcOK || !dstOK {
+			return ErrInvalidInput("未知的战利品容器")
+		}
+		if src == dst {
 			return nil
 		}
-		var picked *RaidLootItem
-		removeFromSlice := func(slice []RaidLootItem) []RaidLootItem {
-			out := make([]RaidLootItem, 0, len(slice))
-			for _, it := range slice {
-				if picked == nil && it.ID == itemID {
-					cp := it
-					picked = &cp
-					continue
-				}
-				out = append(out, it)
+		if toContainer == "safebox" && int32(len(*dst)) >= safeSlots {
+			return ErrPrecondition("safebox_full", "安全保险箱已满")
+		}
+		if toContainer == "backpack" && int32(len(*dst)) >= bagCap {
+			return ErrPrecondition("backpack_full", "随身背囊已满")
+		}
+		for i, item := range *src {
+			if item.ID != itemID {
+				continue
 			}
-			return out
-		}
-		switch fromContainer {
-		case "chest":
-			sess.ActiveChestDrops = removeFromSlice(sess.ActiveChestDrops)
-		case "backpack":
-			sess.Backpack = removeFromSlice(sess.Backpack)
-		case "safebox":
-			sess.SafeBox = removeFromSlice(sess.SafeBox)
-		default:
-			return ErrInvalidInput("未知的源容器")
-		}
-		if picked == nil {
+			*dst = append(*dst, item)
+			*src = append((*src)[:i], (*src)[i+1:]...)
 			return nil
 		}
-
-		switch toContainer {
-		case "safebox":
-			if int32(len(sess.SafeBox)) >= safeSlots {
-				if fromContainer == "chest" {
-					sess.ActiveChestDrops = append(sess.ActiveChestDrops, *picked)
-				} else if fromContainer == "backpack" {
-					sess.Backpack = append(sess.Backpack, *picked)
-				}
-				return ErrPrecondition("safebox_full", "安全保险箱已满")
-			}
-			sess.SafeBox = append(sess.SafeBox, *picked)
-		case "backpack":
-			if int32(len(sess.Backpack)) >= bagCap {
-				if fromContainer == "chest" {
-					sess.ActiveChestDrops = append(sess.ActiveChestDrops, *picked)
-				} else if fromContainer == "safebox" {
-					sess.SafeBox = append(sess.SafeBox, *picked)
-				}
-				return ErrPrecondition("backpack_full", "随身背囊已满")
-			}
-			sess.Backpack = append(sess.Backpack, *picked)
-		case "chest":
-			sess.ActiveChestDrops = append(sess.ActiveChestDrops, *picked)
-		}
-		return nil
+		return ErrNotFound("战利品不存在或已被移动")
 
 	case "loot_all", "take_all":
 		if len(sess.ActiveChestDrops) == 0 {
@@ -1011,7 +990,7 @@ func isAtOrNearExtractionTile(sess *ActiveRaidSession, now time.Time) bool {
 		if dy < 0 {
 			dy = -dy
 		}
-		if dx+dy <= 1 {
+		if dx+dy == 0 {
 			return true
 		}
 	}
@@ -1027,10 +1006,19 @@ func FinishRaid(p *PlayerState, status string, now time.Time) error {
 	_, _, _, _, _, bagCap, safeSlots := ComputeRaidLoadoutStats(p)
 
 	// Enforce server-side timer expiration and physical extraction beacon position check
-	if now.After(sess.ExpiresAt) || sess.HP <= 0 {
+	if !now.Before(sess.ExpiresAt) || sess.HP <= 0 {
 		status = "MIA"
-	} else if status == "EXTRACTED" && !isAtOrNearExtractionTile(sess, now) {
-		status = "MIA"
+	} else if status == "EXTRACTED" {
+		if !isAtOrNearExtractionTile(sess, now) {
+			status = "MIA"
+		}
+		if status == "EXTRACTED" {
+			if err := verifyRaidChannel(sess, now); err != nil {
+				return err
+			}
+		}
+	} else if status != "MIA" {
+		return ErrInvalidInput("未知的远征结算状态")
 	}
 
 	// Single-run buff cards are consumed at the end of the raid
@@ -1077,6 +1065,7 @@ func FinishRaid(p *PlayerState, status string, now time.Time) error {
 			lootText = fmt.Sprintf("成功带出：%v", summaryParts)
 		}
 		p.RaidLoadout.LastSettlementReport = &RaidSettlementReport{
+			RaidID:        sess.RaidID,
 			Status:        "EXTRACTED",
 			BackpackItems: backpackAwarded,
 			SafeBoxItems:  safeBoxAwarded,
@@ -1126,6 +1115,7 @@ func FinishRaid(p *PlayerState, status string, now time.Time) error {
 	}
 
 	p.RaidLoadout.LastSettlementReport = &RaidSettlementReport{
+		RaidID:        sess.RaidID,
 		Status:        "MIA",
 		BackpackItems: nil,
 		SafeBoxItems:  safeBoxAwarded,

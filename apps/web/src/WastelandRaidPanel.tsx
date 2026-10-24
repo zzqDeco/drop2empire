@@ -1,8 +1,10 @@
+import type { ServerUpdate } from "./serverState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   type DashboardStateResp,
   type RaidGearSpecDTO,
+  type RaidActionReq,
   type RaidLootItemDTO,
 } from "@drop2empire/api-client";
 import {
@@ -27,14 +29,13 @@ import {
 import {
   CHEST_CHANNEL_LABELS,
   EARLY_EXTRACT_CUTOFF_MS,
-  computeChestChannelMs,
 } from "./config/gameConfig";
 
 interface WastelandRaidPanelProps {
   state: DashboardStateResp;
   busy?: boolean;
   runAction: (
-    fn: () => Promise<DashboardStateResp>,
+    fn: () => Promise<ServerUpdate>,
     msg?: string,
   ) => Promise<void>;
 }
@@ -49,7 +50,7 @@ export function WastelandRaidPanel({
 }: WastelandRaidPanelProps) {
   const { raidLoadout, raidGears, equippedCosmetics } = state;
   const activeSession = raidLoadout.activeSession ?? null;
-  const inRaid = raidLoadout.activeRaidSeed > 0 && activeSession !== null;
+  const inRaid = activeSession !== null;
 
   // 2-Stage Pre-Raid Progression: "armory" (Act 1) -> "draft" (Act 2)
   const [preStage, setPreStage] = useState<"armory" | "draft">("armory");
@@ -60,7 +61,7 @@ export function WastelandRaidPanel({
   const [replaceSlotIdx, setReplaceSlotIdx] = useState<number>(0);
 
   // Ceremonial Post-Raid Settlement Overlay State (driven by server's lastSettlementReport)
-  const [dismissedSettlementSeed, setDismissedSettlementSeed] =
+  const [dismissedSettlementRaidId, setDismissedSettlementRaidId] =
     useState<string>("");
 
   const [facing, setFacing] = useState<FacingDirection>("right");
@@ -86,18 +87,20 @@ export function WastelandRaidPanel({
 
   const settlingRef = useRef(false);
 
-  const activeSeed = activeSession?.seed ?? 0;
+  const activeRaidId = activeSession?.raidId ?? "";
   const serverTimeRemMs = activeSession?.timeRemainingMs ?? 0;
+  const countdownDeadlineRef = useRef(0);
   const serverFacing = activeSession?.facing ?? "right";
 
   // Sync local countdown & facing from authoritative server session
   useEffect(() => {
-    if (!inRaid || activeSeed <= 0) {
+    if (!inRaid || !activeRaidId) {
       setChanneling(null);
       setShowLootModal(false);
       settlingRef.current = false;
       return;
     }
+    countdownDeadlineRef.current = performance.now() + serverTimeRemMs;
     setTimeLeftMs(serverTimeRemMs);
     if (
       serverFacing === "up" ||
@@ -108,7 +111,29 @@ export function WastelandRaidPanel({
       setFacing(serverFacing);
     }
     settlingRef.current = false;
-  }, [inRaid, activeSeed, serverTimeRemMs, serverFacing]);
+  }, [inRaid, activeRaidId, serverTimeRemMs, serverFacing]);
+
+  const commandPendingRef = useRef(false);
+  const sessionRef = useRef(activeSession);
+  const channelDeadlineRef = useRef(0);
+  useEffect(() => {
+    sessionRef.current = activeSession;
+    channelDeadlineRef.current = performance.now() + (activeSession?.channelRemainingMs ?? 0);
+  }, [activeSession]);
+  const sendRaidCommand = useCallback(async (command: Omit<RaidActionReq, "raidId" | "commandSeq"> | { status: "EXTRACTED" | "MIA" }) => {
+    const session = sessionRef.current;
+    if (!session || commandPendingRef.current) throw new Error("请等待当前远征指令完成");
+    commandPendingRef.current = true;
+    const identity = { raidId: session.raidId, commandSeq: session.lastCommandSeq + 1 };
+    try {
+      const response = "status" in command
+        ? await api.finishRaid({ ...command, ...identity })
+        : await api.raidAction({ ...command, ...identity });
+      sessionRef.current = response.raidLoadout.activeSession ?? null;
+      return response;
+    } finally { commandPendingRef.current = false; }
+  }, []);
+  const sendRaidAction = useCallback((command: Omit<RaidActionReq, "raidId" | "commandSeq">) => sendRaidCommand(command), [sendRaidCommand]);
 
   const triggerFinishRaid = useCallback(
     (status: "EXTRACTED" | "MIA") => {
@@ -118,29 +143,19 @@ export function WastelandRaidPanel({
       setShowLootModal(false);
       setPreStage("armory");
 
-      void runAction(
-        () => api.finishRaid({ status }),
-        status === "EXTRACTED"
-          ? "凯旋归城！背囊与安全箱全部战利品已入库。"
-          : "荒原迷失 (MIA)！仅安全保险箱内物资成功带回。",
-      );
+      void runAction(() => sendRaidCommand({ status })).finally(() => { settlingRef.current = false; });
     },
-    [runAction],
+    [runAction, sendRaidCommand],
   );
 
   // Real-time countdown & channeling ticker (100ms)
   useEffect(() => {
-    if (!inRaid || activeSeed <= 0) return;
+    if (!inRaid || !activeRaidId) return;
     const id = window.setInterval(() => {
       const now = Date.now();
-      setTimeLeftMs((prev) => {
-        const next = prev - 100;
-        if (next <= 0) {
-          triggerFinishRaid("MIA");
-          return 0;
-        }
-        return next;
-      });
+      const remaining = Math.max(0, countdownDeadlineRef.current - performance.now());
+      setTimeLeftMs(remaining);
+      if (remaining === 0 && !commandPendingRef.current) triggerFinishRaid("MIA");
 
       setChanneling((cur) => {
         if (!cur) return null;
@@ -158,7 +173,7 @@ export function WastelandRaidPanel({
       });
     }, 100);
     return () => window.clearInterval(id);
-  }, [inRaid, activeSeed, triggerFinishRaid]);
+  }, [inRaid, activeRaidId, triggerFinishRaid]);
 
   // Complete channeling when progressPct reaches 100 -> Request Server Chest Roll or Extraction!
   useEffect(() => {
@@ -172,12 +187,12 @@ export function WastelandRaidPanel({
     }
 
     setShowLootModal(true);
-    void runAction(() => api.raidAction({ action: "open_chest" }));
-  }, [channeling, triggerFinishRaid, runAction]);
+    void runAction(() => sendRaidAction({ action: "open_chest" }));
+  }, [channeling, triggerFinishRaid, runAction, sendRaidAction]);
 
   const zones = activeSession?.zones ?? [];
   const curZoneId = activeSession?.currentZoneId ?? 0;
-  const currentZone = zones[curZoneId];
+  const currentZone = zones.find(zone => zone.id === curZoneId);
   const pos = useMemo(
     () => ({
       x: activeSession?.playerX ?? 1,
@@ -191,7 +206,6 @@ export function WastelandRaidPanel({
   const def = activeSession?.def ?? raidLoadout.totalDef;
   const effectiveMoveCooldownMs =
     activeSession?.effectiveMoveCooldownMs ?? raidLoadout.moveCooldownMs ?? 360;
-  const scavRemMs = activeSession?.scavRemainingMs ?? 0;
   const usedPotions = activeSession?.usedPotionKeys ?? [];
   const backpack = activeSession?.backpack ?? [];
   const safeBox = activeSession?.safeBox ?? [];
@@ -207,7 +221,7 @@ export function WastelandRaidPanel({
 
   const handleStep = useCallback(
     (dx: number, dy: number) => {
-      if (!inRaid || !currentZone || settlingRef.current) return;
+      if (!inRaid || !currentZone || settlingRef.current || commandPendingRef.current) return;
       if (dx < 0) setFacing("left");
       else if (dx > 0) setFacing("right");
       else if (dy < 0) setFacing("up");
@@ -238,14 +252,14 @@ export function WastelandRaidPanel({
       const isBossAlive = dest.kind === "enemy_boss" && !dest.looted;
 
       void runAction(async () => {
-        const resp = await api.raidAction({ action: "move", dx, dy });
+        const resp = await sendRaidAction({ action: "move", dx, dy });
         const nextSess = resp.raidLoadout.activeSession;
         if (!nextSess) {
           setChanneling(null);
           setShowLootModal(false);
           return resp;
         }
-        const nextZone = nextSess.zones[nextSess.currentZoneId];
+        const nextZone = nextSess.zones.find(zone => zone.id === nextSess.currentZoneId);
         const landed =
           nextZone?.tiles[nextSess.playerY * nextZone.width + nextSess.playerX];
         if (!landed) return resp;
@@ -262,11 +276,7 @@ export function WastelandRaidPanel({
             landed.kind === "chest_abyss") &&
           !landed.looted
         ) {
-          const dur = computeChestChannelMs(
-            landed.kind,
-            nextSess.scavRemainingMs > 0,
-            landed.channelMs,
-          );
+          const dur = Math.max(1, nextSess.channelRemainingMs);
           setChanneling({
             label: CHEST_CHANNEL_LABELS[landed.kind] ?? "正在搜索容器",
             kind: landed.kind as TileKind,
@@ -280,7 +290,7 @@ export function WastelandRaidPanel({
         return resp;
       });
     },
-    [inRaid, currentZone, lastMoveAtMs, effectiveMoveCooldownMs, pos, runAction],
+    [inRaid, currentZone, lastMoveAtMs, effectiveMoveCooldownMs, pos, runAction, sendRaidAction],
   );
 
   // Keyboard WASD / Arrow navigation + [B]/[Tab] toggle for hidden backpack
@@ -327,13 +337,13 @@ export function WastelandRaidPanel({
     }
     setChanneling(null);
     setShowLootModal(false);
-    void runAction(() => api.raidAction({ action: "use_portal" }));
+    void runAction(() => sendRaidAction({ action: "use_portal" }));
   };
 
   const handleDrinkPotion = (potKey: string) => {
     if (usedPotions.includes(potKey)) return;
     void runAction(() =>
-      api.raidAction({ action: "drink_potion", itemKey: potKey }),
+      sendRaidAction({ action: "drink_potion", itemKey: potKey }),
     );
   };
 
@@ -348,7 +358,7 @@ export function WastelandRaidPanel({
     if (to === "backpack" && backpack.length >= raidLoadout.backpackCapacity)
       return;
     void runAction(() =>
-      api.raidAction({
+      sendRaidAction({
         action: "transfer_loot",
         itemId: item.id,
         fromContainer: from,
@@ -359,21 +369,21 @@ export function WastelandRaidPanel({
 
   const lootAllFromChest = () => {
     if (activeChestDrops.length === 0) return;
-    void runAction(() => api.raidAction({ action: "loot_all" }));
+    void runAction(() => sendRaidAction({ action: "loot_all" }));
   };
 
   const handleMerchantBuy = (offer: "heal" | "mystery_bp") => {
     void runAction(() =>
-      api.raidAction({ action: "merchant_buy", itemKey: offer }),
+      sendRaidAction({ action: "merchant_buy", itemKey: offer }),
     );
   };
 
   const serverReport = raidLoadout.lastSettlementReport ?? null;
   const reportKey = serverReport
-    ? `${serverReport.status}_${serverReport.zonesVisited}_${serverReport.chestsOpened}_${serverReport.bossesKilled}_${serverReport.backpackItems.length}_${serverReport.safeBoxItems.length}`
+    ? serverReport.raidId
     : "";
   const settlementReport =
-    !inRaid && serverReport && dismissedSettlementSeed !== reportKey
+    !inRaid && serverReport && dismissedSettlementRaidId !== reportKey
       ? serverReport
       : null;
 
@@ -513,7 +523,7 @@ export function WastelandRaidPanel({
                   <button
                     type="button"
                     className="btn-primary btn-block"
-                    onClick={() => setDismissedSettlementSeed(reportKey)}
+                    onClick={() => setDismissedSettlementRaidId(reportKey)}
                   >
                     收拢战利品 · 返回斥候大本营
                   </button>
@@ -776,16 +786,12 @@ export function WastelandRaidPanel({
                       className="btn-primary"
                       onClick={() =>
                         setChanneling({
-                          label: "正在呼叫信标撤离 (2.8s)",
+                          label: "正在呼叫信标撤离",
                           kind: currentTile.kind as TileKind,
                           x: pos.x,
                           y: pos.y,
                           startedAt: Date.now(),
-                          durationMs: computeChestChannelMs(
-                            currentTile.kind,
-                            scavRemMs > 0,
-                            currentTile.channelMs,
-                          ),
+                          durationMs: Math.max(1, channelDeadlineRef.current - performance.now()),
                           progressPct: 0,
                         })
                       }
@@ -1752,7 +1758,7 @@ export function LordProfileWardrobeBar({
   busy?: boolean;
   defaultExpanded?: boolean;
   runAction: (
-    fn: () => Promise<DashboardStateResp>,
+    fn: () => Promise<ServerUpdate>,
     msg?: string,
   ) => Promise<void>;
 }) {
