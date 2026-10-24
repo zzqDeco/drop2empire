@@ -1,32 +1,35 @@
-# 微观设计 III：领主常驻动态卡通形象与程序化蚀刻藏品 (Micro Animated Lord Avatar & Procedural Relics)
+# 微观设计 III：领主纸墨蚀刻动态立绘与程序化藏品 (Blueprint & Ink Animated Lord Avatar & Procedural Relics)
 
-> **层级定位**：`03-micro`（微观设计层 · 角色动态渲染架构与程序化藏品生成算法）  
-> **职责边界**：定义领主个人卡通动态形象 (`LordAvatarSVG`) 的四部位分层 SVG 动画系统、双场景投射（主界面常驻 Profile 衣橱栏 + 2D 搜打撤肉鸽地图实机移动棋子），以及战争活动点数铸造的 CS 式唯一编号 UV 蚀刻藏品 (`ProceduralRelicSVG`)。  
+> **层级定位**：`03-micro`（微观设计层 · 纸墨工程制图角色动态渲染架构与程序化藏品生成算法）  
+> **职责边界**：定义领主个人纸墨蚀刻动态形象 (`LordAvatarSVG`) 的八层工程制图 SVG 动画系统、三场景投射（顶栏迷你徽章、领主衣橱工程图版、2D 搜打撤肉鸽地图实机棋子），以及战争活动点数铸造的 CS 式唯一编号 UV 蚀刻藏品 (`ProceduralRelicSVG`)。  
 > **代码映射**：[`apps/web/src/LordAvatarSVG.tsx`](../../../apps/web/src/LordAvatarSVG.tsx)、[`apps/web/src/WastelandRaidPanel.tsx`](../../../apps/web/src/WastelandRaidPanel.tsx)、[`apps/web/src/ProceduralRelicSVG.tsx`](../../../apps/web/src/ProceduralRelicSVG.tsx)
 
 ---
 
-## 1. 领主常驻动态卡通形象架构 (`LordAvatarSVG`)
+## 1. 领主纸墨工程蚀刻动态立绘架构 (`LordAvatarSVG`)
 
-为让玩家在荒原摸出或在市场淘到的稀有外观具备极致的视觉正反馈，系统设计了基于纯矢量分层动画的 **`LordAvatarSVG` 动态角色渲染引擎**，支持三档自适应尺寸 (`"profile" 112px`、`"token" 44px`、`"mini" 32px`) 与六层骨骼/特效叠加：
+为确保角色形象与全站 **Blueprint & Ink（纸墨工程制图 / 钢笔排线蚀刻风）** 视觉体系（[`apps/web/src/tokens.css`](../../../apps/web/src/tokens.css) 与 [`apps/web/src/ProceduralRelicSVG.tsx`](../../../apps/web/src/ProceduralRelicSVG.tsx)）严丝合缝，系统摒弃传统高饱和扁平卡通色块，采用**达芬奇手稿 / 墨械自动机（Clockwork Automaton）钢笔蚀刻立绘风格**：
+
+- **自适应主题色板（CSS Tokens 驱动）**：直接绑定 `var(--text-strong)`（焦墨主线）、`var(--surface)` / `var(--surface-sunken)`（宣纸与沉降底纸）、`var(--seal-accent)`（朱砂印泥点缀）、`var(--warning-text)`（鎏金黄铜齿轮）与 `var(--success-text)`（氧化铜绿液冷管路），在「纸墨日间」与「曜石夜间」双主题下自动无损切换。
+- **三档钢笔排线纹理 (`<pattern>`)**：内置 `42°` 单向钢笔排线 (`#lordInkHatch`)、双角度正交建筑阴影排线 (`#lordCrossHatch`) 与 `-35°` 朱砂印泥排线 (`#lordSealHatch`)，赋予披风褶皱、肩甲切面与面甲阴影纯粹的版画质感。
+- **八层工程骨骼与动态机关叠加**（支持 `"profile" 124px`、`"token" 44px`、`"mini" 34px`）：
 
 ```text
-[Layer 6: 悬浮跟宠层 Companion]  ──► 凝水小精灵 / 发条猫头鹰 / 以太星尘幼龙 (上下环绕浮动与粒子吐息)
-[Layer 5: 手持圣物层 Held Relic] ──► 寻水灵枝 / 永明以太提灯 / 泰坦雷霆权杖 (电弧闪烁与光晕呼吸)
-[Layer 4: 局外武器与战靴层 Gear] ──► 燧石短矛 / 连发手弩 / 泰坦裂地重锤 + 麻布靴 / 弹簧靴 / 羽靴
-[Layer 3: 头部冠冕层 Headgear]   ──► 拾荒斗笠 / 蒸汽护目镜 / 黑曜永耀皇冠 (金焰脉冲与眨眼动画)
-[Layer 2: 躯干与护甲层 Armor]    ──► 荒原皮甲 / 沙虫壳胸甲 / 水压动力重甲 (随呼吸上下起伏)
-[Layer 1: 背部披风与光环 Mantle] ──► 远行客披风 / 齿轮羽翼 / 星界流光幻翼 + 传世金色星芒粒子光环
+[Layer 8: 机关随从层 Companion]  ──► 折纸发条蛙 / 达芬奇齿轮鸮 / 星轨朱砂机巧龙 (发条旋钮与悬浮游弋)
+[Layer 7: 右持圣物层 Held Relic] ──► 星盘罗经仪 / 八角铜绿炼金灯 / 陀螺仪雷霆杖 (指针摆动与双环自转)
+[Layer 6: 左持武器层 Weapon]     ──► 刻度燧石戟 / 机械滑轮弩 / 泰坦液压攻城锤 (钢笔排线刃面)
+[Layer 5: 头部冠冕层 Headgear]   ──► 测绘三角羽帽 / 十字准星双镜 / 擒纵轮蒸汽冠 / 黑曜浮空方尖冠
+[Layer 4: 棱面瓷墨面甲 Visage]   ──► 六棱测绘面甲 + 机械快门眨眼目镜 + 高领排线阴影
+[Layer 3: 胸甲与肩甲层 Cuirass]  ──► 铆钉板甲 / 黑曜六角虫壳甲 / 铜绿双表水压甲 + 胸口计时核心
+[Layer 2: 机械胫甲与战靴 Greaves]──► 膝部圆规铆钉关节 + 小腿黄铜扭簧 (弹簧靴) / 朱砂翼片 (赫尔墨斯靴)
+[Layer 1: 背部装置与星盘 Halo]   ──► 沙暴排线大氅 / 达芬奇液冷翼 / 六羽星盘翼 + 360° 自转星盘刻度环
+[Layer 0: 工程制图图框 Plate]    ──► (仅 Profile 模式) 双线制图外框、正交准星、游标角标、「FIG.01·LORD」钢印与朱砂方印
 ```
 
-### 三大常驻与实机显形场景
-1. **顶栏迷你徽章 (`size="mini"`)**：在页面最上方 `topbar` 品牌栏旁实时显示玩家当前穿戴的动态小人。
-2. **主界面常驻【领主形象与赛季衣橱】横幅 (`LordProfileWardrobeBar`, `size="profile"`)**：
-   - 紧贴纪元叙事条下方常驻展示 `112×112` 高精度动态领主形象、当前局外整备战力/生命/移速冷却读数，以及四部位外观切换器。
-   - 展开【衣橱与藏品图鉴】即可查看当季全部 12 款限定外观的拥有数量、市场参考价与一键穿戴/卸下按钮。
-3. **2D 荒原搜打撤地图实机棋子 (`size="token"`, `isMoving`)**：
-   - 当玩家进入 2D 多区块荒原地图时，网格上的玩家坐标格**直接渲染该动态卡通形象**（而非普通圆点或文字）。
-   - 按下 `W A S D` 或点击移动时，`isMoving` 状态激活动态疾跑倾斜与披风高频摆动特效，让「攒外观」的乐趣在每一局走位摸金中直观兑现。
+### 三大显形场景
+1. **顶栏迷你徽章 (`size="mini"`)**：在页面顶部 `topbar` 品牌区实时展示玩家当前穿戴的纸墨蚀刻小人。
+2. **领主衣橱工程图版 (`size="profile"`)**：展示完整的 `124×124` 工程制图图版（含 `FIG.01·LORD` 编号与朱砂方印）及 12 款赛季限定外观 (`cos_*`) 换装台。
+3. **2D 荒原搜打撤地图实机棋子 (`size="token"`, `isMoving`)**：在 2D 多区块传送门荒原网格上直接渲染领主蚀刻棋子，移动时触发高频步伐起伏与阴影缩放。
 
 ---
 
@@ -41,4 +44,4 @@
 | `patternSeed` | `int32` | `[1, 999]` 随机图案种子（其中 `#777`、`#888`、`#999` 为特殊黄金对称模板） |
 | `uvOffsetX` / `uvOffsetY` | `double` | `[0.000, 1.000]` 纹理采样偏移坐标，决定精密齿轮与星轨在器物表面的切割位置 |
 | `uvScale` / `uvRotation` | `double` | `[0.75, 1.65]` 缩放比与 `[0°, 360°]` 旋转角，保证全服没有任何两件藏品纹理完全相同 |
-| `paletteId` | `int32` | 6 套古典纸墨与鎏金配色方案 |
+| `paletteId` | `int32` | 古典纸墨、朱砂印泥、氧化铜绿与鎏金黑曜配色方案 |
