@@ -172,7 +172,7 @@ func TestSiphonSluiceRationOrderAndForageEdictsAndGuideProgression(t *testing.T)
 		t.Fatalf("expected empire guide after profession choice, got %s", g.Code)
 	}
 
-	// EdictNightShift stays active with only JobForage assigned and boosts JobForage by +45%
+	// A funded night shift boosts forage by +45%; zero-stock recovery is tested separately.
 	p.Workers = map[string]int32{JobWater: 3, JobForage: 1}
 	p.ResourcesMilli[ResWater] = 100 * ResourceScale
 	p.ResourcesMilli[ResWood] = 10 * ResourceScale

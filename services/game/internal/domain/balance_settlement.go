@@ -186,7 +186,7 @@ var EdictCatalog = []EdictSpec{
 		Category:              "edict",
 		PrerequisiteCode:      BPColonyEdicts,
 		EffectSummary:         "全岗位采集与工业产出 +45%",
-		DrawbackSummary:       "居民耗水 +0.14/秒，且每秒燃烧 0.40 木材（缺木时自动失效）",
+		DrawbackSummary:       "居民耗水 +0.14/秒，每秒燃烧 0.40 木材；库存不足则暂停，补足后自动恢复",
 		MutuallyExclusiveWith: EdictWaterRation,
 		JobEfficiencyBonusPct: map[string]int64{
 			JobForage:     45,

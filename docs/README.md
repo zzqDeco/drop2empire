@@ -2,6 +2,8 @@
 
 本目录采用与 `teamie` 一致的**工程契约先行 + 四维正交游戏策划分层**管理体系。任何代码、Thrift 协议、数值或赛季内容的变更，必须同步更新对应分层的文档。
 
+本次聚落建设改版按**清档重开**切换，旧经营进度不自动迁移或补偿。发布数据边界见 [架构发布约定](architecture/overview.md#2-persistence-migration-and-rollout-boundary)，常规赛季保留规则见 [赛季框架](design/04-seasons/season-framework.md)。
+
 ---
 
 ## 1. 策划案四维分层边界定义 (4D Game Design Taxonomy)

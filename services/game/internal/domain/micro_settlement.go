@@ -80,7 +80,10 @@ func isEdictEffectivelyActive(p *PlayerState, ed EdictSpec) bool {
 	if ed.PrerequisiteCode != "" && !p.UnlockedBlueprints[ed.PrerequisiteCode] {
 		return false
 	}
-	if ed.Code == EdictNightShift && p.ResourcesMilli[ResWood] <= 0 && p.Workers[JobWood] <= 0 && p.Workers[JobForage] <= 0 {
+	// Determine the whole tick's bonus and upkeep from its opening inventory.
+	// Future gathering (especially one forager) cannot fund an unpaid bonus.
+	// Upkeep is paid before industrial jobs can consume this reserved fuel.
+	if ed.Code == EdictNightShift && p.ResourcesMilli[ResWood] < ed.FlatResourceDrainMilliSec[ResWood] {
 		return false
 	}
 	if ed.Code == EdictHydroSaw && p.ResourcesMilli[ResWater] <= 0 {
