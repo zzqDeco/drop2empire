@@ -83,11 +83,10 @@ func isEdictEffectivelyActive(p *PlayerState, ed EdictSpec) bool {
 	// Determine the whole tick's bonus and upkeep from its opening inventory.
 	// Future gathering (especially one forager) cannot fund an unpaid bonus.
 	// Upkeep is paid before industrial jobs can consume this reserved fuel.
-	if ed.Code == EdictNightShift && p.ResourcesMilli[ResWood] < ed.FlatResourceDrainMilliSec[ResWood] {
-		return false
-	}
-	if ed.Code == EdictHydroSaw && p.ResourcesMilli[ResWater] <= 0 {
-		return false
+	for resKey, flatDrain := range ed.FlatResourceDrainMilliSec {
+		if p.ResourcesMilli[resKey] < flatDrain {
+			return false
+		}
 	}
 	return true
 }
@@ -349,9 +348,18 @@ func produceSecond(p *PlayerState) {
 			break
 		}
 	}
-	waterBefore := productionStock(p, ResWater)
+	beforeStock := map[string]int64{
+		ResWater:    productionStock(p, ResWater),
+		ResWood:     productionStock(p, ResWood),
+		ResStone:    productionStock(p, ResStone),
+		ResCharcoal: productionStock(p, ResCharcoal),
+	}
+	addUncappedStock := func(key string, delta int64) {
+		next := productionStock(p, key) + delta
+		p.ResourcesMilli[key], p.ProductionRemainders[key] = next/1000, next%1000
+	}
 	var waterProduced, waterDemand int64
-	// Gather, pay upkeep, then route only net water overflow into the siphon.
+	// Gather, pay upkeep, convert, then cap net surpluses and route net water overflow into the siphon.
 	for _, job := range jobs {
 		if job.JobKey != JobWater && job.JobKey != JobWood && job.JobKey != JobStone && job.JobKey != JobForage {
 			continue
@@ -359,11 +367,8 @@ func produceSecond(p *PlayerState) {
 		output := job.TotalOutputPerSecMilli * 1000
 		if job.JobKey == JobWater {
 			waterProduced = output
-			next := productionStock(p, ResWater) + output
-			p.ResourcesMilli[ResWater], p.ProductionRemainders[ResWater] = next/1000, next%1000
-		} else {
-			changeProductionStock(p, job.OutputResourceKey, output)
 		}
+		addUncappedStock(job.OutputResourceKey, output)
 
 		if job.JobKey == JobWood {
 			changeProductionStock(p, ResFlint, output*byproductMult/SettlementBalance.WoodToFlintDivisor)
@@ -432,14 +437,24 @@ func produceSecond(p *PlayerState) {
 			}
 			changeProductionStock(p, key, -rate*workMs)
 		}
-		changeProductionStock(p, job.OutputResourceKey, job.EffectiveRateMilli*workMs)
+		if job.OutputResourceKey == ResCharcoal {
+			addUncappedStock(job.OutputResourceKey, job.EffectiveRateMilli*workMs)
+		} else {
+			changeProductionStock(p, job.OutputResourceKey, job.EffectiveRateMilli*workMs)
+		}
 	}
-	waterCeiling := max(waterBefore, ResourceCapacityMilli(p, ResWater)*1000)
+	waterCeiling := max(beforeStock[ResWater], ResourceCapacityMilli(p, ResWater)*1000)
 	if overflow := productionStock(p, ResWater) - waterCeiling; overflow > 0 {
 		changeProductionStock(p, ResWater, -overflow)
 		if p.ActiveEdicts[EdictSiphonSluice] && p.UnlockedBlueprints[BPSiphonSluice] {
 			changeProductionStock(p, ResStone, overflow/SettlementBalance.SiphonStoneDivisor)
 			changeProductionStock(p, ResFlint, overflow/SettlementBalance.SiphonFlintDivisor)
+		}
+	}
+	for _, key := range []string{ResWood, ResStone, ResCharcoal} {
+		ceiling := max(beforeStock[key], ResourceCapacityMilli(p, key)*1000)
+		if overflow := productionStock(p, key) - ceiling; overflow > 0 {
+			changeProductionStock(p, key, -overflow)
 		}
 	}
 	p.HydrationWarning = p.PopulationTotal >= SettlementBalance.MinPopForHydrationDrain && productionStock(p, ResWater) == 0 && waterProduced < waterDemand

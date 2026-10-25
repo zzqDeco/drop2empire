@@ -116,3 +116,50 @@ func TestNightShiftFuelAccountingIsIndependentOfPolling(t *testing.T) {
 		}
 	}
 }
+
+func TestHydroSawRequiresFullTickOfStoredWaterAndFullWoodCapDoesNotDiscardFuel(t *testing.T) {
+	// 1. EdictHydroSaw requires the full 1,500 milli water upfront at tick start.
+	p := NewBlankPlayer("hydro-full-tick", time.Unix(1000, 0))
+	p.PopulationTotal = 2
+	p.Workers = map[string]int32{JobWood: 1}
+	p.BuildingCounts[BuildingLumberCamp] = 1
+	p.BuildingCounts[BPWaterWheel1] = 1
+	EnsureSettlementState(p)
+	p.ActiveEdicts[EdictHydroSaw] = true
+	p.ResourcesMilli[ResWater] = 1499 // 1 milli short of 1500
+	gross, drain, _ := ComputeResourceFlows(p)
+	if gross[ResWood] != 450 || drain[ResWater] != 360 {
+		t.Fatalf("expected hydro_saw paused at 1499 milli water, got grossWood=%d drainWater=%d", gross[ResWood], drain[ResWater])
+	}
+	AdvancePlayerSeconds(p, 1)
+	if p.ResourcesMilli[ResWood] != 450 || p.ResourcesMilli[ResWater] != 1499-360 {
+		t.Fatalf("expected hydro_saw paused during simulation at 1499 milli water, got wood=%d water=%d", p.ResourcesMilli[ResWood], p.ResourcesMilli[ResWater])
+	}
+
+	// Fund water to 1500 milli: hydro_saw activates (+40% wood = 630 milli/s, drain = 1500 + 360 = 1860)
+	p.ResourcesMilli[ResWater] = 2000
+	gross, drain, _ = ComputeResourceFlows(p)
+	if gross[ResWood] != 630 || drain[ResWater] != 1860 {
+		t.Fatalf("expected hydro_saw active at 2000 milli water, got grossWood=%d drainWater=%d", gross[ResWood], drain[ResWater])
+	}
+	AdvancePlayerSeconds(p, 1)
+	if p.ResourcesMilli[ResWood] != 450+630 || p.ResourcesMilli[ResWater] != 2000-1860 {
+		t.Fatalf("expected hydro_saw active during simulation, got wood=%d water=%d", p.ResourcesMilli[ResWood], p.ResourcesMilli[ResWater])
+	}
+
+	// 2. When Wood starts at storage cap (450,000 milli), gathered wood in the tick funds Night Shift and Charcoal
+	// before storage cap truncation is applied at the end of the tick.
+	capPlayer := nightShiftPlayer(t)
+	capPlayer.Workers = map[string]int32{JobWater: 2, JobWood: 1, JobCharcoal: 1}
+	capPlayer.ResourcesMilli[ResWood] = ResourceCapacityMilli(capPlayer, ResWood) // 450,000 milli
+	_, _, net := ComputeResourceFlows(capPlayer)
+	// JobWood produces +652, NightShift drains -400, JobCharcoal drains -300 -> net = -48 milli wood
+	if net[ResWood] != -48 {
+		t.Fatalf("expected net wood -48 milli/s at cap, got %d", net[ResWood])
+	}
+	AdvancePlayerSeconds(capPlayer, 1)
+	if capPlayer.ResourcesMilli[ResWood] != 450*ResourceScale-48 {
+		t.Fatalf("expected wood stock 449952 after 1s at cap, got %d", capPlayer.ResourcesMilli[ResWood])
+	}
+}
+

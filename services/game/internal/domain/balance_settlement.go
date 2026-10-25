@@ -225,7 +225,7 @@ var EdictCatalog = []EdictSpec{
 		Category:                  "mechanism",
 		PrerequisiteCode:          BPWaterWheel1,
 		EffectSummary:             "将水轮水压注入林场与炭窑，伐木与烧炭产出 +40%",
-		DrawbackSummary:           "水渠引流每秒额外消耗 1.50 水/秒",
+		DrawbackSummary:           "水渠引流每秒额外消耗 1.50 水/秒；库存不足则暂停，补足后自动恢复",
 		JobEfficiencyBonusPct:     map[string]int64{JobWood: 40, JobCharcoal: 40},
 		FlatResourceDrainMilliSec: map[string]int64{ResWater: 1500},
 	},
