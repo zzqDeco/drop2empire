@@ -130,6 +130,27 @@ export function WastelandRaidPanel({
         ? await api.finishRaid({ ...command, ...identity })
         : await api.raidAction({ ...command, ...identity });
       sessionRef.current = response.raidLoadout.activeSession ?? null;
+      if ("action" in command && (command.action === "move" || command.action === "use_consumable")) {
+        const next = sessionRef.current;
+        const zone = next?.zones.find(z => z.id === next.currentZoneId);
+        const tile = next && zone ? zone.tiles[next.playerY * zone.width + next.playerX] : undefined;
+        channelDeadlineRef.current = performance.now() + (next?.channelRemainingMs ?? 0);
+        // Movement and consumables can both change the tile or its deadline.
+        // Continue an explicitly requested extraction, but never start one by blinking.
+        setChanneling(current => {
+          if (!next || !tile) return null;
+          const chest = tile.kind.startsWith("chest_") && !tile.looted;
+          const extracting = current && (tile.kind === "extract_early" || tile.kind === "extract_deep") &&
+            current.kind === tile.kind && current.x === next.playerX && current.y === next.playerY;
+          if (!chest && !extracting) return null;
+          return {
+            label: chest ? CHEST_CHANNEL_LABELS[tile.kind] ?? "正在搜索容器" : current!.label,
+            kind: tile.kind as TileKind,
+            x: next.playerX, y: next.playerY, startedAt: Date.now(),
+            durationMs: Math.max(1, next.channelRemainingMs), progressPct: 0,
+          };
+        });
+      }
       return response;
     } finally { commandPendingRef.current = false; }
   }, []);
@@ -256,23 +277,6 @@ export function WastelandRaidPanel({
           landed.kind === "merchant"
         ) {
           setShowLootModal(true);
-        } else if (
-          (landed.kind === "chest_wood" ||
-            landed.kind === "chest_iron" ||
-            landed.kind === "chest_coffin" ||
-            landed.kind === "chest_abyss") &&
-          !landed.looted
-        ) {
-          const dur = Math.max(1, nextSess.channelRemainingMs);
-          setChanneling({
-            label: CHEST_CHANNEL_LABELS[landed.kind] ?? "正在搜索容器",
-            kind: landed.kind as TileKind,
-            x: nextSess.playerX,
-            y: nextSess.playerY,
-            startedAt: Date.now(),
-            durationMs: dur,
-            progressPct: 0,
-          });
         }
         return resp;
       });
@@ -970,6 +974,9 @@ export function WastelandRaidPanel({
                   </div>
                 </div>
 
+                <div className="economy-tabs" aria-label="职业远征耗材">
+                  {(state.economy?.professional.consumables ?? []).filter(c => c.use === "raid" && c.inventoryMilli >= 1000).map(c => <button className="btn-outline" key={c.itemKey} disabled={usedPotions.includes(c.itemKey)} title={c.effect} onClick={() => void runAction(() => sendRaidAction({ action: "use_consumable", itemKey: c.itemKey, dx: c.itemKey === "blink_scroll" ? (facing === "left" ? -2 : facing === "right" ? 2 : 0) : 0, dy: c.itemKey === "blink_scroll" ? (facing === "up" ? -2 : facing === "down" ? 2 : 0) : 0 }))}>{c.name}{usedPotions.includes(c.itemKey) ? "（本局已使用）" : c.itemKey === "blink_scroll" ? "（朝当前面向）" : ""}</button>)}
+                </div>
                 <div className="tab-body split-3col">
                   {/* LEFT COLUMN: Safe Box + Raid Backpack (Drop Targets) */}
                   <div

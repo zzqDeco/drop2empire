@@ -163,7 +163,7 @@ var BlueprintCatalog = func() []BlueprintSpec {
 		{Code: BPPartValve, Name: "导水阀芯", Kind: "project", Stage: "assembly", RequiredPopulation: 1, PrerequisiteCode: BPBasicWorkshop, CostsMilli: resourceCosts(300, 60, 20, 10), EffectSummary: "工程部件 · 取水效率 +20%", JobEfficiencyBonusPct: map[string]int64{JobWater: 20}},
 		{Code: BPPartFrame, Name: "承压木框", Kind: "project", Stage: "assembly", RequiredPopulation: 1, PrerequisiteCode: BPBasicWorkshop, CostsMilli: resourceCosts(100, 100, 30, 15), EffectSummary: "工程部件 · 伐木效率 +25%", JobEfficiencyBonusPct: map[string]int64{JobWood: 25}},
 		{Code: BPPartTablet, Name: "铭文石板", Kind: "project", Stage: "assembly", RequiredPopulation: 1, PrerequisiteCode: BPBasicWorkshop, CostsMilli: resourceCosts(160, 40, 70, 20), EffectSummary: "工程部件 · 采石效率 +30%", JobEfficiencyBonusPct: map[string]int64{JobStone: 30}},
-		{Code: BPMysteryTreasure, Name: "装配古代装置", Kind: "project", Stage: "assembly", RequiredPopulation: 1, PrerequisiteCode: BPBasicWorkshop, RequiredCodes: []string{BPPartValve, BPPartFrame, BPPartTablet}, CostsMilli: map[string]int64{}, EffectSummary: "完成三个部件后装配，领取一次性 500 金币并开放职业", GrantsGoldBasis: 500 * GoldScale},
+		{Code: BPMysteryTreasure, Name: "装配古代装置", Kind: "project", Stage: "assembly", RequiredPopulation: 1, PrerequisiteCode: BPBasicWorkshop, RequiredCodes: []string{BPPartValve, BPPartFrame, BPPartTablet}, CostsMilli: map[string]int64{}, EffectSummary: "完成三个部件后装配，开放职业、专属设施与市场"},
 	}
 	for _, b := range BuildingCatalog {
 		if b.EffectCode == "" {

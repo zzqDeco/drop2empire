@@ -1,5 +1,8 @@
 import {
   IDL_ROUTES,
+  type EconomyActionReq,
+  type MonetaryPolicyReq,
+  type IntroduceCompanyReq,
   type AllocateWorkersReq,
   type Benchmark30mResp,
   type ChooseProfessionReq,
@@ -204,6 +207,10 @@ export class EmpireClient {
       throw error;
     }
   }
+
+  economyAction = (req: EconomyActionReq) => this.#settlementRequest(IDL_ROUTES.EconomyAction.clientPath, { method: IDL_ROUTES.EconomyAction.method, body: JSON.stringify(req) });
+  monetaryPolicy = (req: MonetaryPolicyReq) => this.#request<DashboardStateResp>(IDL_ROUTES.MonetaryPolicy.clientPath, { method: IDL_ROUTES.MonetaryPolicy.method, body: JSON.stringify(req) });
+  introduceCompany = (req: IntroduceCompanyReq) => this.#request<DashboardStateResp>(IDL_ROUTES.IntroduceCompany.clientPath, { method: IDL_ROUTES.IntroduceCompany.method, body: JSON.stringify(req) });
 
   researchTechnology = (req: ResearchTechnologyReq) =>
     this.#settlementRequest(IDL_ROUTES.ResearchTechnology.clientPath, {

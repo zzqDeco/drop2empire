@@ -1,0 +1,953 @@
+[
+  {
+    "scenario": {
+      "pack": "precision_workpack",
+      "name": "industrial-consumables",
+      "players": 48,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "inputPricePct": 100,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 84,
+        "cashBasis": 90083400,
+        "revenueBasis": 200831400,
+        "realizedProfitBasis": 42407066,
+        "unsoldUnits": 12,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 57,
+        "cashBasis": 76593000,
+        "revenueBasis": 151371000,
+        "realizedProfitBasis": 29694201,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 138,
+        "cashBasis": 109413600,
+        "revenueBasis": 328521600,
+        "realizedProfitBasis": 63321600,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "control",
+        "batches": 139,
+        "cashBasis": 99896600,
+        "revenueBasis": 273972600,
+        "realizedProfitBasis": 53128600,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "works",
+        "batches": 136,
+        "cashBasis": 178760200,
+        "revenueBasis": 658627200,
+        "realizedProfitBasis": 135367200,
+        "unsoldUnits": 16,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "precision",
+        "batches": 137,
+        "cashBasis": 179609300,
+        "revenueBasis": 676932300,
+        "realizedProfitBasis": 136009300,
+        "unsoldUnits": 16,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      }
+    ],
+    "terminalUnitsConsumed": 2688,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 160000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "votePricePct": 200,
+      "name": "price-recovery-vote",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "inputPricePct": 200,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 12,
+        "cashBasis": 56068800,
+        "revenueBasis": 52390800,
+        "realizedProfitBasis": 10702800,
+        "unsoldUnits": 12,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 9,
+        "cashBasis": 49422000,
+        "revenueBasis": 39204000,
+        "realizedProfitBasis": 7380000,
+        "unsoldUnits": 18,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 18,
+        "cashBasis": 57097200,
+        "revenueBasis": 77299200,
+        "realizedProfitBasis": 14899200,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "control",
+        "batches": 18,
+        "cashBasis": 55959600,
+        "revenueBasis": 63993600,
+        "realizedProfitBasis": 12409600,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "works",
+        "batches": 16,
+        "cashBasis": 66332400,
+        "revenueBasis": 141134400,
+        "realizedProfitBasis": 28814400,
+        "unsoldUnits": 16,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "precision",
+        "batches": 16,
+        "cashBasis": 66143600,
+        "revenueBasis": 143985600,
+        "realizedProfitBasis": 28929600,
+        "unsoldUnits": 16,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      }
+    ],
+    "terminalUnitsConsumed": 288,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 40000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "baseline-12",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "inputPricePct": 100,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 24,
+        "cashBasis": 57524100,
+        "revenueBasis": 53846100,
+        "realizedProfitBasis": 11000100,
+        "unsoldUnits": 18,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 16,
+        "cashBasis": 54931000,
+        "revenueBasis": 40293000,
+        "realizedProfitBasis": 7585000,
+        "unsoldUnits": 12,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 37,
+        "cashBasis": 62394000,
+        "revenueBasis": 84546000,
+        "realizedProfitBasis": 16296000,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "control",
+        "batches": 37,
+        "cashBasis": 60347000,
+        "revenueBasis": 69993000,
+        "realizedProfitBasis": 13573000,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "works",
+        "batches": 35,
+        "cashBasis": 78154800,
+        "revenueBasis": 164656800,
+        "realizedProfitBasis": 33616800,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "precision",
+        "batches": 35,
+        "cashBasis": 78156200,
+        "revenueBasis": 167983200,
+        "realizedProfitBasis": 33751200,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      }
+    ],
+    "terminalUnitsConsumed": 672,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 40000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "growth-48",
+      "players": 48,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "inputPricePct": 100,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 84,
+        "cashBasis": 88703400,
+        "revenueBasis": 200831400,
+        "realizedProfitBasis": 41027400,
+        "unsoldUnits": 12,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 57,
+        "cashBasis": 74304000,
+        "revenueBasis": 150282000,
+        "realizedProfitBasis": 28290000,
+        "unsoldUnits": 18,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 138,
+        "cashBasis": 109413600,
+        "revenueBasis": 328521600,
+        "realizedProfitBasis": 63321600,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "control",
+        "batches": 138,
+        "cashBasis": 99508800,
+        "revenueBasis": 271972800,
+        "realizedProfitBasis": 52740800,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "works",
+        "batches": 136,
+        "cashBasis": 178219200,
+        "revenueBasis": 658627200,
+        "realizedProfitBasis": 134467200,
+        "unsoldUnits": 16,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "precision",
+        "batches": 136,
+        "cashBasis": 178604800,
+        "revenueBasis": 671932800,
+        "realizedProfitBasis": 135004800,
+        "unsoldUnits": 16,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      }
+    ],
+    "terminalUnitsConsumed": 2688,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 160000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "demand-collapse",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "shockDay": 4,
+      "inputPricePct": 100,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 9,
+        "cashBasis": 51546900,
+        "revenueBasis": 18918900,
+        "realizedProfitBasis": 3864900,
+        "unsoldUnits": 12,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 7,
+        "cashBasis": 48685000,
+        "revenueBasis": 14157000,
+        "realizedProfitBasis": 2665000,
+        "unsoldUnits": 18,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 13,
+        "cashBasis": 51219600,
+        "revenueBasis": 26571600,
+        "realizedProfitBasis": 5121600,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "control",
+        "batches": 13,
+        "cashBasis": 51039800,
+        "revenueBasis": 21997800,
+        "realizedProfitBasis": 4265800,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "works",
+        "batches": 11,
+        "cashBasis": 54142800,
+        "revenueBasis": 47044800,
+        "realizedProfitBasis": 9604800,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "precision",
+        "batches": 11,
+        "cashBasis": 54048200,
+        "revenueBasis": 47995200,
+        "realizedProfitBasis": 9643200,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      }
+    ],
+    "terminalUnitsConsumed": 192,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 40000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "input-price-shock",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "inputPricePct": 200,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 0,
+        "cashBasis": 49998000,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 0,
+        "state": "listed: 投入成本超过批次预算或销售收入"
+      },
+      {
+        "id": "crystal",
+        "batches": 0,
+        "cashBasis": 49998000,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 0,
+        "state": "listed: 投入成本超过批次预算或销售收入"
+      },
+      {
+        "id": "heavy",
+        "batches": 0,
+        "cashBasis": 49998000,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 0,
+        "state": "listed: 等待市场供货"
+      },
+      {
+        "id": "control",
+        "batches": 0,
+        "cashBasis": 49998000,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 0,
+        "state": "listed: 等待市场供货"
+      },
+      {
+        "id": "works",
+        "batches": 0,
+        "cashBasis": 49998000,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 0,
+        "state": "listed: 等待市场供货"
+      },
+      {
+        "id": "precision",
+        "batches": 0,
+        "cashBasis": 49998000,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 0,
+        "state": "listed: 等待市场供货"
+      }
+    ],
+    "terminalUnitsConsumed": 0,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 40000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "cash-shortage",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "inputPricePct": 100,
+      "initialPublicGold": 12000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 2,
+        "cashBasis": 46138000,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 20,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 2,
+        "cashBasis": 45578000,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 20,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 0,
+        "cashBasis": 0,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 0,
+        "state": "failed: 募资未达下限，认购款已原路退回"
+      },
+      {
+        "id": "control",
+        "batches": 0,
+        "cashBasis": 0,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 0,
+        "state": "failed: 募资未达下限，认购款已原路退回"
+      },
+      {
+        "id": "works",
+        "batches": 0,
+        "cashBasis": 0,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 0,
+        "state": "failed: 募资未达下限，认购款已原路退回"
+      },
+      {
+        "id": "precision",
+        "batches": 0,
+        "cashBasis": 0,
+        "revenueBasis": 0,
+        "realizedProfitBasis": 0,
+        "unsoldUnits": 0,
+        "state": "failed: 募资未达下限，认购款已原路退回"
+      }
+    ],
+    "terminalUnitsConsumed": 0,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 120000000,
+    "moneyHeldBasis": 120000000,
+    "publicCashBasis": 0,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "outage-alloy",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "stopCompany": "alloy",
+      "shockDay": 4,
+      "inputPricePct": 100,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 9,
+        "cashBasis": 51546900,
+        "revenueBasis": 18918900,
+        "realizedProfitBasis": 3864900,
+        "unsoldUnits": 12,
+        "state": "listed: 股东计划暂停生产"
+      },
+      {
+        "id": "crystal",
+        "batches": 16,
+        "cashBasis": 54931000,
+        "revenueBasis": 40293000,
+        "realizedProfitBasis": 7585000,
+        "unsoldUnits": 12,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 13,
+        "cashBasis": 51219600,
+        "revenueBasis": 26571600,
+        "realizedProfitBasis": 5121600,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "control",
+        "batches": 37,
+        "cashBasis": 60347000,
+        "revenueBasis": 69993000,
+        "realizedProfitBasis": 13573000,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "works",
+        "batches": 11,
+        "cashBasis": 61003500,
+        "revenueBasis": 53905500,
+        "realizedProfitBasis": 11005500,
+        "unsoldUnits": 0,
+        "state": "listed: 投入成本超过批次预算或销售收入"
+      },
+      {
+        "id": "precision",
+        "batches": 35,
+        "cashBasis": 78156200,
+        "revenueBasis": 167983200,
+        "realizedProfitBasis": 33751200,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      }
+    ],
+    "terminalUnitsConsumed": 446,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 40000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "outage-crystal",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "stopCompany": "crystal",
+      "shockDay": 4,
+      "inputPricePct": 100,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 24,
+        "cashBasis": 57524100,
+        "revenueBasis": 53846100,
+        "realizedProfitBasis": 11000100,
+        "unsoldUnits": 18,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 7,
+        "cashBasis": 48685000,
+        "revenueBasis": 14157000,
+        "realizedProfitBasis": 2665000,
+        "unsoldUnits": 18,
+        "state": "listed: 股东计划暂停生产"
+      },
+      {
+        "id": "heavy",
+        "batches": 37,
+        "cashBasis": 62394000,
+        "revenueBasis": 84546000,
+        "realizedProfitBasis": 16296000,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "control",
+        "batches": 13,
+        "cashBasis": 51039800,
+        "revenueBasis": 21997800,
+        "realizedProfitBasis": 4265800,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "works",
+        "batches": 35,
+        "cashBasis": 78154800,
+        "revenueBasis": 164656800,
+        "realizedProfitBasis": 33616800,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "precision",
+        "batches": 11,
+        "cashBasis": 61047500,
+        "revenueBasis": 54994500,
+        "realizedProfitBasis": 11049500,
+        "unsoldUnits": 0,
+        "state": "listed: 投入成本超过批次预算或销售收入"
+      }
+    ],
+    "terminalUnitsConsumed": 446,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 40000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "outage-heavy",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "stopCompany": "heavy",
+      "shockDay": 4,
+      "inputPricePct": 100,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 9,
+        "cashBasis": 51546900,
+        "revenueBasis": 18918900,
+        "realizedProfitBasis": 3864900,
+        "unsoldUnits": 12,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 16,
+        "cashBasis": 54931000,
+        "revenueBasis": 40293000,
+        "realizedProfitBasis": 7585000,
+        "unsoldUnits": 12,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 13,
+        "cashBasis": 51219600,
+        "revenueBasis": 26571600,
+        "realizedProfitBasis": 5121600,
+        "unsoldUnits": 8,
+        "state": "listed: 股东计划暂停生产"
+      },
+      {
+        "id": "control",
+        "batches": 37,
+        "cashBasis": 60347000,
+        "revenueBasis": 69993000,
+        "realizedProfitBasis": 13573000,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "works",
+        "batches": 11,
+        "cashBasis": 54142800,
+        "revenueBasis": 47044800,
+        "realizedProfitBasis": 9604800,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "precision",
+        "batches": 35,
+        "cashBasis": 78156200,
+        "revenueBasis": 167983200,
+        "realizedProfitBasis": 33751200,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      }
+    ],
+    "terminalUnitsConsumed": 432,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 40000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "outage-control",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "stopCompany": "control",
+      "shockDay": 4,
+      "inputPricePct": 100,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 24,
+        "cashBasis": 57524100,
+        "revenueBasis": 53846100,
+        "realizedProfitBasis": 11000100,
+        "unsoldUnits": 18,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 7,
+        "cashBasis": 48685000,
+        "revenueBasis": 14157000,
+        "realizedProfitBasis": 2665000,
+        "unsoldUnits": 18,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 37,
+        "cashBasis": 62394000,
+        "revenueBasis": 84546000,
+        "realizedProfitBasis": 16296000,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "control",
+        "batches": 13,
+        "cashBasis": 51039800,
+        "revenueBasis": 21997800,
+        "realizedProfitBasis": 4265800,
+        "unsoldUnits": 8,
+        "state": "listed: 股东计划暂停生产"
+      },
+      {
+        "id": "works",
+        "batches": 35,
+        "cashBasis": 78154800,
+        "revenueBasis": 164656800,
+        "realizedProfitBasis": 33616800,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "precision",
+        "batches": 11,
+        "cashBasis": 54048200,
+        "revenueBasis": 47995200,
+        "realizedProfitBasis": 9643200,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      }
+    ],
+    "terminalUnitsConsumed": 432,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 40000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "outage-works",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "stopCompany": "works",
+      "shockDay": 4,
+      "inputPricePct": 100,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 9,
+        "cashBasis": 51546900,
+        "revenueBasis": 18918900,
+        "realizedProfitBasis": 3864900,
+        "unsoldUnits": 12,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 16,
+        "cashBasis": 54931000,
+        "revenueBasis": 40293000,
+        "realizedProfitBasis": 7585000,
+        "unsoldUnits": 12,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 13,
+        "cashBasis": 51219600,
+        "revenueBasis": 26571600,
+        "realizedProfitBasis": 5121600,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "control",
+        "batches": 37,
+        "cashBasis": 60347000,
+        "revenueBasis": 69993000,
+        "realizedProfitBasis": 13573000,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "works",
+        "batches": 11,
+        "cashBasis": 61003500,
+        "revenueBasis": 53905500,
+        "realizedProfitBasis": 11005500,
+        "unsoldUnits": 0,
+        "state": "listed: 股东计划暂停生产"
+      },
+      {
+        "id": "precision",
+        "batches": 35,
+        "cashBasis": 78156200,
+        "revenueBasis": 167983200,
+        "realizedProfitBasis": 33751200,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      }
+    ],
+    "terminalUnitsConsumed": 446,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 40000,
+    "seed": "deterministic-v1"
+  },
+  {
+    "scenario": {
+      "name": "outage-precision",
+      "players": 12,
+      "days": 14,
+      "demandPerPlayer": 2,
+      "stopCompany": "precision",
+      "shockDay": 4,
+      "inputPricePct": 100,
+      "initialPublicGold": 100000
+    },
+    "companies": [
+      {
+        "id": "alloy",
+        "batches": 24,
+        "cashBasis": 57524100,
+        "revenueBasis": 53846100,
+        "realizedProfitBasis": 11000100,
+        "unsoldUnits": 18,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "crystal",
+        "batches": 7,
+        "cashBasis": 48685000,
+        "revenueBasis": 14157000,
+        "realizedProfitBasis": 2665000,
+        "unsoldUnits": 18,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "heavy",
+        "batches": 37,
+        "cashBasis": 62394000,
+        "revenueBasis": 84546000,
+        "realizedProfitBasis": 16296000,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "control",
+        "batches": 13,
+        "cashBasis": 51039800,
+        "revenueBasis": 21997800,
+        "realizedProfitBasis": 4265800,
+        "unsoldUnits": 8,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "works",
+        "batches": 35,
+        "cashBasis": 78154800,
+        "revenueBasis": 164656800,
+        "realizedProfitBasis": 33616800,
+        "unsoldUnits": 14,
+        "state": "listed: 库存达到两批覆盖，等待销量"
+      },
+      {
+        "id": "precision",
+        "batches": 11,
+        "cashBasis": 61047500,
+        "revenueBasis": 54994500,
+        "realizedProfitBasis": 11049500,
+        "unsoldUnits": 0,
+        "state": "listed: 股东计划暂停生产"
+      }
+    ],
+    "terminalUnitsConsumed": 446,
+    "ledgerChecks": 336,
+    "moneyIssuedBasis": 1000000000,
+    "moneyHeldBasis": 1000000000,
+    "publicCashBasis": 40000,
+    "seed": "deterministic-v1"
+  }
+]

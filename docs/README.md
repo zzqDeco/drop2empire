@@ -29,8 +29,8 @@
 - [`design/01-overall/lifecycle-and-loops.md`](design/01-overall/lifecycle-and-loops.md) — 玩家生命周期三阶段 (`Phase 1/2/3`) 与四大子系统全局耦合拓扑图
 
 ### C. 02 · 宏观设计层 (`design/02-macro/`)
-- [`design/02-macro/monetary-and-clob-market.md`](design/02-macro/monetary-and-clob-market.md) — 宏观货币存量恒等式 $M(t)$、水龙头与销毁税矩阵、CLOB 价格-时间优先撮合算法
-- [`design/02-macro/profession-and-economy-boundary.md`](design/02-macro/profession-and-economy-boundary.md) — 四大终身职业生产力分工、跨职业 4 槽设备架互锁、主城与荒原肉鸽单向经济隔离边界
+- [`design/02-macro/monetary-and-clob-market.md`](design/02-macro/monetary-and-clob-market.md) — 宏观货币存量恒等式 $M(t)$、货币联盟发行/拨款/注销政策、CLOB 价格-时间优先撮合算法
+- [`design/02-macro/profession-and-economy-boundary.md`](design/02-macro/profession-and-economy-boundary.md) — 四大终身职业生产力分工、职业专属设施与可交易耗材、主城与荒原肉鸽单向经济隔离边界
 - [`design/02-macro/chamber-war-macro.md`](design/02-macro/chamber-war-macro.md) — 黑曜 vs 白银双商会 8 节点图拓扑领土战争、补给线校验、三兵种克制矩阵与每日 20:00 权威结算
 
 ### D. 03 · 微观设计层 (`design/03-micro/`)
@@ -41,3 +41,12 @@
 ### E. 04 · 赛季设计层 (`design/04-seasons/`)
 - [`design/04-seasons/season-framework.md`](design/04-seasons/season-framework.md) — 赛季更替通用框架：跨赛季重置项 vs 永久保留项边界、一次性蓝图与安全保险箱当季生命周期、绝版外观流通规则
 - [`design/04-seasons/s1-obsidian-awakening.md`](design/04-seasons/s1-obsidian-awakening.md) — **【S1 赛季：黑曜苏醒】专属策划案**：S1 主题、12 款 S1 限定可交易动态外观掉率与指导价表、19 项 S1 局外整备军械与 10 种一次性蓝图完整参数表
+
+
+### F. 持续产业经济新增索引
+
+- [公司、供应链与股东治理](design/02-macro/companies-and-governance.md)
+- [职业设施与耗材使用](design/03-micro/profession-consumables.md)
+- [S1 产业与十二种职业制品目录](design/04-seasons/s1-industry-catalog.md)
+- [经济仿真与校准结果](design/04-seasons/economy-calibration.md)
+- [清档重开、验收与回滚](operations/economy-clean-start.md)

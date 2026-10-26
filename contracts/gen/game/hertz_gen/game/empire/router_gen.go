@@ -32,6 +32,9 @@ type EmpireServer = EmpireService
 
 // EmpireService route pattern constants generated from contracts/game/http_empire.thrift.
 const (
+	PatternEconomyAction = "POST /api/v1/empire/economy/action"
+	PatternMonetaryPolicy = "POST /api/v1/empire/admin/economy/policy"
+	PatternIntroduceCompany = "POST /api/v1/empire/admin/economy/company"
 	PatternGetDashboard = "GET /api/v1/empire/state"
 	PatternRegisterAccount = "POST /api/v1/empire/auth/register"
 	PatternLoginAccount = "POST /api/v1/empire/auth/login"
@@ -74,8 +77,11 @@ const (
 	PatternPublishNotice = "POST /api/v1/empire/admin/notices"
 )
 
-// EmpireServiceRoutes lists all 40 route specifications declared on EmpireService.
+// EmpireServiceRoutes lists all 43 route specifications declared on EmpireService.
 var EmpireServiceRoutes = []RouteSpec{
+	{Name: "EconomyAction", Method: "POST", Path: "/api/v1/empire/economy/action", MuxPattern: PatternEconomyAction, RequestType: "EconomyActionReq", ResponseType: "DashboardStateResp"},
+	{Name: "MonetaryPolicy", Method: "POST", Path: "/api/v1/empire/admin/economy/policy", MuxPattern: PatternMonetaryPolicy, RequestType: "MonetaryPolicyReq", ResponseType: "DashboardStateResp"},
+	{Name: "IntroduceCompany", Method: "POST", Path: "/api/v1/empire/admin/economy/company", MuxPattern: PatternIntroduceCompany, RequestType: "IntroduceCompanyReq", ResponseType: "DashboardStateResp"},
 	{Name: "GetDashboard", Method: "GET", Path: "/api/v1/empire/state", MuxPattern: PatternGetDashboard, RequestType: "GetDashboardReq", ResponseType: "DashboardStateResp"},
 	{Name: "RegisterAccount", Method: "POST", Path: "/api/v1/empire/auth/register", MuxPattern: PatternRegisterAccount, RequestType: "RegisterAccountReq", ResponseType: "DashboardStateResp"},
 	{Name: "LoginAccount", Method: "POST", Path: "/api/v1/empire/auth/login", MuxPattern: PatternLoginAccount, RequestType: "LoginAccountReq", ResponseType: "DashboardStateResp"},
@@ -120,6 +126,9 @@ var EmpireServiceRoutes = []RouteSpec{
 
 // EmpireServiceRouteHandlers binds every endpoint in EmpireService to an http.HandlerFunc.
 type EmpireServiceRouteHandlers struct {
+	EconomyAction http.HandlerFunc
+	MonetaryPolicy http.HandlerFunc
+	IntroduceCompany http.HandlerFunc
 	GetDashboard http.HandlerFunc
 	RegisterAccount http.HandlerFunc
 	LoginAccount http.HandlerFunc
@@ -164,6 +173,18 @@ type EmpireServiceRouteHandlers struct {
 
 // RegisterEmpireServiceRoutes registers all EmpireService endpoints on mux and panics if any IDL endpoint handler is nil.
 func RegisterEmpireServiceRoutes(mux *http.ServeMux, h EmpireServiceRouteHandlers) {
+	if h.EconomyAction == nil {
+		panic("EmpireServiceRouteHandlers.EconomyAction (" + PatternEconomyAction + ") is nil")
+	}
+	mux.HandleFunc(PatternEconomyAction, h.EconomyAction)
+	if h.MonetaryPolicy == nil {
+		panic("EmpireServiceRouteHandlers.MonetaryPolicy (" + PatternMonetaryPolicy + ") is nil")
+	}
+	mux.HandleFunc(PatternMonetaryPolicy, h.MonetaryPolicy)
+	if h.IntroduceCompany == nil {
+		panic("EmpireServiceRouteHandlers.IntroduceCompany (" + PatternIntroduceCompany + ") is nil")
+	}
+	mux.HandleFunc(PatternIntroduceCompany, h.IntroduceCompany)
 	if h.GetDashboard == nil {
 		panic("EmpireServiceRouteHandlers.GetDashboard (" + PatternGetDashboard + ") is nil")
 	}
@@ -333,6 +354,63 @@ func RegisterEmpireServer(mux *http.ServeMux, srv EmpireServer, m HTTPResponder,
 		h = overrides[0]
 	}
 	mw, hasMW := m.(HTTPRouteMiddleware)
+	if h.EconomyAction == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req EconomyActionReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.EconomyAction(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "EconomyAction", Method: "POST", Path: "/api/v1/empire/economy/action", MuxPattern: PatternEconomyAction, RequestType: "EconomyActionReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.EconomyAction = fn
+	}
+	if h.MonetaryPolicy == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req MonetaryPolicyReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.MonetaryPolicy(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "MonetaryPolicy", Method: "POST", Path: "/api/v1/empire/admin/economy/policy", MuxPattern: PatternMonetaryPolicy, RequestType: "MonetaryPolicyReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.MonetaryPolicy = fn
+	}
+	if h.IntroduceCompany == nil {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req IntroduceCompanyReq
+			if err := m.DecodeRequest(w, r, &req); err != nil {
+				m.WriteBindErrorHTTP(w, r, err)
+				return
+			}
+			resp, err := srv.IntroduceCompany(r.Context(), &req)
+			if err != nil {
+				m.WriteDomainErrorHTTP(w, r, err)
+				return
+			}
+			m.WriteOKHTTP(w, r, http.StatusOK, resp)
+		})
+		if hasMW {
+			fn = mw.WrapRoute(RouteSpec{Name: "IntroduceCompany", Method: "POST", Path: "/api/v1/empire/admin/economy/company", MuxPattern: PatternIntroduceCompany, RequestType: "IntroduceCompanyReq", ResponseType: "DashboardStateResp"}, fn)
+		}
+		h.IntroduceCompany = fn
+	}
 	if h.GetDashboard == nil {
 		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var req GetDashboardReq

@@ -60,3 +60,9 @@ jobs:
           for module in pkg contracts/gen/game services/game; do
             (cd "$module" && go test -race ./... && go vet ./... && go build ./...)
           done
+      - name: Reproduce economy calibration reports
+        run: |
+          make simulate-economy > /tmp/s1-industry-14d.json
+          (cd services/game && go run ./cmd/economy-sim -consumables) > /tmp/s1-consumables-costs.json
+          cmp /tmp/s1-industry-14d.json docs/design/04-seasons/simulation/s1-industry-14d.json
+          cmp /tmp/s1-consumables-costs.json docs/design/04-seasons/simulation/s1-consumables-costs.json

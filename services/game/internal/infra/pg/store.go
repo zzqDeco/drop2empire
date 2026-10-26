@@ -61,6 +61,7 @@ INSERT INTO d2e_players(handle, state_json)
  LATERAL jsonb_each(COALESCE(state_json->'players','{}'::jsonb)) entry;
 UPDATE d2e_world_state SET state_json = state_json - 'players';
 `},
+	{Version: 3, SQL: `CREATE TABLE d2e_economy_audit (record_id text PRIMARY KEY, kind text NOT NULL, company_id text NOT NULL, actor text NOT NULL, occurred_at timestamptz NOT NULL, data jsonb NOT NULL);`},
 }
 
 type Store struct {
@@ -111,6 +112,9 @@ func (s *Store) LoadWorld(ctx context.Context, now time.Time) (*domain.WorldStat
 	if err := json.Unmarshal(raw, &w); err != nil {
 		return nil, err
 	}
+	if w.Economy == nil || w.Economy.Version != 1 {
+		return nil, domain.ErrPrecondition("economy_restart_required", "新经济规则要求清档重开，请按上线手册重新初始化经济数据库")
+	}
 	w.Players = make(map[string]*domain.PlayerState)
 	// Global transactions always lock realm first, then players in handle order.
 	// Raid transactions lock only their player and never acquire the realm lock.
@@ -139,6 +143,9 @@ func (s *Store) LoadWorld(ctx context.Context, now time.Time) (*domain.WorldStat
 }
 
 func (s *Store) SaveWorld(ctx context.Context, world *domain.WorldState) error {
+	if err := domain.CheckEconomy(world); err != nil {
+		return err
+	}
 	meta := *world
 	meta.Players = nil
 	raw, err := json.Marshal(&meta)
@@ -165,6 +172,12 @@ SET state_json = EXCLUDED.state_json, updated_at = now()
 			return err
 		}
 	}
+	for _, record := range world.PendingEconomyRecords {
+		if _, err := s.db.Exec(ctx, `INSERT INTO d2e_economy_audit(record_id,kind,company_id,actor,occurred_at,data) VALUES($1,$2,$3,$4,$5,$6::jsonb)`, record.ID, record.Kind, record.Company, record.Actor, record.At, string(record.Data)); err != nil {
+			return err
+		}
+	}
+	world.PendingEconomyRecords = nil
 	// PendingTrades and PendingCollectibles record only new fills/mints from this transaction.
 	for _, tr := range world.PendingTrades {
 		_, err = s.db.Exec(ctx, `
@@ -264,9 +277,13 @@ func sessionTarget(raw string) (string, bool) {
 
 func (s *Store) LoadSessionPlayer(ctx context.Context, token string) (*domain.PlayerState, bool, error) {
 	var raw string
-	err := s.db.QueryRow(ctx, `SELECT COALESCE(state_json->'sessions'->>$1,'') FROM d2e_world_state WHERE realm_id='realm-main'`, token).Scan(&raw)
+	var economyVersion int
+	err := s.db.QueryRow(ctx, `SELECT COALESCE(state_json->'sessions'->>$1,''), COALESCE((state_json->'economy'->>'version')::int,0) FROM d2e_world_state WHERE realm_id='realm-main'`, token).Scan(&raw, &economyVersion)
 	if err != nil && !postgres.IsNoRows(err) {
 		return nil, false, err
+	}
+	if err == nil && economyVersion != 1 {
+		return nil, false, domain.ErrPrecondition("economy_restart_required", "新经济规则要求清档重开，请按上线手册重新初始化经济数据库")
 	}
 	if raw == "" {
 		return nil, false, domain.ErrUnauthorized("登录会话已过期，请重新登录")

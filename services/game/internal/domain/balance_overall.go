@@ -9,10 +9,10 @@ const (
 	OfflineCapSeconds int64 = 8 * 3600
 	// DailyWarBudgetCap is the per-member daily armament deployment cap.
 	DailyWarBudgetCap int32 = 100
-	// MarketTaxBps is 1.00% (100 bps) on spot trades: 0.50% burned, 0.50% to public treasury.
+	// MarketTaxBps is 1.00% on spot trades, entirely transferred to treasury.
 	MarketTaxBps int64 = 100
-	// MarketBurnShareBps is 50 bps (half of the 100 bps tax).
-	MarketBurnShareBps int64 = 50
+	// MarketBurnShareBps is zero; only an explicit monetary policy cancels currency.
+	MarketBurnShareBps int64 = 0
 	// ChestRedeemCostPoints is the Activity Points required to redeem 1 Season Chest.
 	ChestRedeemCostPoints int32 = 100
 )
@@ -36,15 +36,15 @@ var OverallBalance = struct {
 	VeteranResourcesUnits  map[string]int64
 	VeteranInstalledEquips map[string]int32
 }{
-	TreasuryInitialGoldBasis: 5_000_000 * GoldScale,
-	NPCInitialGoldBasis:      2_000_000 * GoldScale,
+	TreasuryInitialGoldBasis: 0,
+	NPCInitialGoldBasis:      0,
 	MaxEventLogEntries:       40,
 	InviteExpireDays:         7,
 
 	VeteranPopulationTotal: 45,
 	VeteranPhase:           3,
 	VeteranActivityPoints:  260,
-	VeteranGrantGoldBasis:  1850 * GoldScale,
+	VeteranGrantGoldBasis:  0,
 	VeteranSimElapsedSec:   2400,
 	VeteranWorkers: map[string]int32{
 		JobWater:      18,
@@ -68,25 +68,25 @@ var OverallBalance = struct {
 		BPScoutCamp:        1,
 	},
 	VeteranResourcesUnits: map[string]int64{
-		ResWater:           12500,
-		ResWood:            4800,
-		ResStone:           2100,
-		ResIronIngot:       28,
-		ResRation:          36,
-		ResAutoPump:        3,
-		ResInfantryKit:     16,
-		ResArcherKit:       12,
-		ResCavalryKit:      10,
-		ResSeasonChest:     2,
-		ResFlint:           14,
-		ResAncientShard:    5,
-		ResMeteorOre:       2,
-		ResBPCrossbow:      1,
-		ResBPSpringBoots:   1,
-		ResCosSteamCrown:   1,
-		ResCosHydroWings:   1,
-		ResCosAlchLantern:  1,
-		ResCosMechOwl:      1,
+		ResWater:          12500,
+		ResWood:           4800,
+		ResStone:          2100,
+		ResIronIngot:      28,
+		ResRation:         36,
+		ResAutoPump:       3,
+		ResInfantryKit:    16,
+		ResArcherKit:      12,
+		ResCavalryKit:     10,
+		ResSeasonChest:    2,
+		ResFlint:          14,
+		ResAncientShard:   5,
+		ResMeteorOre:      2,
+		ResBPCrossbow:     1,
+		ResBPSpringBoots:  1,
+		ResCosSteamCrown:  1,
+		ResCosHydroWings:  1,
+		ResCosAlchLantern: 1,
+		ResCosMechOwl:     1,
 	},
 	VeteranInstalledEquips: map[string]int32{
 		ResAutoPump:     2,

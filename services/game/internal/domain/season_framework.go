@@ -10,12 +10,13 @@ import (
 var SeasonResetRules = []string{
 	"聚落人口、物资、已研究技术、建筑、改良与工程进度全部归零，恢复初始营地",
 	"终身职业抉择、工坊装槽设备及三系军备库存全部归零",
-	"玩家流通与托管金币、开放挂单及商会城池战驻军全部归零",
+	"玩家开放挂单撤回，商会城池战驻军归零；金币继续保留",
 	"本赛季已研读的荒原高阶蓝图配方（bp_*）与赛季安全保险箱等级重置为 1 格",
 }
 
 // SeasonRetentionRules lists what is permanently preserved across all seasons (docs/design/04-seasons/season-framework.md).
 var SeasonRetentionRules = []string{
+	"金币余额、货币联盟账本、公司资产、认购、股权与股东决策跨季保留",
 	"账号身份、历史赛季徽章与累积收藏家声望永久保留",
 	"已获取的赛季限定动态领主外观（cos_* 头饰/背饰/手持/随从）与穿戴配置永久保留",
 	"已开启铸造的唯一序列号程序化纹理藏品（Collectibles）永久保留",
@@ -107,19 +108,18 @@ func isCosmeticKey(key string) bool {
 
 // RolloverSeason executes an authoritative cross-season rollover:
 //   - Increments SeasonNumber, updates SeasonCode and SeasonName.
-//   - Resets central monetary ledger, CLOB market orders, and Chamber War map.
-//   - Resets each player's settlement, population, non-cosmetic resources, profession, gold, learned raid blueprints, and raid gear/safebox.
-//   - Permanently preserves each player's owned cosmetics (including any cosmetics frozen in open ASK orders) and minted Collectibles.
+//   - Cancels player orders and resets the Chamber War map; institutional orders remain.
+//   - Resets seasonal settlement, profession, non-financial materials and raid progression.
+//   - Preserves currency, institutions, IPOs, shares, governance, cosmetics and Collectibles.
 func RolloverSeason(w *WorldState, nextSeasonTitle string, now time.Time) {
 	EnsureSeasonState(w, now)
 
-	// 1. Return any frozen cosmetic ASK orders to their makers before wiping orders
-	for i := range w.Orders {
-		o := &w.Orders[i]
-		if o.Status == "OPEN" && !o.IsNPC && o.Side == "ASK" && isCosmeticKey(o.ItemKey) && o.RemainingMilli > 0 {
-			if pl, ok := w.Players[o.MakerHandle]; ok && pl != nil {
-				pl.FrozenResourcesMilli[o.ItemKey] = 0
-				pl.ResourcesMilli[o.ItemKey] += o.RemainingMilli
+	// Financial accounts and institutions persist across content seasons.
+	// Cancel player orders before resetting seasonal physical stock.
+	for _, o := range append([]MarketOrder{}, w.Orders...) {
+		if o.Status == "OPEN" {
+			if p := w.Players[o.MakerHandle]; p != nil {
+				_ = CancelMarketOrder(w, p, o.ID, now)
 			}
 		}
 	}
@@ -134,19 +134,8 @@ func RolloverSeason(w *WorldState, nextSeasonTitle string, now time.Time) {
 	w.SeasonName = title
 	w.SeasonStartedAt = now.UTC().Format("2006-01-02 15:04:05")
 
-	// 3. Reset Macro Economy & War Ledger
-	treasuryInit := int64(5_000_000) * GoldScale
-	npcInit := int64(2_000_000) * GoldScale
-	w.TotalIssuedBasis = treasuryInit + npcInit
-	w.NPCHeldBasis = npcInit
-	w.TreasuryHeldBasis = treasuryInit
-	w.PermanentlyBurnedBasis = 0
-	for _, r := range ResourceCatalog {
-		w.LastPricesBasis[r.Key] = r.InitPriceBasis
-		w.OpenPriceBasis[r.Key] = r.InitPriceBasis
-	}
-	w.Orders = []MarketOrder{}
-	w.Trades = []MarketTrade{}
+	// The monetary union, IPOs, corporate assets and share ownership are not
+	// seasonal rewards. Their ledgers and audit trail survive this rollover.
 	w.WarDay = 1
 	w.LastWarPeriod = WarPeriod(now)
 	w.ObsidianScore = 35
@@ -162,12 +151,12 @@ func RolloverSeason(w *WorldState, nextSeasonTitle string, now time.Time) {
 		}
 		savedCosmetics := make(map[string]int64)
 		for k, v := range p.ResourcesMilli {
-			if isCosmeticKey(k) && v > 0 {
+			if (isCosmeticKey(k) || strings.HasPrefix(k, "share:")) && v > 0 {
 				savedCosmetics[k] = v
 			}
 		}
 		for k, v := range p.FrozenResourcesMilli {
-			if isCosmeticKey(k) && v > 0 {
+			if (isCosmeticKey(k) || strings.HasPrefix(k, "share:")) && v > 0 {
 				savedCosmetics[k] += v
 			}
 		}
@@ -207,7 +196,7 @@ func RolloverSeason(w *WorldState, nextSeasonTitle string, now time.Time) {
 		p.ActiveEdicts = map[string]bool{}
 		p.ActiveExpedition = nil
 		p.InstalledEquipments = map[string]int32{}
-		p.GoldBasis = 0
+		p.Professional = nil
 		p.GoldFrozenBasis = 0
 		p.ActivityPoints = 0
 		p.DailyWarBudgetUsed = 0
@@ -225,7 +214,7 @@ func RolloverSeason(w *WorldState, nextSeasonTitle string, now time.Time) {
 		p.RaidLoadout = RaidLoadoutState{}
 		EnsureRaidState(p)
 
-		AppendLog(p, now, "COLLECTIBLE", fmt.Sprintf("★ 新赛季【%s】已开启！聚落与宏观经济已重置，你的赛季限定动态外观与历史唯一藏品已永久保留。", w.SeasonName))
+		AppendLog(p, now, "COLLECTIBLE", fmt.Sprintf("★ 新赛季【%s】已开启！聚落进度已重置；金币、公司股份、赛季外观与历史藏品继续保留。", w.SeasonName))
 	}
 
 	SeedNPCMarket(w, now)

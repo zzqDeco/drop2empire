@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { ICON } from "./icons";
 
 const srcDir = dirname(fileURLToPath(import.meta.url));
-const cssFiles = ["tokens.css", "styles.css", "layout.css"];
+const cssFiles = readdirSync(srcDir).filter(file => file.endsWith(".css")).sort();
 
 function parseHex(hex: string) {
   const clean = hex.replace("#", "").trim().toLowerCase();
@@ -205,10 +205,7 @@ describe("Blueprint & Ink design tokens & WCAG AA contrast", () => {
     }
 
     // Reverse check: every static className used in .tsx must be defined in styles.css or layout.css
-    const fullCss =
-      readFileSync(join(srcDir, "styles.css"), "utf8") +
-      "\n" +
-      readFileSync(join(srcDir, "layout.css"), "utf8");
+    const fullCss = cssFiles.map(file => readFileSync(join(srcDir, file), "utf8")).join("\n");
     const definedClasses = new Set<string>();
     for (const m of fullCss.matchAll(/\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g)) {
       definedClasses.add(m[1]);

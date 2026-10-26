@@ -218,8 +218,8 @@ func TestParallelProjectsRewardOnceAndSeasonReset(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if p.GoldBasis != 500*GoldScale {
-		t.Fatal("starter award missing")
+	if p.GoldBasis != 0 {
+		t.Fatal("graduation must not issue or transfer Gold")
 	}
 	assertMacroLedgerIdentity(t, w)
 	if err := UnlockBlueprint(w, p, BPMysteryTreasure, now); err == nil {
@@ -247,7 +247,7 @@ func TestAllOpeningStrategiesPreserveLedgerAndNeedNoFurtherClicks(t *testing.T) 
 		if !run.Completed {
 			t.Fatal(run.FailureReason)
 		}
-		if p.TotalManualClicks != 10 || p.GoldBasis != 500*GoldScale {
+		if p.TotalManualClicks != 10 || p.GoldBasis != 0 {
 			t.Fatal("bootstrap used hidden clicks or rewards")
 		}
 		for _, v := range p.ResourcesMilli {

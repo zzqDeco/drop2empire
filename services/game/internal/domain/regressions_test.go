@@ -177,6 +177,11 @@ func TestMarketFIFOAcrossDecimalBoundaryAndEveryFillRetained(t *testing.T) {
 	w.Trades = nil
 	w.NextOrderSeq = 98
 	buyer := w.Players["archon_demo"]
+	fundPlayerByProcurement(t, w, buyer, 100*GoldScale, now)
+	w.PendingTrades = nil
+	w.Trades = nil
+	w.Orders = nil
+	w.NextOrderSeq = 98
 	for i := 0; i < 65; i++ {
 		p := NewBlankPlayer(fmt.Sprintf("seller_%02d", i), now)
 		p.Profession = ProfScientist

@@ -553,7 +553,160 @@ export interface PlayerProfileDTO {
   isAdmin: boolean;
 }
 
+export interface InventoryAmountDTO {
+  itemKey: string;
+  name: string;
+  quantityMilli: number;
+  frozenMilli: number;
+}
+
+export interface ConsumableDTO {
+  itemKey: string;
+  name: string;
+  profession: string;
+  use: string;
+  effect: string;
+  inventoryMilli: number;
+  outputMilli: number;
+  seconds: number;
+  costs: CostItemDTO[];
+}
+
+export interface ProfessionalDTO {
+  level: number;
+  facilityName: string;
+  buildCosts: CostItemDTO[];
+  queueItem: string;
+  queueOutputMilli: number;
+  remainingSeconds: number;
+  productionMode: string;
+  productionCharges: number;
+  constructionTool: boolean;
+  guildTool: boolean;
+  sigilSeconds: number;
+  consumables: ConsumableDTO[];
+}
+
+export interface CompanyPlanDTO {
+  route: string;
+  activeLines: number;
+  askPriceBasis: number;
+  inputBudgetBasis: number;
+  pack: string;
+  expandWith: string;
+  dividendBasis: number;
+  capitalBudgetBasis: number;
+}
+
+export interface CompanyRouteDTO {
+  code: string;
+  seconds: number;
+  inputs: CostItemDTO[];
+}
+
+export interface CompanyVoteDTO {
+  id: number;
+  endsAt: string;
+  yesShares: number;
+  noShares: number;
+  myWeight: number;
+  myBallot: string;
+  result: string;
+  plan: CompanyPlanDTO;
+}
+
+export interface CompanyDTO {
+  id: string;
+  name: string;
+  asset: string;
+  outputKey: string;
+  outputName: string;
+  outputMilli: number;
+  status: string;
+  cashBasis: number;
+  escrowBasis: number;
+  revenueBasis: number;
+  profitBasis: number;
+  dividendsBasis: number;
+  totalShares: number;
+  ipoPriceBasis: number;
+  ipoMinimumShares: number;
+  ipoEndsAt: string;
+  subscribedShares: number;
+  mySubscription: number;
+  myShares: number;
+  myFrozenShares: number;
+  bestBidBasis: number;
+  bestAskBasis: number;
+  lastTradeBasis: number;
+  lines: number;
+  runningLines: number;
+  completedBatches: number;
+  statusReason: string;
+  nextVoteAt: string;
+  plan: CompanyPlanDTO;
+  vote: CompanyVoteDTO;
+  routes: CompanyRouteDTO[];
+  inventory: InventoryAmountDTO[];
+  expansionPack: string;
+  expansionBudgetBasis: number;
+}
+
+export interface MonetaryPolicyDTO {
+  id: string;
+  action: string;
+  amountBasis: number;
+  itemKey: string;
+  quantityMilli: number;
+  priceBasis: number;
+  at: string;
+}
+
+export interface EconomyStateDTO {
+  professional: ProfessionalDTO;
+  companies: CompanyDTO[];
+  companyCatalog: CompanyDTO[];
+  issuedBasis: number;
+  cancelledBasis: number;
+  reserveBasis: number;
+  publicCashBasis: number;
+  corporateCashBasis: number;
+  ipoEscrowBasis: number;
+  holdingsBasis: number;
+  policies: MonetaryPolicyDTO[];
+  publicInventory: InventoryAmountDTO[];
+}
+
+export interface EconomyActionReq {
+  commandSeq: number;
+  action: string;
+  target: string;
+  option: string;
+  quantity: number;
+  voteId: number;
+  approve: boolean;
+  plan: CompanyPlanDTO;
+}
+
+export interface MonetaryPolicyReq {
+  policyId: string;
+  action: string;
+  amountBasis: number;
+  itemKey: string;
+  quantityMilli: number;
+  priceBasis: number;
+}
+
+export interface IntroduceCompanyReq {
+  companyId: string;
+  shares: number;
+  priceBasis: number;
+  minimumShares: number;
+  durationHours: number;
+}
+
 export interface DashboardStateResp {
+  economy: EconomyStateDTO;
   settlement: SettlementProgressDTO;
   revision: number;
   serverTime: string;
@@ -815,6 +968,33 @@ export interface Benchmark30mResp {
 // ============================================================================
 
 export const IDL_ROUTES = {
+  EconomyAction: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/economy/action",
+    clientPath: "/empire/economy/action",
+    requestType: "EconomyActionReq",
+    responseType: "DashboardStateResp",
+  },
+  MonetaryPolicy: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/admin/economy/policy",
+    clientPath: "/empire/admin/economy/policy",
+    requestType: "MonetaryPolicyReq",
+    responseType: "DashboardStateResp",
+  },
+  IntroduceCompany: {
+    service: "EmpireService",
+    namespace: "game.empire",
+    method: "POST",
+    path: "/api/v1/empire/admin/economy/company",
+    clientPath: "/empire/admin/economy/company",
+    requestType: "IntroduceCompanyReq",
+    responseType: "DashboardStateResp",
+  },
   GetDashboard: {
     service: "EmpireService",
     namespace: "game.empire",

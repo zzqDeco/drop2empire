@@ -1,3 +1,6 @@
+import { EconomyWorkspace, CompanyPortfolio } from "./EconomyWorkspace";
+import { EconomyEvents } from "./EconomyEvents";
+import "./economy.css";
 import { belongsToSession, mergeServerUpdate, type ServerUpdate } from "./serverState";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -28,7 +31,6 @@ import {
 import { AdminConsoleView } from "./AdminConsoleView";
 import {
   ImperialAnnouncementModal,
-  MarketSceneView,
   SeasonRelicVaultPanel,
   SettingsChronicleModal,
   WarGuildSceneView,
@@ -210,6 +212,8 @@ export function App() {
     },
     [applyServerState],
   );
+
+  useEffect(() => { if (!noticeBanner) return; const timer = window.setTimeout(() => setNoticeBanner(null), 5000); return () => window.clearTimeout(timer); }, [noticeBanner]);
 
   const handleLogout = async () => {
     setBusy(true);
@@ -487,6 +491,7 @@ export function App() {
     player.profession === "none" &&
     !treasureUnlocked;
 
+  const retainedPortfolio = player.profession === "none" && state.economy.companies.length > 0;
   const hasAnyWaterYet = liveWaterMilli > 0 || totalClicks > 0;
   const canSeeFirstRecruit =
     liveWaterMilli >= SETTLEMENT_UI_CONFIG.firstRecruitWaterMilli ||
@@ -623,6 +628,9 @@ export function App() {
             </section>
           </div>
         </main>
+        {retainedPortfolio && <details className="subpanel"><summary>跨季公司与股权</summary><CompanyPortfolio state={state} busy={busy} runAction={runAction} /></details>}
+        <EconomyEvents state={state} />
+        {errorBanner && <p role="alert" className="status-banner status-danger economy-toast">{errorBanner}</p>}
       </div>
     );
   }
@@ -639,7 +647,8 @@ export function App() {
     state.cosmetics.some((c) => c.ownedCount > 0) ||
     state.collectibles.length > 0;
 
-  const unlockedResources = resources.filter((r) => r.unlocked);
+  const unlockedResources = resources.filter((r) => r.unlocked &&
+    (!['consumable', 'corporate'].includes(r.tier) || r.amountMilli > 0 || r.frozenMilli > 0));
   const unlockedJobs = jobs.filter((j) => j.unlocked);
   const unlockedEdicts = (state.edicts ?? []).filter((e) => e.unlocked);
   const waterJob = jobs.find((j) => j.jobKey === "water");
@@ -671,6 +680,9 @@ export function App() {
 
   return (
     <div className="app-shell" onClickCapture={handleGlobalButtonPop}>
+      <EconomyEvents key={state.player.handle} state={state} />
+      {retainedPortfolio && !isOpeningStage && <details className="subpanel"><summary>跨季公司与股权</summary><CompanyPortfolio state={state} busy={busy} runAction={runAction} /></details>}
+
       {/* ========================================================================
           GRAND IMPERIAL CREST HEADER (无冗余左上角品牌/小人，强化人口/金币/积分纹章边框)
           ======================================================================== */}
@@ -754,13 +766,13 @@ export function App() {
         </div>
       </header>
 
-      {(errorBanner || noticeBanner || player.offlineAwardSummary) && (
+      {(errorBanner || noticeBanner) && (
         <div
-          className={`status-banner ${errorBanner ? "status-danger" : "status-info"}`}
+          className={`status-banner economy-toast ${errorBanner ? "status-danger" : "status-info"}`}
           role="status"
         >
           <span>
-            {errorBanner || noticeBanner || player.offlineAwardSummary}
+            {errorBanner || noticeBanner}
           </span>
           <button
             type="button"
@@ -780,9 +792,9 @@ export function App() {
           ======================================================================== */}
       {activeScene === "settlement" && (
         <div key="scene-settlement">
-          <div className="status-banner status-info" aria-label="聚落进展">
+          {!showAdvancedWorld && <div className="status-banner status-info" aria-label="聚落进展">
             <div><strong>{storyChapter.tag}</strong><p>{storyChapter.text}</p></div>
-          </div>
+          </div>}
           {showProfessionChoice && (
             <section className="profession-gate-banner" aria-label="选择职业">
               <div className="section-head">
@@ -1290,7 +1302,7 @@ export function App() {
           ======================================================================== */}
       {activeScene === "market" && showAdvancedWorld && (
         <div key="scene-market" style={{ marginTop: "var(--space-3)" }}>
-          <MarketSceneView state={state} runAction={runAction} />
+          <EconomyWorkspace state={state} busy={busy} runAction={runAction} />
         </div>
       )}
 

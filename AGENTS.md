@@ -16,7 +16,7 @@
   - The operator console (`/admin`) and `/api/v1/empire/admin/*` routes are bound exclusively to host loopback (`127.0.0.1:18480` -> `:8081` with `X-D2E-Admin-Tunnel: 1`) for SSH local port forwarding (`ssh -L 18480:127.0.0.1:18480`). Never expose admin controls, simulator buttons, or invite generators on the player UI.
 - **Authoritative Server State & Fixed-Point Accounting**:
   - Never use floating-point accumulators for balances. Physical resources use integer milli-units (`1.000 = 1,000`), and currency uses integer basis-units (`1.0000 Gold = 10,000`).
-  - Maintain the Monetary Supply Identity (`M_issued = M_player + M_escrow + M_npc + M_treasury`) across every market match, crafting fee, war stipend, and tax burn.
+  - Maintain the Monetary Supply Identity (`M_issued = M_player + M_escrow + M_npc + M_treasury + M_union_reserve + M_public + M_company + M_ipo_escrow`) across every market match, crafting fee, funded war stipend and monetary policy. Public/company terms include their order escrow. Only explicit planner policies issue or cancel currency; taxes transfer to treasury.
   - Maintain strict economic isolation between settlement production and the 2D wasteland extraction roguelite: the roguelite consumes settlement resources (`water/wood/charcoal/stone/flint`) and outputs only non-producible tactical consumables, single-use tradable blueprints (`bp_*`), and ultra-low-drop-rate tradable seasonal cosmetics (`cos_*`). Never introduce "100% guaranteed cosmetic drop" buffs.
 - **Blueprint & Ink Design System (`apps/web`)**:
   - All colors, surfaces, radii, shadows, and typography scales live in `apps/web/src/tokens.css`.

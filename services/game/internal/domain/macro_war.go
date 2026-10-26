@@ -127,8 +127,17 @@ func PerformGuildAction(w *WorldState, p *PlayerState, action, guildID, name, ta
 		waterCost := MacroBalance.GuildCreateWaterCostMilli
 		woodCost := MacroBalance.GuildCreateWoodCostMilli
 		stoneCost := MacroBalance.GuildCreateStoneCostMilli
+		useTool := p.Professional != nil && p.Professional.GuildTool
+		if useTool {
+			waterCost = waterCost * 92 / 100
+			woodCost = woodCost * 92 / 100
+			stoneCost = stoneCost * 92 / 100
+		}
 		if p.ResourcesMilli[ResWater] < waterCost || p.ResourcesMilli[ResWood] < woodCost || p.ResourcesMilli[ResStone] < stoneCost {
 			return ErrPrecondition("insufficient_resources", "创建新公会需要建造驻地物资：清水 100、木材 60、石料 30")
+		}
+		if useTool {
+			p.Professional.GuildTool = false
 		}
 		p.ResourcesMilli[ResWater] -= waterCost
 		p.ResourcesMilli[ResWood] -= woodCost
@@ -174,8 +183,17 @@ func PerformGuildAction(w *WorldState, p *PlayerState, action, guildID, name, ta
 		waterCost := MacroBalance.GuildDonateWaterCostMilli
 		woodCost := MacroBalance.GuildDonateWoodCostMilli
 		stoneCost := MacroBalance.GuildDonateStoneCostMilli
+		useTool := p.Professional != nil && p.Professional.GuildTool
+		if useTool {
+			waterCost = waterCost * 92 / 100
+			woodCost = woodCost * 92 / 100
+			stoneCost = stoneCost * 92 / 100
+		}
 		if p.ResourcesMilli[ResWater] < waterCost || p.ResourcesMilli[ResWood] < woodCost || p.ResourcesMilli[ResStone] < stoneCost {
 			return ErrPrecondition("insufficient_resources", "公会后勤物资捐献需：清水 80、木材 50、石料 25")
+		}
+		if useTool {
+			p.Professional.GuildTool = false
 		}
 		p.ResourcesMilli[ResWater] -= waterCost
 		p.ResourcesMilli[ResWood] -= woodCost
@@ -393,12 +411,45 @@ func DeployWarTroops(w *WorldState, p *PlayerState, nodeID string, infDelta, arc
 }
 
 func ComputeWeightedPower(side Troops, opp Troops, defenseBonusPct int32) int64 {
+	return computeCalibratedPower(side, opp, defenseBonusPct, false)
+}
+
+func EffectiveNodeDefenseBonus(n WarNodeState) int32 {
+	bonus := n.DefenseBonusPct
+	if n.Consumables[n.OwnerGuild+":"+ResWard] {
+		bonus += 8
+	}
+	return bonus
+}
+
+func WarConsumableSummary(n WarNodeState) string {
+	var effects []string
+	for _, side := range []struct{ code, name string }{{GuildObsidian, "黑曜"}, {GuildArgent, "白银"}} {
+		for _, item := range []string{ResCalibration, ResMedic, ResWard} {
+			if n.Consumables[side.code+":"+item] {
+				effects = append(effects, side.name+"·"+ResourceName(item))
+			}
+		}
+	}
+	return strings.Join(effects, "，")
+}
+
+func computeCalibratedPower(side Troops, opp Troops, defenseBonusPct int32, calibrated bool) int64 {
 	totalSide := side.Total()
 	if totalSide <= 0 {
 		return 0
 	}
 	totalOpp := opp.Total()
 	kBps := MacroBalance.WarCounterMatrixBps
+	if calibrated {
+		for i := range kBps {
+			for j, v := range kBps[i] {
+				if v < 10000 {
+					kBps[i][j] = (v + 10000) / 2
+				}
+			}
+		}
+	}
 	sArr := [3]int64{int64(side.Infantry), int64(side.Archer), int64(side.Cavalry)}
 	oArr := [3]int64{int64(opp.Infantry), int64(opp.Archer), int64(opp.Cavalry)}
 
@@ -476,6 +527,19 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 		obs := n.ObsidianTroops
 		arg := n.ArgentTroops
 		neu := n.NeutralGarrison
+		defenseBonus := EffectiveNodeDefenseBonus(*n)
+		power := func(side, opp Troops, def int32, faction string) int64 {
+			return computeCalibratedPower(side, opp, def, n.Consumables[faction+":"+ResCalibration])
+		}
+		lossRate := func(loss int32, faction string) int32 {
+			if n.Consumables[faction+":"+ResMedic] {
+				loss = max(int32(0), loss-5)
+			}
+			return loss
+		}
+		attrition := func(side Troops, loss int32, faction string) Troops {
+			return ApplyAttrition(side, lossRate(loss, faction))
+		}
 
 		var atkMilli, defMilli int64
 		winner := prevOwner
@@ -484,78 +548,78 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 		switch prevOwner {
 		case GuildObsidian:
 			if arg.Total() > 0 {
-				atkMilli = ComputeWeightedPower(arg, obs, 0)
-				defMilli = ComputeWeightedPower(obs, arg, n.DefenseBonusPct)
+				atkMilli = power(arg, obs, 0, GuildArgent)
+				defMilli = power(obs, arg, defenseBonus, GuildObsidian)
 				if atkMilli > defMilli {
 					winner = GuildArgent
-					n.ArgentTroops = ApplyAttrition(arg, winLoss)
-					n.ObsidianTroops = ApplyAttrition(obs, loseLoss)
-					casualtyText = fmt.Sprintf("白银同盟攻破城防（胜方战损 %d%%，守军战损 %d%%）", winLoss, loseLoss)
+					n.ArgentTroops = attrition(arg, winLoss, GuildArgent)
+					n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
+					casualtyText = fmt.Sprintf("白银同盟攻破城防（胜方战损 %d%%，守军战损 %d%%）", lossRate(winLoss, GuildArgent), lossRate(loseLoss, GuildObsidian))
 				} else {
 					winner = GuildObsidian
-					n.ObsidianTroops = ApplyAttrition(obs, winLoss)
-					n.ArgentTroops = ApplyAttrition(arg, loseLoss)
-					casualtyText = fmt.Sprintf("黑曜商会依托 +%d%% 城防成功守住节点（守军战损 %d%%，攻方战损 %d%%）", n.DefenseBonusPct, winLoss, loseLoss)
+					n.ObsidianTroops = attrition(obs, winLoss, GuildObsidian)
+					n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
+					casualtyText = fmt.Sprintf("黑曜商会依托 +%d%% 城防成功守住节点（守军战损 %d%%，攻方战损 %d%%）", defenseBonus, lossRate(winLoss, GuildObsidian), lossRate(loseLoss, GuildArgent))
 				}
 			} else {
-				defMilli = ComputeWeightedPower(obs, Troops{}, n.DefenseBonusPct)
+				defMilli = power(obs, Troops{}, defenseBonus, GuildObsidian)
 			}
 
 		case GuildArgent:
 			if obs.Total() > 0 {
-				atkMilli = ComputeWeightedPower(obs, arg, 0)
-				defMilli = ComputeWeightedPower(arg, obs, n.DefenseBonusPct)
+				atkMilli = power(obs, arg, 0, GuildObsidian)
+				defMilli = power(arg, obs, defenseBonus, GuildArgent)
 				if atkMilli > defMilli {
 					winner = GuildObsidian
-					n.ObsidianTroops = ApplyAttrition(obs, winLoss)
-					n.ArgentTroops = ApplyAttrition(arg, loseLoss)
-					casualtyText = fmt.Sprintf("黑曜商会攻克城池（胜方战损 %d%%，守军战损 %d%%）", winLoss, loseLoss)
+					n.ObsidianTroops = attrition(obs, winLoss, GuildObsidian)
+					n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
+					casualtyText = fmt.Sprintf("黑曜商会攻克城池（胜方战损 %d%%，守军战损 %d%%）", lossRate(winLoss, GuildObsidian), lossRate(loseLoss, GuildArgent))
 				} else {
 					winner = GuildArgent
-					n.ArgentTroops = ApplyAttrition(arg, winLoss)
-					n.ObsidianTroops = ApplyAttrition(obs, loseLoss)
-					casualtyText = fmt.Sprintf("白银同盟依托 +%d%% 城防击退进攻（守军战损 %d%%，攻方战损 %d%%）", n.DefenseBonusPct, winLoss, loseLoss)
+					n.ArgentTroops = attrition(arg, winLoss, GuildArgent)
+					n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
+					casualtyText = fmt.Sprintf("白银同盟依托 +%d%% 城防击退进攻（守军战损 %d%%，攻方战损 %d%%）", defenseBonus, lossRate(winLoss, GuildArgent), lossRate(loseLoss, GuildObsidian))
 				}
 			} else {
-				defMilli = ComputeWeightedPower(arg, Troops{}, n.DefenseBonusPct)
+				defMilli = power(arg, Troops{}, defenseBonus, GuildArgent)
 			}
 
 		default: // NEUTRAL
-			obsAtk := ComputeWeightedPower(obs, neu, 0)
-			argAtk := ComputeWeightedPower(arg, neu, 0)
+			obsAtk := power(obs, neu, 0, GuildObsidian)
+			argAtk := power(arg, neu, 0, GuildArgent)
 			neuDef := ComputeWeightedPower(neu, Troops{
 				Infantry: obs.Infantry + arg.Infantry,
 				Archer:   obs.Archer + arg.Archer,
 				Cavalry:  obs.Cavalry + arg.Cavalry,
-			}, n.DefenseBonusPct)
+			}, defenseBonus)
 			defMilli = neuDef
 			if obsAtk >= argAtk {
 				atkMilli = obsAtk
 				if obsAtk > neuDef && obs.Total() > 0 {
 					winner = GuildObsidian
-					n.ObsidianTroops = ApplyAttrition(obs, winLoss)
-					n.ArgentTroops = ApplyAttrition(arg, loseLoss)
+					n.ObsidianTroops = attrition(obs, winLoss, GuildObsidian)
+					n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
 					n.NeutralGarrison = Troops{}
 					casualtyText = "黑曜商会击败中立守军与竞争者，夺取城池控制权"
 				} else if obs.Total() > 0 || arg.Total() > 0 {
-					n.ObsidianTroops = ApplyAttrition(obs, loseLoss)
-					n.ArgentTroops = ApplyAttrition(arg, loseLoss)
+					n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
+					n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
 					n.NeutralGarrison = ApplyAttrition(neu, winLoss)
-					casualtyText = fmt.Sprintf("进攻火力未突破中立城防（+%d%%），双方部队受创撤退", n.DefenseBonusPct)
+					casualtyText = fmt.Sprintf("进攻火力未突破中立城防（+%d%%），双方部队受创撤退", defenseBonus)
 				}
 			} else {
 				atkMilli = argAtk
 				if argAtk > neuDef && arg.Total() > 0 {
 					winner = GuildArgent
-					n.ArgentTroops = ApplyAttrition(arg, winLoss)
-					n.ObsidianTroops = ApplyAttrition(obs, loseLoss)
+					n.ArgentTroops = attrition(arg, winLoss, GuildArgent)
+					n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
 					n.NeutralGarrison = Troops{}
 					casualtyText = "白银同盟击败中立守军与竞争者，夺取城池控制权"
 				} else {
-					n.ObsidianTroops = ApplyAttrition(obs, loseLoss)
-					n.ArgentTroops = ApplyAttrition(arg, loseLoss)
+					n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
+					n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
 					n.NeutralGarrison = ApplyAttrition(neu, winLoss)
-					casualtyText = fmt.Sprintf("进攻火力未突破中立城防（+%d%%），双方部队受创撤退", n.DefenseBonusPct)
+					casualtyText = fmt.Sprintf("进攻火力未突破中立城防（+%d%%），双方部队受创撤退", defenseBonus)
 				}
 			}
 		}
@@ -567,6 +631,7 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 			argDelta += n.DailyScore
 		}
 
+		n.Consumables = nil
 		reports = append(reports, WarBattleNodeReport{
 			NodeID:                n.NodeID,
 			NodeName:              n.Name,

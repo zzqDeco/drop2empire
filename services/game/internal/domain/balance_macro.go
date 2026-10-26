@@ -3,10 +3,9 @@ package domain
 // MacroBalance centralizes numerical parameters for Profession starter grants, Workshop crafting fees,
 // Spot Market bounds, Guild creation/donation rules, and Chamber War combat & reward formulas.
 var MacroBalance = struct {
-	MaxCraftBatchesPerReq     int32
-	CraftingFeeBurnShareDiv   int64 // 2 -> 50% burned, 50% to treasury
-	StarterUniversalGrants    map[string]int64
-	StarterActivityPoints     int32
+	MaxCraftBatchesPerReq  int32
+	StarterUniversalGrants map[string]int64
+	StarterActivityPoints  int32
 
 	// Spot Market order validation bounds:
 	MinOrderPriceBasis int64
@@ -50,8 +49,7 @@ var MacroBalance = struct {
 	WarStipendGoldPerUnit   int64
 	MaxWarHistoryEntries    int
 }{
-	MaxCraftBatchesPerReq:   20,
-	CraftingFeeBurnShareDiv: 2,
+	MaxCraftBatchesPerReq: 20,
 	StarterUniversalGrants: map[string]int64{
 		ResIronIngot:   10 * ResourceScale,
 		ResRation:      12 * ResourceScale,
@@ -153,69 +151,6 @@ var ResourceCatalog = []ResourceMeta{
 	{Key: ResCosAetherDrake, Name: "★S1·星界以太幼龙", Tier: "cosmetic", Description: "S1传说限定随从 · 环绕飞行吐泡幼龙（可交易）", Tradable: true, InitPriceBasis: 3500000},
 }
 
-// NPCSeedOrderSpec defines an initial NPC market maker order.
-type NPCSeedOrderSpec struct {
-	ItemKey       string
-	Side          string
-	PriceBasis    int64
-	QuantityMilli int64
-	MakerHandle   string
-}
-
-var NPCMarketSeedOrders = []NPCSeedOrderSpec{
-	{ResWater, "BID", 900, 5000 * ResourceScale, "炼金师·赫尔"},
-	{ResWater, "ASK", 1100, 6000 * ResourceScale, "科学家·林格"},
-	{ResWood, "BID", 4200, 2000 * ResourceScale, "铁匠·巴隆"},
-	{ResWood, "ASK", 4800, 2500 * ResourceScale, "科学家·林格"},
-	{ResStone, "BID", 9000, 1200 * ResourceScale, "铁匠·巴隆"},
-	{ResStone, "ASK", 10200, 1400 * ResourceScale, "大法师·梅林"},
-	{ResIronIngot, "BID", 30000, 40 * ResourceScale, "科学家·林格"},
-	{ResIronIngot, "ASK", 34000, 45 * ResourceScale, "铁匠·巴隆"},
-	{ResRation, "BID", 22000, 50 * ResourceScale, "军需官·霍克"},
-	{ResRation, "ASK", 26000, 60 * ResourceScale, "炼金师·赫尔"},
-	{ResAutoPump, "BID", 170000, 4 * ResourceScale, "炼金师·赫尔"},
-	{ResAutoPump, "ASK", 192000, 5 * ResourceScale, "科学家·林格"},
-	{ResAlchCatalyst, "BID", 180000, 4 * ResourceScale, "大法师·梅林"},
-	{ResAlchCatalyst, "ASK", 205000, 5 * ResourceScale, "炼金师·赫尔"},
-	{ResEnchantScroll, "BID", 185000, 4 * ResourceScale, "铁匠·巴隆"},
-	{ResEnchantScroll, "ASK", 210000, 5 * ResourceScale, "大法师·梅林"},
-	{ResHeavyToolset, "BID", 175000, 4 * ResourceScale, "科学家·林格"},
-	{ResHeavyToolset, "ASK", 198000, 5 * ResourceScale, "铁匠·巴隆"},
-	{ResInfantryKit, "BID", 94000, 15 * ResourceScale, "黑曜军需处"},
-	{ResInfantryKit, "ASK", 104000, 15 * ResourceScale, "铁匠·巴隆"},
-	{ResArcherKit, "BID", 97000, 15 * ResourceScale, "白银军需处"},
-	{ResArcherKit, "ASK", 108000, 15 * ResourceScale, "大法师·梅林"},
-	{ResCavalryKit, "BID", 106000, 15 * ResourceScale, "黑曜军需处"},
-	{ResCavalryKit, "ASK", 118000, 15 * ResourceScale, "炼金师·赫尔"},
-	{ResSeasonChest, "BID", 420000, 3 * ResourceScale, "收藏家·维克"},
-	{ResSeasonChest, "ASK", 480000, 2 * ResourceScale, "白银军需处"},
-	{ResBPCrossbow, "BID", 200000, 2 * ResourceScale, "斥候统领·雷恩"},
-	{ResBPCrossbow, "ASK", 240000, 2 * ResourceScale, "荒原黑市商团"},
-	{ResBPSpringBoots, "BID", 220000, 2 * ResourceScale, "斥候统领·雷恩"},
-	{ResBPSpringBoots, "ASK", 260000, 2 * ResourceScale, "荒原黑市商团"},
-	{ResBPCipherSafe, "BID", 330000, 2 * ResourceScale, "收藏家·维克"},
-	{ResBPCipherSafe, "ASK", 390000, 1 * ResourceScale, "荒原黑市商团"},
-	{ResCosGoggles, "BID", 290000, 2 * ResourceScale, "收藏家·维克"},
-	{ResCosGoggles, "ASK", 350000, 1 * ResourceScale, "荒原黑市商团"},
-	{ResCosObsidianCrown, "BID", 2600000, 1 * ResourceScale, "收藏家·维克"},
-	{ResCosAstralWings, "BID", 3000000, 1 * ResourceScale, "收藏家·维克"},
-}
-
-type NPCSeedTradeSpec struct {
-	ItemKey       string
-	PriceBasis    int64
-	QuantityMilli int64
-	BuyerHandle   string
-	SellerHandle  string
-}
-
-var NPCMarketSeedTrades = []NPCSeedTradeSpec{
-	{ResAutoPump, 185000, 2 * ResourceScale, "炼金师·赫尔", "科学家·林格"},
-	{ResAlchCatalyst, 195000, 2 * ResourceScale, "铁匠·巴隆", "炼金师·赫尔"},
-	{ResEnchantScroll, 200000, 1 * ResourceScale, "科学家·林格", "大法师·梅林"},
-	{ResInfantryKit, 98000, 6 * ResourceScale, "黑曜军需处", "铁匠·巴隆"},
-}
-
 // ProfessionCatalog defines the 4 lifelong professions and their declarative stat modifiers.
 var ProfessionCatalog = []ProfessionSpec{
 	{
@@ -223,10 +158,10 @@ var ProfessionCatalog = []ProfessionSpec{
 		Name:             "科学家",
 		Title:            "工业自动化",
 		ArtifactName:     "阿基米德水力核",
-		ExclusiveOutputs: []string{"自动抽水机"},
+		ExclusiveOutputs: []string{"过载电池", "便携探测器", "火控校准包", "自动抽水机"},
 		StrengthText:     "基础资源高产",
 		WeaknessText:     "耗铁量高",
-		MarketRoleText:   "自动化设备供应",
+		MarketRoleText:   "生产加速、探索侦察与火控支援",
 		PassiveBonusText: "水/木/石效率 +15%",
 		JobEfficiencyBonusPct: map[string]int64{
 			JobWater: 15,
@@ -241,10 +176,10 @@ var ProfessionCatalog = []ProfessionSpec{
 		Name:             "炼金术士",
 		Title:            "高能催化",
 		ArtifactName:     "赫尔墨斯蒸馏釜",
-		ExclusiveOutputs: []string{"赫尔墨斯催化剂"},
-		StrengthText:     "全工坊通用增产",
+		ExclusiveOutputs: []string{"工业触媒", "恢复药剂", "战地救护包", "赫尔墨斯催化剂"},
+		StrengthText:     "制造节料与恢复支援",
 		WeaknessText:     "基础采集较慢",
-		MarketRoleText:   "催化剂供应",
+		MarketRoleText:   "制造触媒与个人、公会恢复耗材",
 		PassiveBonusText: "军粮 +20% / 水 +10%",
 		JobEfficiencyBonusPct: map[string]int64{
 			JobPrepRation: 20,
@@ -259,10 +194,10 @@ var ProfessionCatalog = []ProfessionSpec{
 		Name:             "魔法师",
 		Title:            "以太铭文",
 		ArtifactName:     "星界刻印棱镜",
-		ExclusiveOutputs: []string{"星界附魔卷轴"},
+		ExclusiveOutputs: []string{"定向符印", "闪步卷轴", "守城结界", "星界附魔卷轴"},
 		StrengthText:     "矿石与远程强化",
 		WeaknessText:     "耗木量高",
-		MarketRoleText:   "附魔卷轴供应",
+		MarketRoleText:   "定向开采、移动与城防耗材",
 		PassiveBonusText: "采石 +20% / 军粮 +15%",
 		JobEfficiencyBonusPct: map[string]int64{
 			JobStone:      20,
@@ -276,10 +211,10 @@ var ProfessionCatalog = []ProfessionSpec{
 		Name:             "工匠",
 		Title:            "重装锻造",
 		ArtifactName:     "泰坦锻造矩尺",
-		ExclusiveOutputs: []string{"泰坦精锻工具组"},
+		ExclusiveOutputs: []string{"精锻刀具", "破障工具", "工事包", "泰坦精锻工具组"},
 		StrengthText:     "冶金与军械制造",
-		WeaknessText:     "依赖外部矿源",
-		MarketRoleText:   "工具与军备供应",
+		WeaknessText:     "铁材与加工投入较高",
+		MarketRoleText:   "建设节料、破障与公会后勤",
 		PassiveBonusText: "炼铁 +25% / 伐木 +15%",
 		JobEfficiencyBonusPct: map[string]int64{
 			JobSmeltIron: 25,
@@ -472,7 +407,7 @@ func DefaultGuilds() []GuildState {
 			LeaderHandle:      "archon_demo",
 			Level:             3,
 			XP:                420,
-			TreasuryGoldBasis: 650 * GoldScale,
+			TreasuryGoldBasis: 0,
 			RallyNodeID:       "node_north_fort",
 			Announcement:      "以水力与黑曜齿轮构筑西线铁壁，优先集结北侧据点！",
 			Members: []GuildMember{
@@ -489,7 +424,7 @@ func DefaultGuilds() []GuildState {
 			LeaderHandle:      "重甲督军·岩罡",
 			Level:             2,
 			XP:                260,
-			TreasuryGoldBasis: 320 * GoldScale,
+			TreasuryGoldBasis: 0,
 			RallyNodeID:       "node_south_ferry",
 			Announcement:      "专司南线渡口重步兵攻坚，欢迎巨匠与炼金师加盟。",
 			Members: []GuildMember{
@@ -505,7 +440,7 @@ func DefaultGuilds() []GuildState {
 			LeaderHandle:      "星轨大导师·凛月",
 			Level:             3,
 			XP:                410,
-			TreasuryGoldBasis: 600 * GoldScale,
+			TreasuryGoldBasis: 0,
 			RallyNodeID:       "node_east_fort",
 			Announcement:      "星盘所指即为白银疆域，协同夺取东侧据点与中央宝藏城。",
 			Members: []GuildMember{
@@ -521,7 +456,7 @@ func DefaultGuilds() []GuildState {
 			LeaderHandle:      "翠玉炼金师·维克",
 			Level:             2,
 			XP:                240,
-			TreasuryGoldBasis: 280 * GoldScale,
+			TreasuryGoldBasis: 0,
 			RallyNodeID:       "node_center_vault",
 			Announcement:      "海量催化剂与附魔卷轴后勤支援，直插中央宝藏城。",
 			Members: []GuildMember{

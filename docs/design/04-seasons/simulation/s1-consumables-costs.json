@@ -1,0 +1,110 @@
+[
+  {
+    "item": "overload_battery",
+    "name": "过载电池",
+    "profession": "scientist",
+    "batchCostBasis": 348000,
+    "outputUnits": 5,
+    "unitCostBasis": 69600,
+    "seconds": 120
+  },
+  {
+    "item": "portable_detector",
+    "name": "便携探测器",
+    "profession": "scientist",
+    "batchCostBasis": 219500,
+    "outputUnits": 1,
+    "unitCostBasis": 219500,
+    "seconds": 90
+  },
+  {
+    "item": "fire_control_pack",
+    "name": "火控校准包",
+    "profession": "scientist",
+    "batchCostBasis": 635000,
+    "outputUnits": 2,
+    "unitCostBasis": 317500,
+    "seconds": 180
+  },
+  {
+    "item": "industrial_catalyst",
+    "name": "工业触媒",
+    "profession": "alchemist",
+    "batchCostBasis": 292000,
+    "outputUnits": 5,
+    "unitCostBasis": 58400,
+    "seconds": 120
+  },
+  {
+    "item": "recovery_potion",
+    "name": "恢复药剂",
+    "profession": "alchemist",
+    "batchCostBasis": 96000,
+    "outputUnits": 2,
+    "unitCostBasis": 48000,
+    "seconds": 90
+  },
+  {
+    "item": "field_medkit",
+    "name": "战地救护包",
+    "profession": "alchemist",
+    "batchCostBasis": 300000,
+    "outputUnits": 2,
+    "unitCostBasis": 150000,
+    "seconds": 180
+  },
+  {
+    "item": "direction_sigil",
+    "name": "定向符印",
+    "profession": "mage",
+    "batchCostBasis": 269000,
+    "outputUnits": 3,
+    "unitCostBasis": 89667,
+    "seconds": 120
+  },
+  {
+    "item": "blink_scroll",
+    "name": "闪步卷轴",
+    "profession": "mage",
+    "batchCostBasis": 102000,
+    "outputUnits": 1,
+    "unitCostBasis": 102000,
+    "seconds": 90
+  },
+  {
+    "item": "defense_ward",
+    "name": "守城结界",
+    "profession": "mage",
+    "batchCostBasis": 455000,
+    "outputUnits": 2,
+    "unitCostBasis": 227500,
+    "seconds": 180
+  },
+  {
+    "item": "fine_tool",
+    "name": "精锻刀具",
+    "profession": "artisan",
+    "batchCostBasis": 340000,
+    "outputUnits": 2,
+    "unitCostBasis": 170000,
+    "seconds": 120
+  },
+  {
+    "item": "breach_tool",
+    "name": "破障工具",
+    "profession": "artisan",
+    "batchCostBasis": 123000,
+    "outputUnits": 1,
+    "unitCostBasis": 123000,
+    "seconds": 90
+  },
+  {
+    "item": "fortification_pack",
+    "name": "工事包",
+    "profession": "artisan",
+    "batchCostBasis": 759000,
+    "outputUnits": 20,
+    "unitCostBasis": 37950,
+    "seconds": 180
+  }
+]
