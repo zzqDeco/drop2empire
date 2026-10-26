@@ -553,7 +553,162 @@ struct PlayerProfileDTO {
   19: required bool isAdmin (api.body="isAdmin")
 }
 
+
+// Economy v1: all amounts use authoritative fixed-point integers.
+struct InventoryAmountDTO {
+  1: required string itemKey (api.body="itemKey")
+  2: required string name (api.body="name")
+  3: required i64 quantityMilli (api.body="quantityMilli")
+  4: required i64 frozenMilli (api.body="frozenMilli")
+}
+
+struct ConsumableDTO {
+  1: required string itemKey (api.body="itemKey")
+  2: required string name (api.body="name")
+  3: required string profession (api.body="profession")
+  4: required string use (api.body="use")
+  5: required string effect (api.body="effect")
+  6: required i64 inventoryMilli (api.body="inventoryMilli")
+  7: required i64 outputMilli (api.body="outputMilli")
+  8: required i64 seconds (api.body="seconds")
+  9: required list<CostItemDTO> costs (api.body="costs")
+}
+
+struct ProfessionalDTO {
+  1: required i32 level (api.body="level")
+  2: required string facilityName (api.body="facilityName")
+  3: required list<CostItemDTO> buildCosts (api.body="buildCosts")
+  4: required string queueItem (api.body="queueItem")
+  5: required i64 queueOutputMilli (api.body="queueOutputMilli")
+  6: required i64 remainingSeconds (api.body="remainingSeconds")
+  7: required string productionMode (api.body="productionMode")
+  8: required i32 productionCharges (api.body="productionCharges")
+  9: required bool constructionTool (api.body="constructionTool")
+  10: required bool guildTool (api.body="guildTool")
+  11: required i64 sigilSeconds (api.body="sigilSeconds")
+  12: required list<ConsumableDTO> consumables (api.body="consumables")
+}
+
+struct CompanyPlanDTO {
+  1: required string route (api.body="route")
+  2: required i32 activeLines (api.body="activeLines")
+  3: required i64 askPriceBasis (api.body="askPriceBasis")
+  4: required i64 inputBudgetBasis (api.body="inputBudgetBasis")
+  5: required string pack (api.body="pack")
+  6: required string expandWith (api.body="expandWith")
+  7: required i64 dividendBasis (api.body="dividendBasis")
+  8: required i64 capitalBudgetBasis (api.body="capitalBudgetBasis")
+}
+
+struct CompanyRouteDTO {
+  1: required string code (api.body="code")
+  2: required i64 seconds (api.body="seconds")
+  3: required list<CostItemDTO> inputs (api.body="inputs")
+}
+
+struct CompanyVoteDTO {
+  1: required i64 id (api.body="id")
+  2: required string endsAt (api.body="endsAt")
+  3: required i64 yesShares (api.body="yesShares")
+  4: required i64 noShares (api.body="noShares")
+  5: required i64 myWeight (api.body="myWeight")
+  6: required string myBallot (api.body="myBallot")
+  7: required string result (api.body="result")
+  8: required CompanyPlanDTO plan (api.body="plan")
+}
+
+struct CompanyDTO {
+  1: required string id (api.body="id")
+  2: required string name (api.body="name")
+  3: required string asset (api.body="asset")
+  4: required string outputKey (api.body="outputKey")
+  5: required string outputName (api.body="outputName")
+  6: required i64 outputMilli (api.body="outputMilli")
+  7: required string status (api.body="status")
+  8: required i64 cashBasis (api.body="cashBasis")
+  9: required i64 escrowBasis (api.body="escrowBasis")
+  10: required i64 revenueBasis (api.body="revenueBasis")
+  11: required i64 profitBasis (api.body="profitBasis")
+  12: required i64 dividendsBasis (api.body="dividendsBasis")
+  13: required i64 totalShares (api.body="totalShares")
+  14: required i64 ipoPriceBasis (api.body="ipoPriceBasis")
+  15: required i64 ipoMinimumShares (api.body="ipoMinimumShares")
+  16: required string ipoEndsAt (api.body="ipoEndsAt")
+  17: required i64 subscribedShares (api.body="subscribedShares")
+  18: required i64 mySubscription (api.body="mySubscription")
+  19: required i64 myShares (api.body="myShares")
+  20: required i64 myFrozenShares (api.body="myFrozenShares")
+  21: required i64 bestBidBasis (api.body="bestBidBasis")
+  22: required i64 bestAskBasis (api.body="bestAskBasis")
+  23: required i64 lastTradeBasis (api.body="lastTradeBasis")
+  24: required i32 lines (api.body="lines")
+  25: required i32 runningLines (api.body="runningLines")
+  26: required i64 completedBatches (api.body="completedBatches")
+  27: required string statusReason (api.body="statusReason")
+  28: required string nextVoteAt (api.body="nextVoteAt")
+  29: required CompanyPlanDTO plan (api.body="plan")
+  30: required CompanyVoteDTO vote (api.body="vote")
+  31: required list<CompanyRouteDTO> routes (api.body="routes")
+  32: required list<InventoryAmountDTO> inventory (api.body="inventory")
+  33: required string expansionPack (api.body="expansionPack")
+  34: required i64 expansionBudgetBasis (api.body="expansionBudgetBasis")
+}
+
+struct MonetaryPolicyDTO {
+  1: required string id (api.body="id")
+  2: required string action (api.body="action")
+  3: required i64 amountBasis (api.body="amountBasis")
+  4: required string itemKey (api.body="itemKey")
+  5: required i64 quantityMilli (api.body="quantityMilli")
+  6: required i64 priceBasis (api.body="priceBasis")
+  7: required string at (api.body="at")
+}
+
+struct EconomyStateDTO {
+  1: required ProfessionalDTO professional (api.body="professional")
+  2: required list<CompanyDTO> companies (api.body="companies")
+  3: required list<CompanyDTO> companyCatalog (api.body="companyCatalog")
+  4: required i64 issuedBasis (api.body="issuedBasis")
+  5: required i64 cancelledBasis (api.body="cancelledBasis")
+  6: required i64 reserveBasis (api.body="reserveBasis")
+  7: required i64 publicCashBasis (api.body="publicCashBasis")
+  8: required i64 corporateCashBasis (api.body="corporateCashBasis")
+  9: required i64 ipoEscrowBasis (api.body="ipoEscrowBasis")
+  10: required i64 holdingsBasis (api.body="holdingsBasis")
+  11: required list<MonetaryPolicyDTO> policies (api.body="policies")
+  12: required list<InventoryAmountDTO> publicInventory (api.body="publicInventory")
+}
+
+struct EconomyActionReq {
+  1: required i64 commandSeq (api.body="commandSeq")
+  2: required string action (api.body="action")
+  3: required string target (api.body="target")
+  4: required string option (api.body="option")
+  5: required i64 quantity (api.body="quantity")
+  6: required i64 voteId (api.body="voteId")
+  7: required bool approve (api.body="approve")
+  8: required CompanyPlanDTO plan (api.body="plan")
+}
+
+struct MonetaryPolicyReq {
+  1: required string policyId (api.body="policyId")
+  2: required string action (api.body="action")
+  3: required i64 amountBasis (api.body="amountBasis")
+  4: required string itemKey (api.body="itemKey")
+  5: required i64 quantityMilli (api.body="quantityMilli")
+  6: required i64 priceBasis (api.body="priceBasis")
+}
+
+struct IntroduceCompanyReq {
+  1: required string companyId (api.body="companyId")
+  2: required i64 shares (api.body="shares")
+  3: required i64 priceBasis (api.body="priceBasis")
+  4: required i64 minimumShares (api.body="minimumShares")
+  5: required i64 durationHours (api.body="durationHours")
+}
+
 struct DashboardStateResp {
+  34: required EconomyStateDTO economy (api.body="economy")
   33: required SettlementProgressDTO settlement (api.body="settlement")
   32: required i64 revision (api.body="revision")
   1: required string serverTime (api.body="serverTime")
@@ -811,6 +966,9 @@ struct Benchmark30mResp {
 }
 
 service EmpireService {
+  DashboardStateResp EconomyAction(1: EconomyActionReq req) (api.post="/api/v1/empire/economy/action")
+  DashboardStateResp MonetaryPolicy(1: MonetaryPolicyReq req) (api.post="/api/v1/empire/admin/economy/policy")
+  DashboardStateResp IntroduceCompany(1: IntroduceCompanyReq req) (api.post="/api/v1/empire/admin/economy/company")
   DashboardStateResp GetDashboard(1: GetDashboardReq req) (api.get="/api/v1/empire/state")
   DashboardStateResp RegisterAccount(1: RegisterAccountReq req) (api.post="/api/v1/empire/auth/register")
   DashboardStateResp LoginAccount(1: LoginAccountReq req) (api.post="/api/v1/empire/auth/login")

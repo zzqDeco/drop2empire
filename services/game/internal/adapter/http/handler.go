@@ -295,10 +295,18 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 
 	recipesDTO := make([]*empire.CraftRecipeDTO, 0, len(domain.CraftRecipeCatalog))
 	for _, rc := range domain.CraftRecipeCatalog {
+		if rc.Category == "consumable" {
+			continue
+		}
 		profOK := rc.ProfessionReq == "all" || p.Profession == rc.ProfessionReq
 		resOK := p.UnlockedBlueprints[domain.BPBasicWorkshop] && p.GoldBasis >= rc.GoldCostBasis
 		costsDTO := make([]*empire.CostItemDTO, 0, len(rc.CostsMilli))
-		for _, rKey := range []string{domain.ResWater, domain.ResWood, domain.ResStone, domain.ResIronIngot, domain.ResRation} {
+		recipeKeys := make([]string, 0, len(rc.CostsMilli))
+		for k := range rc.CostsMilli {
+			recipeKeys = append(recipeKeys, k)
+		}
+		sort.Strings(recipeKeys)
+		for _, rKey := range recipeKeys {
 			reqMilli, exists := rc.CostsMilli[rKey]
 			if !exists {
 				continue
@@ -456,7 +464,12 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		default:
 			garrison = n.NeutralGarrison
 		}
-		gPower := domain.ComputeWeightedPower(garrison, domain.Troops{}, n.DefenseBonusPct)
+		defenseBonus := domain.EffectiveNodeDefenseBonus(n)
+		gPower := domain.ComputeWeightedPower(garrison, domain.Troops{}, defenseBonus)
+		intelNote := n.IntelNote
+		if effects := domain.WarConsumableSummary(n); effects != "" {
+			intelNote += "；本轮支援：" + effects
+		}
 		myDep := n.PlayerDeployed[p.Handle]
 		warNodesDTO = append(warNodesDTO, &empire.WarNodeDTO{
 			NodeId:          n.NodeID,
@@ -465,7 +478,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 			X:               n.X,
 			Y:               n.Y,
 			OwnerGuild:      n.OwnerGuild,
-			DefenseBonusPct: n.DefenseBonusPct,
+			DefenseBonusPct: defenseBonus,
 			DailyScore:      n.DailyScore,
 			IsTreasureVault: n.IsTreasureVault,
 			GarrisonPower:   gPower,
@@ -477,7 +490,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 			MyCavalry:       myDep.Cavalry,
 			CanDeploy:       deployable[n.NodeID],
 			SupplyConnected: connected[n.NodeID],
-			IntelNote:       n.IntelNote,
+			IntelNote:       intelNote,
 		})
 	}
 
@@ -781,6 +794,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	equippedCosDTO, cosmeticsDTO, raidGearsDTO, raidLoadoutDTO := mapRaidPresentation(p)
 
 	return &empire.DashboardStateResp{
+		Economy:             mapEconomy(w, p, isAdmin),
 		ServerTime:          time.Now().UTC().Format(time.RFC3339Nano),
 		Revision:            p.Revision,
 		Settlement:          mapSettlement(p, rates),
@@ -815,7 +829,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 			SeasonId:       w.SeasonCode,
 			SeasonNumber:   w.SeasonNumber,
 			Title:          w.SeasonName,
-			Subtitle:       "跨赛季重置聚落与宏观经济 · 永久保留赛季限定动态外观与唯一纹理藏品",
+			Subtitle:       "跨赛季重置聚落进度 · 保留金币、公司股权、外观与藏品",
 			StartedAt:      w.SeasonStartedAt,
 			ResetRules:     append([]string{}, domain.SeasonResetRules...),
 			RetentionRules: append([]string{}, domain.SeasonRetentionRules...),

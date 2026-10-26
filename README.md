@@ -30,7 +30,7 @@ flowchart LR
 3. **Unified Thrift IDL Pipeline**:
    - [`contracts/game/http_empire.thrift`](contracts/game/http_empire.thrift) is the single source of truth for all HTTP DTOs and routes. Running `make gen` (`./ops/codegen.sh`) deterministically generates Go Hertz route binders (`contracts/gen/game`) and the TypeScript client SDK (`packages/api-client/src/generated.ts`).
 4. **Authoritative Fixed-Point Accounting & Economic Isolation**:
-   - Resources use integer `Milli` units (`1.000 = 1,000`) and currency uses integer `Basis` units (`1.0000 Gold = 10,000`), preserving the global Monetary Supply Identity ($M_{\text{issued}} = M_{\text{player}} + M_{\text{escrow}} + M_{\text{npc}} + M_{\text{treasury}}$).
+   - Resources use integer `Milli` units (`1.000 = 1,000`) and currency uses integer `Basis` units (`1.0000 Gold = 10,000`), preserving the global Monetary Supply Identity including players, escrow, treasury, union reserves, public procurement, corporate wallets and IPO escrow.
    - The 2D Wasteland Extraction Roguelite is strictly isolated from settlement production: it consumes settlement resources and yields only non-producible tactical consumables, single-use tradable blueprints (`bp_*`), and ultra-low-drop-rate tradable seasonal cosmetics (`cos_*`).
 5. **Blueprint & Ink Design System & Zero-Spoiler Progressive Disclosure**:
    - Design tokens (`apps/web/src/tokens.css`) and tabular monospace numerals (`.mono-num`) are enforced by automated tests (`design-tokens.test.ts`).
@@ -58,9 +58,9 @@ flowchart LR
 - **12 Tradable S1 Animated Cosmetics (`cos_*`)**: Headgear, Mantle, Held Relic, and Floating Companion slots with strict low natural drop rates (`0.22%~0.85%` for Legendary items in Abyssal Vaults).
 - **Dual Real-Time Projection**: Your equipped animated cartoon character renders both in the **always-visible Lord Profile & Wardrobe Bar** under the story banner AND **directly as your moving player token on the 2D Wasteland Raid grid**.
 
-### 4. Four Professions, CLOB Spot Market & 20:00 Chamber Territory War (Macro)
-- **4 Interlocked Professions**: Scientist (`自动抽水机`), Alchemist (`赫尔墨斯催化剂`), Mage (`星界附魔卷轴`), and Artisan (`泰坦精锻工具组`).
-- **Price-Time Priority CLOB Market**: Trade resources, cross-profession devices, war gear, unlearned raid blueprints (`bp_*`), and S1 animated cosmetics (`cos_*`) with `1.00%` transaction tax (`0.50%` burned + `0.50%` to imperial treasury).
+### 4. Professions, Companies, CLOB & Chamber War (Macro)
+- **4 Professions, 12 Consumables**: Paid profession facilities and batch queues; exclusive manufacturing with universal purchase/use across production, building, exploration and guild support.
+- **Price-Time Priority CLOB Market**: Trade resources, cross-profession devices, war gear, unlearned raid blueprints (`bp_*`), and S1 animated cosmetics (`cos_*`) with `1.00%` transaction tax (entirely transferred to treasury; currency cancellation requires explicit planner policy).
 - **8-Node Chamber Territory War**: Obsidian vs. Argent 7-day war across an 8-node supply-line graph with Infantry/Archer/Cavalry counter-matrix (`1.15x / 0.90x`), daily 20:00 authoritative resolution, treasury gold stipends, and unique UV-etched procedural collectibles (`ProceduralRelicSVG`).
 
 ---
@@ -123,3 +123,10 @@ make deploy
 - **04 · Seasonal Design (赛季设计 — 赛季重置法则与当季专属内容表)**
   - [Seasonal Lifecycle & Reset/Retention Boundary (`docs/design/04-seasons/season-framework.md`)](docs/design/04-seasons/season-framework.md)
   - [Season 1: Obsidian Awakening Catalog (`docs/design/04-seasons/s1-obsidian-awakening.md`)](docs/design/04-seasons/s1-obsidian-awakening.md)
+
+
+## Persistent Economy Release
+
+Six planner-introduced companies procure through real CLOB depth and form two interdependent industrial branches with alternative recipes. IPOs use existing cash, share trading pays sellers, weekly shareholder proposals govern prices, production, capital budgets and realized-profit dividends. A planner-controlled monetary union owns issuance, funded public procurement, recall and cancellation. No tutorial Gold grant, fabricated NPC liquidity or automatic minting remains.
+
+Run `make simulate-economy` for the deterministic 14-day scenarios. See [calibration](docs/design/04-seasons/economy-calibration.md), [industry catalog](docs/design/04-seasons/s1-industry-catalog.md), and [clean-start rollout](docs/operations/economy-clean-start.md). This is a breaking **full clean-start** release; normal content-season rollover preserves financial rights.

@@ -39,9 +39,9 @@ interface SceneProps {
  * Scene III: Workshop Crafting, Cross-Profession Equipment Rack & Global CLOB Spot Market
  */
 export function MarketSceneView({ state, runAction }: SceneProps) {
-  const [selectedMarketItem, setSelectedMarketItem] = useState("auto_pump");
+  const [selectedMarketItem, setSelectedMarketItem] = useState("water");
   const [orderSide, setOrderSide] = useState<"BID" | "ASK">("BID");
-  const [orderPriceGold, setOrderPriceGold] = useState("19.20");
+  const [orderPriceGold, setOrderPriceGold] = useState("0.1");
   const [orderQtyUnits, setOrderQtyUnits] = useState("1");
 
   const selectedMarketMeta =
@@ -56,7 +56,7 @@ export function MarketSceneView({ state, runAction }: SceneProps) {
           <div className="subpanel-head">
             <h3>
               <Layers size={ICON.sm} />
-              <span>跨职业增产设备装槽</span>
+              <span>职业耗材与产业贸易</span>
             </h3>
           </div>
           <div className="equip-slot-list">
@@ -230,7 +230,7 @@ export function MarketSceneView({ state, runAction }: SceneProps) {
                       <strong>{m.itemName}</strong>
                     </td>
                     <td className="num-col mono-num">
-                      {formatGold(m.lastPriceBasis)}
+                      {m.lastPriceBasis ? formatGold(m.lastPriceBasis) : "暂无成交"}
                     </td>
                     <td className="num-col mono-num">
                       {m.bestBidBasis > 0 ? formatGold(m.bestBidBasis) : "—"} /{" "}
@@ -317,7 +317,7 @@ export function MarketSceneView({ state, runAction }: SceneProps) {
                 ).toFixed(2)}{" "}
                 G
               </span>
-              <span>税率 1% (0.5% 销毁 / 0.5% 国库)</span>
+              <span>交易税 1% · 全额进入财政账户</span>
             </div>
 
             <button
@@ -1153,7 +1153,7 @@ export function ImperialAnnouncementModal({
                 </span>
               </div>
               <div className="ledger-row">
-                <span>NPC 做市商 + 国库储备</span>
+                <span>财政账户</span>
                 <span>
                   {formatGold(
                     macroLedger.npcHeldBasis + macroLedger.treasuryHeldBasis,
@@ -1161,8 +1161,10 @@ export function ImperialAnnouncementModal({
                   G
                 </span>
               </div>
+              <div className="ledger-row"><span>联盟准备金 + 公共采购</span><span>{formatGold(state.economy.reserveBasis + state.economy.publicCashBasis)} G</span></div>
+              <div className="ledger-row"><span>公司 + IPO 托管</span><span>{formatGold(state.economy.corporateCashBasis + state.economy.ipoEscrowBasis)} G</span></div>
               <div className="ledger-row">
-                <span>累计通缩销毁</span>
+                <span>累计政策注销</span>
                 <span>{formatGold(macroLedger.permanentlyBurnedBasis)} G</span>
               </div>
             </div>
@@ -1351,7 +1353,7 @@ export function WorldMapCompassModal({
       key: "market",
       title: "皇家工坊与全球交易所",
       subtitle:
-        "跨职业增产设备装槽、四大职业独占配方制造，以及帝国中央交易所现货、蓝图与外观买卖。",
+        "建造职业设施，制造和使用耗材；参与现货交易、公司 IPO 与股东决策。",
       coord: "S 12° · E 28° (东南商埠)",
       unlocked: showAdvancedWorld,
       lockHint: "需开启【神秘的宝藏】并择定终身职业后开放",

@@ -7,15 +7,8 @@ import (
 
 func assertMacroLedgerIdentity(t *testing.T, w *WorldState) {
 	t.Helper()
-	var playerHeld, escrowHeld int64
-	for _, p := range w.Players {
-		playerHeld += p.GoldBasis
-		escrowHeld += p.GoldFrozenBasis
-	}
-	sum := playerHeld + escrowHeld + w.NPCHeldBasis + w.TreasuryHeldBasis
-	if sum != w.TotalIssuedBasis {
-		t.Fatalf("monetary supply identity violated: sum(%d) != totalIssued(%d) [player=%d, escrow=%d, npc=%d, treasury=%d, burned=%d]",
-			sum, w.TotalIssuedBasis, playerHeld, escrowHeld, w.NPCHeldBasis, w.TreasuryHeldBasis, w.PermanentlyBurnedBasis)
+	if err := CheckEconomy(w); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -58,12 +51,21 @@ func TestFullLoopProgressionMarketWarAndCollectibles(t *testing.T) {
 	vet := w.Players["archon_demo"]
 	initialTrades := len(w.Trades)
 
-	// Place a BUY order that crosses an NPC ASK order on AutoPump (ASK @ 192000)
+	// Capital is earned through an explicitly funded public purchase; the
+	// equipment ask is backed by another player's real inventory.
+	fundPlayerByProcurement(t, w, vet, 1000*GoldScale, now)
+	seller := NewBlankPlayer("equipment_seller", now)
+	seller.Profession = ProfScientist
+	seller.ResourcesMilli[ResAutoPump] = 1000
+	w.Players[seller.Handle] = seller
+	if err := PlaceMarketOrder(w, seller, ResAutoPump, "ASK", 192000, 1000, now); err != nil {
+		t.Fatal(err)
+	}
 	if err := PlaceMarketOrder(w, vet, ResAutoPump, "BID", 195000, 1*ResourceScale, now); err != nil {
 		t.Fatal(err)
 	}
 	if len(w.Trades) <= initialTrades {
-		t.Fatal("expected market order to match resting NPC ask")
+		t.Fatal("expected market order to match the funded player ask")
 	}
 	assertMacroLedgerIdentity(t, w)
 

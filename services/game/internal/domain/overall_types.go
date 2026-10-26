@@ -139,7 +139,6 @@ type BlueprintSpec struct {
 	CapacityOverrideUnits map[string]int64 // ResourceKey -> new minimum capacity in whole units
 	JobEfficiencyBonusPct map[string]int64 // JobKey -> +efficiency%
 	DoublesByproductProc  bool
-	GrantsGoldBasis       int64
 	AutoEnableEdict       string
 }
 
@@ -406,6 +405,7 @@ type CollectibleItem struct {
 }
 
 type PlayerState struct {
+	Professional            *ProfessionalState     `json:"professional,omitempty"`
 	Revision                int64                  `json:"revision"`
 	ProductionRemainders    map[string]int64       `json:"productionRemainders,omitempty"`
 	SimulatedRemainderMs    int64                  `json:"simulatedRemainderMs"`
@@ -489,6 +489,7 @@ func (t Troops) Total() int32 {
 }
 
 type WarNodeState struct {
+	Consumables     map[string]bool   `json:"consumables,omitempty"`
 	NodeID          string            `json:"nodeId"`
 	Name            string            `json:"name"`
 	Region          string            `json:"region"`
@@ -567,6 +568,8 @@ type SeasonNotice struct {
 }
 
 type WorldState struct {
+	PendingEconomyRecords  []EconomyRecord         `json:"-"`
+	Economy                *EconomyState           `json:"economy"`
 	LastWarPeriod          string                  `json:"lastWarPeriod"`
 	PendingTrades          []MarketTrade           `json:"-"`
 	PendingCollectibles    []CollectibleItem       `json:"-"`

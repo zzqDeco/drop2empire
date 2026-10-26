@@ -40,6 +40,9 @@ func ChooseProfession(p *PlayerState, prof string, now time.Time) error {
 }
 
 func CraftItem(w *WorldState, p *PlayerState, recipeCode string, batches int32, now time.Time) error {
+	if _, ok := FindConsumable(recipeCode); ok {
+		return ErrPrecondition("sequenced_command_required", "职业耗材请使用带指令序号的经济操作接口")
+	}
 	if !p.UnlockedBlueprints[BPBasicWorkshop] {
 		return ErrPrecondition("workshop_locked", "需要先建成【基础工坊】")
 	}
@@ -81,12 +84,7 @@ func CraftItem(w *WorldState, p *PlayerState, recipeCode string, batches int32, 
 	}
 	if totalGoldCost > 0 {
 		p.GoldBasis -= totalGoldCost
-		// System crafting fee: 50% burned, 50% to public treasury
-		burn := totalGoldCost / 2
-		treasury := totalGoldCost - burn
-		w.PermanentlyBurnedBasis += burn
-		w.TotalIssuedBasis -= burn
-		w.TreasuryHeldBasis += treasury
+		w.TreasuryHeldBasis += totalGoldCost
 	}
 
 	outMilli := spec.OutputAmountMilli * b64

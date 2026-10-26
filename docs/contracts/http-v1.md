@@ -29,7 +29,7 @@ All player endpoints authenticate via the `Authorization: Bearer <session_token>
 | `POST /api/v1/empire/production/presets` | `SaveAllocationPreset` | Saves the current worker allocation distribution under a named preset. |
 | `POST /api/v1/empire/settlement/research` | `ResearchTechnology` | `{code, commandSeq}`; consumes research materials once and grants construction knowledge only. |
 | `POST /api/v1/empire/settlement/build` | `ConstructBuilding` | `{code, quantity, commandSeq}`; quantity 1–20, atomically pays the exact sum of per-building escalated prices, adds buildings/slots without assigning workers. |
-| `POST /api/v1/empire/progression/unlock-blueprint` | `UnlockBlueprint` | Completes a one-time improvement or engineering project. Rejects building-effect codes; buildings must use ConstructBuilding. Assembly requires all three parts and awards 500 Gold once. |
+| `POST /api/v1/empire/progression/unlock-blueprint` | `UnlockBlueprint` | Completes a one-time improvement or engineering project. Rejects building-effect codes; buildings must use ConstructBuilding. Assembly requires all three parts and opens professions without issuing Gold. |
 | `POST /api/v1/empire/colony/toggle-edict` | `ToggleEdict` | Toggles a colony edict or hydro mechanism (`night_shift`, `water_ration`, `hydro_saw`, `siphon_sluice`). |
 | `POST /api/v1/empire/colony/caravan/trade` | `TradeCaravan` | Executes a barter contract at the Caravan Post (`offer_flint_lumber`, `offer_wood_stone`, `offer_charcoal_shard`, `offer_refugee_escort`, `offer_shard_supply`); requires a built caravan post, discovered input/output resources and enough housing for population rewards. |
 | `POST /api/v1/empire/progression/choose-profession` | `ChooseProfession` | Permanently selects one of the 4 professions (`scientist`, `alchemist`, `mage`, `artisan`) after unlocking `mystery_treasure`. |
@@ -45,7 +45,7 @@ All player endpoints authenticate via the `Authorization: Bearer <session_token>
 | `POST /api/v1/empire/colony/raid/gear` | `ManageRaidGear` | Crafts (`action="craft"`) or equips (`action="equip"`) out-of-raid weapons, armor, boots, seasonal safeboxes (`1 -> 3 -> 5` slots), and tactical potions using settlement resources. |
 | `POST /api/v1/empire/colony/raid/buff` | `DraftRaidBuff` | Selects (`action="pick"`) one of the 3 offered pre-departure buff cards (from the 54-card pool, max 4 carried) or spends settlement resources to reroll (`action="reroll"`). |
 | `POST /api/v1/empire/colony/raid/start` | `StartRaid` | Generates an authoritative 4-zone 2D extraction session (`ActiveRaidSession`) on the server with fog-of-war clipping and real-time sandstorm expiration. |
-| `POST /api/v1/empire/colony/raid/action` | `RaidAction` | Requires `raidId` and `commandSeq`; returns `RaidUpdateResp` with the current zone and authoritative loadout. Executes an in-raid intent (`move`, `open_chest`, `use_portal`, `transfer_loot`, `loot_all`, `drink_potion`, `merchant_buy`), resolving combat, fog reveal, and CSPRNG chest drops on the server. |
+| `POST /api/v1/empire/colony/raid/action` | `RaidAction` | Requires `raidId` and `commandSeq`; returns `RaidUpdateResp` with the current zone and authoritative loadout. Executes an in-raid intent (`move`, `open_chest`, `use_portal`, `transfer_loot`, `loot_all`, `drink_potion`, `use_consumable`, `merchant_buy`), resolving combat, fog reveal, and CSPRNG chest drops on the server. |
 | `POST /api/v1/empire/colony/raid/finish` | `FinishRaid` | Requires `raidId` and `commandSeq`; returns `RaidUpdateResp`. Authoritatively settles raid extraction (`EXTRACTED`, verified against the exact beacon tile, full channel deadline and expiration) or death/timeout (`MIA`), awarding only server-recorded `SafeBox` / `Backpack` loot and destroying equipped weapon/armor/boots on `MIA`. |
 
 ---
@@ -54,7 +54,7 @@ All player endpoints authenticate via the `Authorization: Bearer <session_token>
 
 | Method & Path | IDL Operation | Description |
 | :--- | :--- | :--- |
-| `POST /api/v1/empire/crafting/craft` | `CraftItem` | Crafts profession-exclusive devices or war armaments (`infantry_gear`, `archer_gear`, `cavalry_gear`) and pays the `2.0 Gold` crafting fee (`50%` burned, `50%` to treasury). |
+| `POST /api/v1/empire/crafting/craft` | `CraftItem` | Crafts profession-exclusive devices or war armaments (`infantry_gear`, `archer_gear`, `cavalry_gear`) and pays the `2.0 Gold` crafting fee (entirely transferred to treasury). |
 | `POST /api/v1/empire/crafting/install` | `InstallEquipment` | Installs or removes a cross-profession device (`auto_pump`, `hermes_catalyst`, `astral_scroll`, `titan_tools`) in the player's 4-slot workshop rack. |
 | `POST /api/v1/empire/market/orders` | `PlaceMarketOrder` | Places a `BID` or `ASK` limit order on the CLOB spot market (supports resources, crafted devices, war gear, **unlearned raid blueprints `bp_*`**, and **S1 animated cosmetics `cos_*`**). |
 | `POST /api/v1/empire/market/orders/:id/cancel` | `CancelMarketOrder` | Cancels an open limit order and unfreezes escrowed gold or items. |
@@ -75,7 +75,7 @@ Protected by Caddy loopback port isolation and `X-D2E-Admin-Tunnel: 1`:
 | `POST /api/v1/empire/admin/invites/:id/revoke` | `RevokeInvite` | Revokes an unused invitation code. |
 | `POST /api/v1/empire/admin/sim` | `ControlSimulation` | Loopback-only simulation control; see the IDL request for supported actions. |
 | `POST /api/v1/empire/war/settle` | `TriggerWarSettlement` | Manually triggers the daily 20:00 chamber war resolution and stipend distribution. |
-| `POST /api/v1/empire/admin/season/rollover` | `RolloverSeason` | Executes cross-season settlement (`S1 -> S2`): resets settlement population/resources/blueprints, profession, gold, and learned raid blueprints (`bp_*`), while permanently retaining `cos_*` seasonal animated cosmetics and minted `Collectibles`. |
+| `POST /api/v1/empire/admin/season/rollover` | `RolloverSeason` | Executes cross-season settlement (`S1 -> S2`): resets settlement population/resources/blueprints, profession and learned raid blueprints (`bp_*`), while retaining currency, companies, IPOs, shares, votes, `cos_*` cosmetics and minted `Collectibles`. |
 | `POST /api/v1/empire/admin/notices` | `PublishNotice` | Publishes an official Imperial Announcement (`title`, `effectiveIn`, `summary`, `demandShifts`) to all players' `seasonNotices` feed. |
 | `POST /api/v1/empire/admin/benchmark-30m` | `RunBenchmark30m` | Runs three strategies against real domain commands, with a 60-minute safety limit. Reports completed/failureReason and actual duration; the legacy operation name is retained. |
 
@@ -98,3 +98,31 @@ Next research/build command uses `settlement.commandSeq + 1`. The latest sequenc
 `BlueprintNodeDTO.kind` is building/upgrade/project. Building milestones are completed-effect flags used by game mechanics, have visible=false and cannot be bought through UnlockBlueprint. The new UI lists only improvements/projects there. Buildings and technologies whose prerequisites are unknown are omitted. Resource discovery persists after stock reaches zero; caravan input and output resources must all be discovered.
 
 A requested edict or mechanism with flat per-second resource drain (`night_shift`: 400 milli wood/s; `hydro_saw`: 1500 milli water/s) is effective for a one-second simulation tick only if the opening inventory contains the entire configured resource cost for that tick. Otherwise its bonus, flat resource charge and extra hydration charge all pause for that tick; the enabled setting is retained and can resume on a later funded tick. Current-tick gathering does not qualify as opening fuel. The same check governs job/rate previews and production; flat edict costs are charged before industrial conversion.
+
+
+## 8. Professional industry, companies and monetary policy
+
+`DashboardStateResp.economy` is required. It carries `professional` (facility level/build costs/queue/consumables/active effects), announced `companies`, admin-only `companyCatalog` and `publicInventory`, monetary balances and latest 50 policy records. Catalog/consumable discovery is hidden before choosing a profession; current financial ownership is preserved through seasonal progression resets. Monetary `issuedBasis` and `cancelledBasis` are cumulative; `macroLedger.totalIssuedBasis` is net outstanding supply. Institutional cash summary fields include their order escrow; IPO escrow is separate.
+
+| Method / path | Operation | Semantics |
+| --- | --- | --- |
+| `POST /api/v1/empire/economy/action` | `EconomyAction` | Sequenced personal manufacturing, consumable use, IPO and governance |
+| `POST /api/v1/empire/admin/economy/policy` | `MonetaryPolicy` | Loopback admin only; immutable policy ID and exact-replay idempotency |
+| `POST /api/v1/empire/admin/economy/company` | `IntroduceCompany` | Loopback admin only; one permitted company ID, bounded shares/price/minimum/duration |
+
+`EconomyActionReq` uses the **same** `settlement.commandSeq` as research/build. The signed payload includes every field; exact latest retry has no side effect. SDK uses the existing network-retry fence. `action` values:
+
+- `build_facility`: `option` empty for ordinary construction, or a workpack key for level-two alternative costs.
+- `craft`: `target` consumable key, `quantity` 1–20 batches; exclusive profession and paid facility required. The old crafting route rejects these recipes.
+- `use`: `target` consumable key, `option` war node ID when applicable. Raid-use items must instead use the sequenced RaidAction `use_consumable` with `itemKey` (blink additionally `dx/dy` exactly ±2 on one axis).
+- `subscribe`: `target` company ID, `quantity` integer shares; real cash moves into IPO escrow.
+- `propose`: `target` company ID and complete `CompanyPlanDTO` (`route`, `activeLines`, `askPriceBasis`, `inputBudgetBasis`, `pack`, `expandWith`, `dividendBasis`, `capitalBudgetBasis`). `expandWith=""` preserves any pending expansion; a workpack key creates/replaces the pending project; `"cancel"` requires a pending project and zero capital budget.
+- `vote`: company ID, exact `voteId`, `approve`; only snapshot weights count.
+
+Shares trade through the existing order endpoint with `itemKey="share:<companyId>"`, quantity in Milli whole shares. Commodity orders include all 12 consumables and six corporate products. Server rejects fractional quantities and unfunded escrow. Company output is never a craftable personal recipe.
+
+`MonetaryPolicyReq` actions: `issue`, `fund_public`, `fund_treasury`, `recall_public`, `recall_treasury`, `cancel` use `amountBasis`; `procure` uses `itemKey`, `quantityMilli`, `priceBasis`; `withdraw_order` uses `itemKey` as the public order ID; `consume_public` uses item and quantity. Other fields must be present per IDL, normally zero/empty. Conflicting policy ID returns `policy_conflict`. Public procurement cannot buy corporate products or shares. Policy and economic audit commit atomically.
+
+A persisted minute cursor drives corporate production/IPO/vote settlement from both the background ticker and global state requests. Catch-up is capped at eight hours. High-frequency raid commands retain player-only locking and do not advance companies. Legacy economic snapshots are rejected by both load paths with `economy_restart_required`; this release requires the documented full clean start, not an automatic legacy migration.
+
+Company cards expose actual cash/revenue/realized profit, inventory, built/running lines, current/alternative recipes, IPO, share holdings/order book, plan, vote snapshot totals and pending expansion budget. Prices are integer Basis; no float accumulators. Important company event acknowledgements are client-local and do not change authoritative financial state.

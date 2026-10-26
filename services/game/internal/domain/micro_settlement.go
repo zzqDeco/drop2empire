@@ -140,6 +140,9 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 		}
 	}
 
+	if p.Professional != nil && p.Professional.SigilSeconds > 0 {
+		effByJob[JobStone] = effByJob[JobStone] * 8 / 10
+	}
 	// 5. Dehydration penalty on non-water jobs
 	if p.HydrationWarning {
 		for _, js := range JobCatalog {
@@ -204,6 +207,9 @@ func ComputeResourceFlows(p *PlayerState) (gross map[string]int64, drain map[str
 
 	stoneOut := jobMap[JobStone].TotalOutputPerSecMilli
 	gross[ResStone] += stoneOut
+	if p.Professional != nil && p.Professional.SigilSeconds > 0 {
+		stoneOut = stoneOut * 15 / 8
+	}
 	if stoneOut > 0 {
 		gross[ResFlint] += (stoneOut * byproductMult) / SettlementBalance.StoneToFlintDivisor
 		gross[ResAncientShard] += (stoneOut * byproductMult) / SettlementBalance.StoneToAncientShardDivisor
@@ -306,6 +312,7 @@ func applyElapsedSimMs(p *PlayerState, simMs int64) {
 	p.SimulatedRemainderMs = total % 1000
 	for i := int64(0); i < ticks; i++ {
 		produceSecond(p)
+		advanceProfessional(p)
 	}
 	p.SimulatedElapsedSeconds += ticks
 	RefreshSettlementDiscovery(p)
@@ -374,6 +381,9 @@ func produceSecond(p *PlayerState) {
 			changeProductionStock(p, ResFlint, output*byproductMult/SettlementBalance.WoodToFlintDivisor)
 		}
 		if job.JobKey == JobStone {
+			if p.Professional != nil && p.Professional.SigilSeconds > 0 {
+				output = output * 15 / 8
+			}
 			changeProductionStock(p, ResFlint, output*byproductMult/SettlementBalance.StoneToFlintDivisor)
 			changeProductionStock(p, ResAncientShard, output*byproductMult/SettlementBalance.StoneToAncientShardDivisor)
 		}
@@ -827,22 +837,11 @@ func UnlockBlueprint(w *WorldState, p *PlayerState, code string, now time.Time) 
 		p.ActiveEdicts[spec.AutoEnableEdict] = true
 	}
 
-	if spec.GrantsGoldBasis > 0 {
-		if p.Phase < 2 {
-			p.Phase = 2
-		}
-		starterGold := spec.GrantsGoldBasis
-		if w.TreasuryHeldBasis >= starterGold {
-			w.TreasuryHeldBasis -= starterGold
-			p.GoldBasis += starterGold
-		} else {
-			w.TotalIssuedBasis += starterGold
-			p.GoldBasis += starterGold
-		}
-		AppendLog(p, now, "BLUEPRINT", "★ 已开启【神秘的宝藏】！获得中央财政发放的 500.0000 启动金币，请立即在职业面板抉择你的终身职业！")
-	} else {
-		AppendLog(p, now, "BLUEPRINT", fmt.Sprintf("已解锁【%s】：%s", spec.Name, spec.EffectSummary))
+	if code == BPMysteryTreasure {
+		p.Phase = max(p.Phase, 2)
 	}
+	AppendLog(p, now, "BLUEPRINT", fmt.Sprintf("已解锁【%s】：%s", spec.Name, spec.EffectSummary))
+
 	return nil
 }
 

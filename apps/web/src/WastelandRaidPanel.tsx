@@ -970,6 +970,9 @@ export function WastelandRaidPanel({
                   </div>
                 </div>
 
+                <div className="economy-tabs" aria-label="职业远征耗材">
+                  {(state.economy?.professional.consumables ?? []).filter(c => c.use === "raid" && c.inventoryMilli >= 1000).map(c => <button className="btn-outline" key={c.itemKey} disabled={usedPotions.includes(c.itemKey)} title={c.effect} onClick={() => void runAction(() => sendRaidAction({ action: "use_consumable", itemKey: c.itemKey, dx: c.itemKey === "blink_scroll" ? (facing === "left" ? -2 : facing === "right" ? 2 : 0) : 0, dy: c.itemKey === "blink_scroll" ? (facing === "up" ? -2 : facing === "down" ? 2 : 0) : 0 }))}>{c.name}{usedPotions.includes(c.itemKey) ? "（本局已使用）" : c.itemKey === "blink_scroll" ? "（朝当前面向）" : ""}</button>)}
+                </div>
                 <div className="tab-body split-3col">
                   {/* LEFT COLUMN: Safe Box + Raid Backpack (Drop Targets) */}
                   <div

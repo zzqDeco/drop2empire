@@ -55,6 +55,11 @@ func mapSettlement(p *domain.PlayerState, rates map[string]int64) *empire.Settle
 		reason := "已建成"
 		if owned < b.Limit {
 			costs, err = domain.BuildingCosts(b, owned, 1)
+			if owned > 0 && p.Professional != nil && p.Professional.ConstructionTool {
+				for k, n := range costs {
+					costs[k] = (n*9 + 9) / 10
+				}
+			}
 			reason = domain.CostsBlockReason(p, costs)
 			if err != nil {
 				reason = err.Error()

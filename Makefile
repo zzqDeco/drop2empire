@@ -1,4 +1,4 @@
-.PHONY: gen check-arch test build dev-backend dev-web deploy
+.PHONY: gen check-arch test build simulate-economy dev-backend dev-web deploy
 
 gen:
 	bash ops/codegen.sh
@@ -20,3 +20,6 @@ dev-web:
 
 deploy:
 	bash ops/deploy-aliyun.sh
+
+simulate-economy:
+	@cd services/game && go run ./cmd/economy-sim

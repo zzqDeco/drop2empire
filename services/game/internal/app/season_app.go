@@ -110,10 +110,13 @@ func (s *Service) ControlSimulation(ctx context.Context, action string, speedMul
 			if target.ResourcesMilli[domain.ResStone] < 800*domain.ResourceScale {
 				target.ResourcesMilli[domain.ResStone] = 800 * domain.ResourceScale
 			}
-			domain.AppendLog(target, now, "BLUEPRINT", "【管理员沙盒】已补齐技术、设施与三个工程部件，可直接装配古代装置；毕业金币需装配后领取。")
+			domain.AppendLog(target, now, "BLUEPRINT", "【管理员沙盒】已补齐技术、设施与三个工程部件，可直接装配古代装置；装配开放职业，金币仅通过有预算的市场交易取得。")
 			return nil
 
 		case "reset_player":
+			if domain.HasFinancialPosition(w, target) {
+				return domain.ErrPrecondition("financial_position_active", "该账号持有股份、认购或投票快照，不能单独清档")
+			}
 			prevHash := target.PasswordHash
 			prevAdmin := target.IsAdmin
 			returnedGold := target.GoldBasis + target.GoldFrozenBasis

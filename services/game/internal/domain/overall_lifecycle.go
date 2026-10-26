@@ -160,8 +160,8 @@ func NewDefaultWorld(now time.Time) *WorldState {
 	lastPrices := make(map[string]int64, len(ResourceCatalog))
 	openPrices := make(map[string]int64, len(ResourceCatalog))
 	for _, r := range ResourceCatalog {
-		lastPrices[r.Key] = r.InitPriceBasis
-		openPrices[r.Key] = r.InitPriceBasis
+		lastPrices[r.Key] = 0
+		openPrices[r.Key] = 0
 	}
 
 	// Monetary supply bootstrap driven by OverallBalance:

@@ -2883,7 +2883,837 @@ func (p *PlayerProfileDTO) String() string {
 	return fmt.Sprintf("PlayerProfileDTO(%+v)", *p)
 }
 
+type InventoryAmountDTO struct {
+	ItemKey       string `thrift:"itemKey,1,required" json:"itemKey"`
+	Name          string `thrift:"name,2,required" json:"name"`
+	QuantityMilli int64  `thrift:"quantityMilli,3,required" json:"quantityMilli"`
+	FrozenMilli   int64  `thrift:"frozenMilli,4,required" json:"frozenMilli"`
+}
+
+func NewInventoryAmountDTO() *InventoryAmountDTO {
+	return &InventoryAmountDTO{}
+}
+
+func (p *InventoryAmountDTO) InitDefault() {
+}
+
+func (p *InventoryAmountDTO) GetItemKey() (v string) {
+	return p.ItemKey
+}
+
+func (p *InventoryAmountDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *InventoryAmountDTO) GetQuantityMilli() (v int64) {
+	return p.QuantityMilli
+}
+
+func (p *InventoryAmountDTO) GetFrozenMilli() (v int64) {
+	return p.FrozenMilli
+}
+
+func (p *InventoryAmountDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("InventoryAmountDTO(%+v)", *p)
+}
+
+type ConsumableDTO struct {
+	ItemKey        string         `thrift:"itemKey,1,required" json:"itemKey"`
+	Name           string         `thrift:"name,2,required" json:"name"`
+	Profession     string         `thrift:"profession,3,required" json:"profession"`
+	Use            string         `thrift:"use,4,required" json:"use"`
+	Effect         string         `thrift:"effect,5,required" json:"effect"`
+	InventoryMilli int64          `thrift:"inventoryMilli,6,required" json:"inventoryMilli"`
+	OutputMilli    int64          `thrift:"outputMilli,7,required" json:"outputMilli"`
+	Seconds        int64          `thrift:"seconds,8,required" json:"seconds"`
+	Costs          []*CostItemDTO `thrift:"costs,9,required,list<CostItemDTO>" json:"costs"`
+}
+
+func NewConsumableDTO() *ConsumableDTO {
+	return &ConsumableDTO{}
+}
+
+func (p *ConsumableDTO) InitDefault() {
+}
+
+func (p *ConsumableDTO) GetItemKey() (v string) {
+	return p.ItemKey
+}
+
+func (p *ConsumableDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *ConsumableDTO) GetProfession() (v string) {
+	return p.Profession
+}
+
+func (p *ConsumableDTO) GetUse() (v string) {
+	return p.Use
+}
+
+func (p *ConsumableDTO) GetEffect() (v string) {
+	return p.Effect
+}
+
+func (p *ConsumableDTO) GetInventoryMilli() (v int64) {
+	return p.InventoryMilli
+}
+
+func (p *ConsumableDTO) GetOutputMilli() (v int64) {
+	return p.OutputMilli
+}
+
+func (p *ConsumableDTO) GetSeconds() (v int64) {
+	return p.Seconds
+}
+
+func (p *ConsumableDTO) GetCosts() (v []*CostItemDTO) {
+	return p.Costs
+}
+
+func (p *ConsumableDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ConsumableDTO(%+v)", *p)
+}
+
+type ProfessionalDTO struct {
+	Level             int32            `thrift:"level,1,required" json:"level"`
+	FacilityName      string           `thrift:"facilityName,2,required" json:"facilityName"`
+	BuildCosts        []*CostItemDTO   `thrift:"buildCosts,3,required,list<CostItemDTO>" json:"buildCosts"`
+	QueueItem         string           `thrift:"queueItem,4,required" json:"queueItem"`
+	QueueOutputMilli  int64            `thrift:"queueOutputMilli,5,required" json:"queueOutputMilli"`
+	RemainingSeconds  int64            `thrift:"remainingSeconds,6,required" json:"remainingSeconds"`
+	ProductionMode    string           `thrift:"productionMode,7,required" json:"productionMode"`
+	ProductionCharges int32            `thrift:"productionCharges,8,required" json:"productionCharges"`
+	ConstructionTool  bool             `thrift:"constructionTool,9,required" json:"constructionTool"`
+	GuildTool         bool             `thrift:"guildTool,10,required" json:"guildTool"`
+	SigilSeconds      int64            `thrift:"sigilSeconds,11,required" json:"sigilSeconds"`
+	Consumables       []*ConsumableDTO `thrift:"consumables,12,required,list<ConsumableDTO>" json:"consumables"`
+}
+
+func NewProfessionalDTO() *ProfessionalDTO {
+	return &ProfessionalDTO{}
+}
+
+func (p *ProfessionalDTO) InitDefault() {
+}
+
+func (p *ProfessionalDTO) GetLevel() (v int32) {
+	return p.Level
+}
+
+func (p *ProfessionalDTO) GetFacilityName() (v string) {
+	return p.FacilityName
+}
+
+func (p *ProfessionalDTO) GetBuildCosts() (v []*CostItemDTO) {
+	return p.BuildCosts
+}
+
+func (p *ProfessionalDTO) GetQueueItem() (v string) {
+	return p.QueueItem
+}
+
+func (p *ProfessionalDTO) GetQueueOutputMilli() (v int64) {
+	return p.QueueOutputMilli
+}
+
+func (p *ProfessionalDTO) GetRemainingSeconds() (v int64) {
+	return p.RemainingSeconds
+}
+
+func (p *ProfessionalDTO) GetProductionMode() (v string) {
+	return p.ProductionMode
+}
+
+func (p *ProfessionalDTO) GetProductionCharges() (v int32) {
+	return p.ProductionCharges
+}
+
+func (p *ProfessionalDTO) GetConstructionTool() (v bool) {
+	return p.ConstructionTool
+}
+
+func (p *ProfessionalDTO) GetGuildTool() (v bool) {
+	return p.GuildTool
+}
+
+func (p *ProfessionalDTO) GetSigilSeconds() (v int64) {
+	return p.SigilSeconds
+}
+
+func (p *ProfessionalDTO) GetConsumables() (v []*ConsumableDTO) {
+	return p.Consumables
+}
+
+func (p *ProfessionalDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("ProfessionalDTO(%+v)", *p)
+}
+
+type CompanyPlanDTO struct {
+	Route              string `thrift:"route,1,required" json:"route"`
+	ActiveLines        int32  `thrift:"activeLines,2,required" json:"activeLines"`
+	AskPriceBasis      int64  `thrift:"askPriceBasis,3,required" json:"askPriceBasis"`
+	InputBudgetBasis   int64  `thrift:"inputBudgetBasis,4,required" json:"inputBudgetBasis"`
+	Pack               string `thrift:"pack,5,required" json:"pack"`
+	ExpandWith         string `thrift:"expandWith,6,required" json:"expandWith"`
+	DividendBasis      int64  `thrift:"dividendBasis,7,required" json:"dividendBasis"`
+	CapitalBudgetBasis int64  `thrift:"capitalBudgetBasis,8,required" json:"capitalBudgetBasis"`
+}
+
+func NewCompanyPlanDTO() *CompanyPlanDTO {
+	return &CompanyPlanDTO{}
+}
+
+func (p *CompanyPlanDTO) InitDefault() {
+}
+
+func (p *CompanyPlanDTO) GetRoute() (v string) {
+	return p.Route
+}
+
+func (p *CompanyPlanDTO) GetActiveLines() (v int32) {
+	return p.ActiveLines
+}
+
+func (p *CompanyPlanDTO) GetAskPriceBasis() (v int64) {
+	return p.AskPriceBasis
+}
+
+func (p *CompanyPlanDTO) GetInputBudgetBasis() (v int64) {
+	return p.InputBudgetBasis
+}
+
+func (p *CompanyPlanDTO) GetPack() (v string) {
+	return p.Pack
+}
+
+func (p *CompanyPlanDTO) GetExpandWith() (v string) {
+	return p.ExpandWith
+}
+
+func (p *CompanyPlanDTO) GetDividendBasis() (v int64) {
+	return p.DividendBasis
+}
+
+func (p *CompanyPlanDTO) GetCapitalBudgetBasis() (v int64) {
+	return p.CapitalBudgetBasis
+}
+
+func (p *CompanyPlanDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CompanyPlanDTO(%+v)", *p)
+}
+
+type CompanyRouteDTO struct {
+	Code    string         `thrift:"code,1,required" json:"code"`
+	Seconds int64          `thrift:"seconds,2,required" json:"seconds"`
+	Inputs  []*CostItemDTO `thrift:"inputs,3,required,list<CostItemDTO>" json:"inputs"`
+}
+
+func NewCompanyRouteDTO() *CompanyRouteDTO {
+	return &CompanyRouteDTO{}
+}
+
+func (p *CompanyRouteDTO) InitDefault() {
+}
+
+func (p *CompanyRouteDTO) GetCode() (v string) {
+	return p.Code
+}
+
+func (p *CompanyRouteDTO) GetSeconds() (v int64) {
+	return p.Seconds
+}
+
+func (p *CompanyRouteDTO) GetInputs() (v []*CostItemDTO) {
+	return p.Inputs
+}
+
+func (p *CompanyRouteDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CompanyRouteDTO(%+v)", *p)
+}
+
+type CompanyVoteDTO struct {
+	ID        int64           `thrift:"id,1,required" json:"id"`
+	EndsAt    string          `thrift:"endsAt,2,required" json:"endsAt"`
+	YesShares int64           `thrift:"yesShares,3,required" json:"yesShares"`
+	NoShares  int64           `thrift:"noShares,4,required" json:"noShares"`
+	MyWeight  int64           `thrift:"myWeight,5,required" json:"myWeight"`
+	MyBallot  string          `thrift:"myBallot,6,required" json:"myBallot"`
+	Result    string          `thrift:"result,7,required" json:"result"`
+	Plan      *CompanyPlanDTO `thrift:"plan,8,required" json:"plan"`
+}
+
+func NewCompanyVoteDTO() *CompanyVoteDTO {
+	return &CompanyVoteDTO{}
+}
+
+func (p *CompanyVoteDTO) InitDefault() {
+}
+
+func (p *CompanyVoteDTO) GetID() (v int64) {
+	return p.ID
+}
+
+func (p *CompanyVoteDTO) GetEndsAt() (v string) {
+	return p.EndsAt
+}
+
+func (p *CompanyVoteDTO) GetYesShares() (v int64) {
+	return p.YesShares
+}
+
+func (p *CompanyVoteDTO) GetNoShares() (v int64) {
+	return p.NoShares
+}
+
+func (p *CompanyVoteDTO) GetMyWeight() (v int64) {
+	return p.MyWeight
+}
+
+func (p *CompanyVoteDTO) GetMyBallot() (v string) {
+	return p.MyBallot
+}
+
+func (p *CompanyVoteDTO) GetResult() (v string) {
+	return p.Result
+}
+
+var CompanyVoteDTO_Plan_DEFAULT *CompanyPlanDTO
+
+func (p *CompanyVoteDTO) GetPlan() (v *CompanyPlanDTO) {
+	if !p.IsSetPlan() {
+		return CompanyVoteDTO_Plan_DEFAULT
+	}
+	return p.Plan
+}
+
+func (p *CompanyVoteDTO) IsSetPlan() bool {
+	return p.Plan != nil
+}
+
+func (p *CompanyVoteDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CompanyVoteDTO(%+v)", *p)
+}
+
+type CompanyDTO struct {
+	ID                   string                `thrift:"id,1,required" json:"id"`
+	Name                 string                `thrift:"name,2,required" json:"name"`
+	Asset                string                `thrift:"asset,3,required" json:"asset"`
+	OutputKey            string                `thrift:"outputKey,4,required" json:"outputKey"`
+	OutputName           string                `thrift:"outputName,5,required" json:"outputName"`
+	OutputMilli          int64                 `thrift:"outputMilli,6,required" json:"outputMilli"`
+	Status               string                `thrift:"status,7,required" json:"status"`
+	CashBasis            int64                 `thrift:"cashBasis,8,required" json:"cashBasis"`
+	EscrowBasis          int64                 `thrift:"escrowBasis,9,required" json:"escrowBasis"`
+	RevenueBasis         int64                 `thrift:"revenueBasis,10,required" json:"revenueBasis"`
+	ProfitBasis          int64                 `thrift:"profitBasis,11,required" json:"profitBasis"`
+	DividendsBasis       int64                 `thrift:"dividendsBasis,12,required" json:"dividendsBasis"`
+	TotalShares          int64                 `thrift:"totalShares,13,required" json:"totalShares"`
+	IpoPriceBasis        int64                 `thrift:"ipoPriceBasis,14,required" json:"ipoPriceBasis"`
+	IpoMinimumShares     int64                 `thrift:"ipoMinimumShares,15,required" json:"ipoMinimumShares"`
+	IpoEndsAt            string                `thrift:"ipoEndsAt,16,required" json:"ipoEndsAt"`
+	SubscribedShares     int64                 `thrift:"subscribedShares,17,required" json:"subscribedShares"`
+	MySubscription       int64                 `thrift:"mySubscription,18,required" json:"mySubscription"`
+	MyShares             int64                 `thrift:"myShares,19,required" json:"myShares"`
+	MyFrozenShares       int64                 `thrift:"myFrozenShares,20,required" json:"myFrozenShares"`
+	BestBidBasis         int64                 `thrift:"bestBidBasis,21,required" json:"bestBidBasis"`
+	BestAskBasis         int64                 `thrift:"bestAskBasis,22,required" json:"bestAskBasis"`
+	LastTradeBasis       int64                 `thrift:"lastTradeBasis,23,required" json:"lastTradeBasis"`
+	Lines                int32                 `thrift:"lines,24,required" json:"lines"`
+	RunningLines         int32                 `thrift:"runningLines,25,required" json:"runningLines"`
+	CompletedBatches     int64                 `thrift:"completedBatches,26,required" json:"completedBatches"`
+	StatusReason         string                `thrift:"statusReason,27,required" json:"statusReason"`
+	NextVoteAt           string                `thrift:"nextVoteAt,28,required" json:"nextVoteAt"`
+	Plan                 *CompanyPlanDTO       `thrift:"plan,29,required" json:"plan"`
+	Vote                 *CompanyVoteDTO       `thrift:"vote,30,required" json:"vote"`
+	Routes               []*CompanyRouteDTO    `thrift:"routes,31,required,list<CompanyRouteDTO>" json:"routes"`
+	Inventory            []*InventoryAmountDTO `thrift:"inventory,32,required,list<InventoryAmountDTO>" json:"inventory"`
+	ExpansionPack        string                `thrift:"expansionPack,33,required" json:"expansionPack"`
+	ExpansionBudgetBasis int64                 `thrift:"expansionBudgetBasis,34,required" json:"expansionBudgetBasis"`
+}
+
+func NewCompanyDTO() *CompanyDTO {
+	return &CompanyDTO{}
+}
+
+func (p *CompanyDTO) InitDefault() {
+}
+
+func (p *CompanyDTO) GetID() (v string) {
+	return p.ID
+}
+
+func (p *CompanyDTO) GetName() (v string) {
+	return p.Name
+}
+
+func (p *CompanyDTO) GetAsset() (v string) {
+	return p.Asset
+}
+
+func (p *CompanyDTO) GetOutputKey() (v string) {
+	return p.OutputKey
+}
+
+func (p *CompanyDTO) GetOutputName() (v string) {
+	return p.OutputName
+}
+
+func (p *CompanyDTO) GetOutputMilli() (v int64) {
+	return p.OutputMilli
+}
+
+func (p *CompanyDTO) GetStatus() (v string) {
+	return p.Status
+}
+
+func (p *CompanyDTO) GetCashBasis() (v int64) {
+	return p.CashBasis
+}
+
+func (p *CompanyDTO) GetEscrowBasis() (v int64) {
+	return p.EscrowBasis
+}
+
+func (p *CompanyDTO) GetRevenueBasis() (v int64) {
+	return p.RevenueBasis
+}
+
+func (p *CompanyDTO) GetProfitBasis() (v int64) {
+	return p.ProfitBasis
+}
+
+func (p *CompanyDTO) GetDividendsBasis() (v int64) {
+	return p.DividendsBasis
+}
+
+func (p *CompanyDTO) GetTotalShares() (v int64) {
+	return p.TotalShares
+}
+
+func (p *CompanyDTO) GetIpoPriceBasis() (v int64) {
+	return p.IpoPriceBasis
+}
+
+func (p *CompanyDTO) GetIpoMinimumShares() (v int64) {
+	return p.IpoMinimumShares
+}
+
+func (p *CompanyDTO) GetIpoEndsAt() (v string) {
+	return p.IpoEndsAt
+}
+
+func (p *CompanyDTO) GetSubscribedShares() (v int64) {
+	return p.SubscribedShares
+}
+
+func (p *CompanyDTO) GetMySubscription() (v int64) {
+	return p.MySubscription
+}
+
+func (p *CompanyDTO) GetMyShares() (v int64) {
+	return p.MyShares
+}
+
+func (p *CompanyDTO) GetMyFrozenShares() (v int64) {
+	return p.MyFrozenShares
+}
+
+func (p *CompanyDTO) GetBestBidBasis() (v int64) {
+	return p.BestBidBasis
+}
+
+func (p *CompanyDTO) GetBestAskBasis() (v int64) {
+	return p.BestAskBasis
+}
+
+func (p *CompanyDTO) GetLastTradeBasis() (v int64) {
+	return p.LastTradeBasis
+}
+
+func (p *CompanyDTO) GetLines() (v int32) {
+	return p.Lines
+}
+
+func (p *CompanyDTO) GetRunningLines() (v int32) {
+	return p.RunningLines
+}
+
+func (p *CompanyDTO) GetCompletedBatches() (v int64) {
+	return p.CompletedBatches
+}
+
+func (p *CompanyDTO) GetStatusReason() (v string) {
+	return p.StatusReason
+}
+
+func (p *CompanyDTO) GetNextVoteAt() (v string) {
+	return p.NextVoteAt
+}
+
+var CompanyDTO_Plan_DEFAULT *CompanyPlanDTO
+
+func (p *CompanyDTO) GetPlan() (v *CompanyPlanDTO) {
+	if !p.IsSetPlan() {
+		return CompanyDTO_Plan_DEFAULT
+	}
+	return p.Plan
+}
+
+var CompanyDTO_Vote_DEFAULT *CompanyVoteDTO
+
+func (p *CompanyDTO) GetVote() (v *CompanyVoteDTO) {
+	if !p.IsSetVote() {
+		return CompanyDTO_Vote_DEFAULT
+	}
+	return p.Vote
+}
+
+func (p *CompanyDTO) GetRoutes() (v []*CompanyRouteDTO) {
+	return p.Routes
+}
+
+func (p *CompanyDTO) GetInventory() (v []*InventoryAmountDTO) {
+	return p.Inventory
+}
+
+func (p *CompanyDTO) GetExpansionPack() (v string) {
+	return p.ExpansionPack
+}
+
+func (p *CompanyDTO) GetExpansionBudgetBasis() (v int64) {
+	return p.ExpansionBudgetBasis
+}
+
+func (p *CompanyDTO) IsSetPlan() bool {
+	return p.Plan != nil
+}
+
+func (p *CompanyDTO) IsSetVote() bool {
+	return p.Vote != nil
+}
+
+func (p *CompanyDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("CompanyDTO(%+v)", *p)
+}
+
+type MonetaryPolicyDTO struct {
+	ID            string `thrift:"id,1,required" json:"id"`
+	Action        string `thrift:"action,2,required" json:"action"`
+	AmountBasis   int64  `thrift:"amountBasis,3,required" json:"amountBasis"`
+	ItemKey       string `thrift:"itemKey,4,required" json:"itemKey"`
+	QuantityMilli int64  `thrift:"quantityMilli,5,required" json:"quantityMilli"`
+	PriceBasis    int64  `thrift:"priceBasis,6,required" json:"priceBasis"`
+	At            string `thrift:"at,7,required" json:"at"`
+}
+
+func NewMonetaryPolicyDTO() *MonetaryPolicyDTO {
+	return &MonetaryPolicyDTO{}
+}
+
+func (p *MonetaryPolicyDTO) InitDefault() {
+}
+
+func (p *MonetaryPolicyDTO) GetID() (v string) {
+	return p.ID
+}
+
+func (p *MonetaryPolicyDTO) GetAction() (v string) {
+	return p.Action
+}
+
+func (p *MonetaryPolicyDTO) GetAmountBasis() (v int64) {
+	return p.AmountBasis
+}
+
+func (p *MonetaryPolicyDTO) GetItemKey() (v string) {
+	return p.ItemKey
+}
+
+func (p *MonetaryPolicyDTO) GetQuantityMilli() (v int64) {
+	return p.QuantityMilli
+}
+
+func (p *MonetaryPolicyDTO) GetPriceBasis() (v int64) {
+	return p.PriceBasis
+}
+
+func (p *MonetaryPolicyDTO) GetAt() (v string) {
+	return p.At
+}
+
+func (p *MonetaryPolicyDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("MonetaryPolicyDTO(%+v)", *p)
+}
+
+type EconomyStateDTO struct {
+	Professional       *ProfessionalDTO      `thrift:"professional,1,required" json:"professional"`
+	Companies          []*CompanyDTO         `thrift:"companies,2,required,list<CompanyDTO>" json:"companies"`
+	CompanyCatalog     []*CompanyDTO         `thrift:"companyCatalog,3,required,list<CompanyDTO>" json:"companyCatalog"`
+	IssuedBasis        int64                 `thrift:"issuedBasis,4,required" json:"issuedBasis"`
+	CancelledBasis     int64                 `thrift:"cancelledBasis,5,required" json:"cancelledBasis"`
+	ReserveBasis       int64                 `thrift:"reserveBasis,6,required" json:"reserveBasis"`
+	PublicCashBasis    int64                 `thrift:"publicCashBasis,7,required" json:"publicCashBasis"`
+	CorporateCashBasis int64                 `thrift:"corporateCashBasis,8,required" json:"corporateCashBasis"`
+	IpoEscrowBasis     int64                 `thrift:"ipoEscrowBasis,9,required" json:"ipoEscrowBasis"`
+	HoldingsBasis      int64                 `thrift:"holdingsBasis,10,required" json:"holdingsBasis"`
+	Policies           []*MonetaryPolicyDTO  `thrift:"policies,11,required,list<MonetaryPolicyDTO>" json:"policies"`
+	PublicInventory    []*InventoryAmountDTO `thrift:"publicInventory,12,required,list<InventoryAmountDTO>" json:"publicInventory"`
+}
+
+func NewEconomyStateDTO() *EconomyStateDTO {
+	return &EconomyStateDTO{}
+}
+
+func (p *EconomyStateDTO) InitDefault() {
+}
+
+var EconomyStateDTO_Professional_DEFAULT *ProfessionalDTO
+
+func (p *EconomyStateDTO) GetProfessional() (v *ProfessionalDTO) {
+	if !p.IsSetProfessional() {
+		return EconomyStateDTO_Professional_DEFAULT
+	}
+	return p.Professional
+}
+
+func (p *EconomyStateDTO) GetCompanies() (v []*CompanyDTO) {
+	return p.Companies
+}
+
+func (p *EconomyStateDTO) GetCompanyCatalog() (v []*CompanyDTO) {
+	return p.CompanyCatalog
+}
+
+func (p *EconomyStateDTO) GetIssuedBasis() (v int64) {
+	return p.IssuedBasis
+}
+
+func (p *EconomyStateDTO) GetCancelledBasis() (v int64) {
+	return p.CancelledBasis
+}
+
+func (p *EconomyStateDTO) GetReserveBasis() (v int64) {
+	return p.ReserveBasis
+}
+
+func (p *EconomyStateDTO) GetPublicCashBasis() (v int64) {
+	return p.PublicCashBasis
+}
+
+func (p *EconomyStateDTO) GetCorporateCashBasis() (v int64) {
+	return p.CorporateCashBasis
+}
+
+func (p *EconomyStateDTO) GetIpoEscrowBasis() (v int64) {
+	return p.IpoEscrowBasis
+}
+
+func (p *EconomyStateDTO) GetHoldingsBasis() (v int64) {
+	return p.HoldingsBasis
+}
+
+func (p *EconomyStateDTO) GetPolicies() (v []*MonetaryPolicyDTO) {
+	return p.Policies
+}
+
+func (p *EconomyStateDTO) GetPublicInventory() (v []*InventoryAmountDTO) {
+	return p.PublicInventory
+}
+
+func (p *EconomyStateDTO) IsSetProfessional() bool {
+	return p.Professional != nil
+}
+
+func (p *EconomyStateDTO) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("EconomyStateDTO(%+v)", *p)
+}
+
+type EconomyActionReq struct {
+	CommandSeq int64           `thrift:"commandSeq,1,required" json:"commandSeq"`
+	Action     string          `thrift:"action,2,required" json:"action"`
+	Target     string          `thrift:"target,3,required" json:"target"`
+	Option     string          `thrift:"option,4,required" json:"option"`
+	Quantity   int64           `thrift:"quantity,5,required" json:"quantity"`
+	VoteId     int64           `thrift:"voteId,6,required" json:"voteId"`
+	Approve    bool            `thrift:"approve,7,required" json:"approve"`
+	Plan       *CompanyPlanDTO `thrift:"plan,8,required" json:"plan"`
+}
+
+func NewEconomyActionReq() *EconomyActionReq {
+	return &EconomyActionReq{}
+}
+
+func (p *EconomyActionReq) InitDefault() {
+}
+
+func (p *EconomyActionReq) GetCommandSeq() (v int64) {
+	return p.CommandSeq
+}
+
+func (p *EconomyActionReq) GetAction() (v string) {
+	return p.Action
+}
+
+func (p *EconomyActionReq) GetTarget() (v string) {
+	return p.Target
+}
+
+func (p *EconomyActionReq) GetOption() (v string) {
+	return p.Option
+}
+
+func (p *EconomyActionReq) GetQuantity() (v int64) {
+	return p.Quantity
+}
+
+func (p *EconomyActionReq) GetVoteId() (v int64) {
+	return p.VoteId
+}
+
+func (p *EconomyActionReq) GetApprove() (v bool) {
+	return p.Approve
+}
+
+var EconomyActionReq_Plan_DEFAULT *CompanyPlanDTO
+
+func (p *EconomyActionReq) GetPlan() (v *CompanyPlanDTO) {
+	if !p.IsSetPlan() {
+		return EconomyActionReq_Plan_DEFAULT
+	}
+	return p.Plan
+}
+
+func (p *EconomyActionReq) IsSetPlan() bool {
+	return p.Plan != nil
+}
+
+func (p *EconomyActionReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("EconomyActionReq(%+v)", *p)
+}
+
+type MonetaryPolicyReq struct {
+	PolicyId      string `thrift:"policyId,1,required" json:"policyId"`
+	Action        string `thrift:"action,2,required" json:"action"`
+	AmountBasis   int64  `thrift:"amountBasis,3,required" json:"amountBasis"`
+	ItemKey       string `thrift:"itemKey,4,required" json:"itemKey"`
+	QuantityMilli int64  `thrift:"quantityMilli,5,required" json:"quantityMilli"`
+	PriceBasis    int64  `thrift:"priceBasis,6,required" json:"priceBasis"`
+}
+
+func NewMonetaryPolicyReq() *MonetaryPolicyReq {
+	return &MonetaryPolicyReq{}
+}
+
+func (p *MonetaryPolicyReq) InitDefault() {
+}
+
+func (p *MonetaryPolicyReq) GetPolicyId() (v string) {
+	return p.PolicyId
+}
+
+func (p *MonetaryPolicyReq) GetAction() (v string) {
+	return p.Action
+}
+
+func (p *MonetaryPolicyReq) GetAmountBasis() (v int64) {
+	return p.AmountBasis
+}
+
+func (p *MonetaryPolicyReq) GetItemKey() (v string) {
+	return p.ItemKey
+}
+
+func (p *MonetaryPolicyReq) GetQuantityMilli() (v int64) {
+	return p.QuantityMilli
+}
+
+func (p *MonetaryPolicyReq) GetPriceBasis() (v int64) {
+	return p.PriceBasis
+}
+
+func (p *MonetaryPolicyReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("MonetaryPolicyReq(%+v)", *p)
+}
+
+type IntroduceCompanyReq struct {
+	CompanyId     string `thrift:"companyId,1,required" json:"companyId"`
+	Shares        int64  `thrift:"shares,2,required" json:"shares"`
+	PriceBasis    int64  `thrift:"priceBasis,3,required" json:"priceBasis"`
+	MinimumShares int64  `thrift:"minimumShares,4,required" json:"minimumShares"`
+	DurationHours int64  `thrift:"durationHours,5,required" json:"durationHours"`
+}
+
+func NewIntroduceCompanyReq() *IntroduceCompanyReq {
+	return &IntroduceCompanyReq{}
+}
+
+func (p *IntroduceCompanyReq) InitDefault() {
+}
+
+func (p *IntroduceCompanyReq) GetCompanyId() (v string) {
+	return p.CompanyId
+}
+
+func (p *IntroduceCompanyReq) GetShares() (v int64) {
+	return p.Shares
+}
+
+func (p *IntroduceCompanyReq) GetPriceBasis() (v int64) {
+	return p.PriceBasis
+}
+
+func (p *IntroduceCompanyReq) GetMinimumShares() (v int64) {
+	return p.MinimumShares
+}
+
+func (p *IntroduceCompanyReq) GetDurationHours() (v int64) {
+	return p.DurationHours
+}
+
+func (p *IntroduceCompanyReq) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("IntroduceCompanyReq(%+v)", *p)
+}
+
 type DashboardStateResp struct {
+	Economy             *EconomyStateDTO         `thrift:"economy,34,required" json:"economy"`
 	Settlement          *SettlementProgressDTO   `thrift:"settlement,33,required" json:"settlement"`
 	Revision            int64                    `thrift:"revision,32,required" json:"revision"`
 	ServerTime          string                   `thrift:"serverTime,1,required" json:"serverTime"`
@@ -2924,6 +3754,15 @@ func NewDashboardStateResp() *DashboardStateResp {
 }
 
 func (p *DashboardStateResp) InitDefault() {
+}
+
+var DashboardStateResp_Economy_DEFAULT *EconomyStateDTO
+
+func (p *DashboardStateResp) GetEconomy() (v *EconomyStateDTO) {
+	if !p.IsSetEconomy() {
+		return DashboardStateResp_Economy_DEFAULT
+	}
+	return p.Economy
 }
 
 var DashboardStateResp_Settlement_DEFAULT *SettlementProgressDTO
@@ -3106,6 +3945,10 @@ func (p *DashboardStateResp) GetCurrentSeason() (v *SeasonStateDTO) {
 		return DashboardStateResp_CurrentSeason_DEFAULT
 	}
 	return p.CurrentSeason
+}
+
+func (p *DashboardStateResp) IsSetEconomy() bool {
+	return p.Economy != nil
 }
 
 func (p *DashboardStateResp) IsSetSettlement() bool {
@@ -4602,6 +5445,12 @@ func (p *Benchmark30mResp) String() string {
 }
 
 type EmpireService interface {
+	EconomyAction(ctx context.Context, req *EconomyActionReq) (r *DashboardStateResp, err error)
+
+	MonetaryPolicy(ctx context.Context, req *MonetaryPolicyReq) (r *DashboardStateResp, err error)
+
+	IntroduceCompany(ctx context.Context, req *IntroduceCompanyReq) (r *DashboardStateResp, err error)
+
 	GetDashboard(ctx context.Context, req *GetDashboardReq) (r *DashboardStateResp, err error)
 
 	RegisterAccount(ctx context.Context, req *RegisterAccountReq) (r *DashboardStateResp, err error)

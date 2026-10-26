@@ -96,6 +96,9 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 		w.ActiveHandle = p.Handle
 		w.AdminMode = isAdmin
 		domain.SettleProduction(p, now)
+		if err := domain.AdvanceEconomy(w, now); err != nil {
+			return err
+		}
 		domain.SettleWarDay(w, p, now)
 		if fn != nil {
 			if err := fn(w, p, now); err != nil {
@@ -103,6 +106,9 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 			}
 		}
 		domain.RefreshSettlementDiscovery(p)
+		if err := domain.CheckEconomy(w); err != nil {
+			return err
+		}
 		if err := s.repo.SaveWorld(txCtx, w); err != nil {
 			return err
 		}
@@ -115,8 +121,8 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 
 func (s *Service) RegisterAccount(ctx context.Context, handle, password, inviteCode string) (*domain.WorldState, string, error) {
 	clean := strings.TrimSpace(handle)
-	if len(clean) < 2 || len(clean) > 24 || strings.ContainsAny(clean, " \t\r\n") {
-		return nil, "", domain.ErrInvalidInput("账号名称长度需在 2–24 个字符之间且不含空格")
+	if len(clean) < 2 || len(clean) > 24 || strings.ContainsAny(clean, " \t\r\n") || strings.HasPrefix(clean, "@") {
+		return nil, "", domain.ErrInvalidInput("账号名称需为 2–24 个字符，不含空格且不能使用机构保留前缀 @")
 	}
 	if len(password) < 6 || len(password) > 64 {
 		return nil, "", domain.ErrInvalidInput("登录密码长度需在 6–64 个字符之间")

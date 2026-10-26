@@ -1,3 +1,4 @@
+import { EconomyAdmin } from "./EconomyAdmin";
 import { useState } from "react";
 import {
   api,
@@ -201,6 +202,7 @@ export function AdminConsoleView({
       )}
 
       <main className="admin-console-wrap">
+        <EconomyAdmin state={state} busy={busy} runAction={runAction} />
         <section className="admin-toolbar" aria-label="沙盒控制">
           <div className="workspace-quick-ops">
             <div className="account-switcher">
@@ -436,32 +438,48 @@ export function AdminConsoleView({
             </div>
             <div className="ledger-audit-box mono-num">
               <div className="ledger-row">
-                <span>发行总量 M_issued</span>
+                <span>净发行量</span>
                 <strong>
-                  {formatGold(state.macroLedger.totalIssuedBasis)} G
+                  {formatGold(state.macroLedger.totalIssuedBasis, 4)} G
                 </strong>
               </div>
               <div className="ledger-row">
-                <span>玩家持有 M_player</span>
-                <span>{formatGold(state.macroLedger.playerHeldBasis)} G</span>
+                <span>玩家持有</span>
+                <span>{formatGold(state.macroLedger.playerHeldBasis, 4)} G</span>
               </div>
               <div className="ledger-row">
-                <span>挂单冻结 M_escrow</span>
-                <span>{formatGold(state.macroLedger.escrowFrozenBasis)} G</span>
+                <span>玩家挂单托管</span>
+                <span>{formatGold(state.macroLedger.escrowFrozenBasis, 4)} G</span>
               </div>
               <div className="ledger-row">
-                <span>做市商池 M_npc</span>
-                <span>{formatGold(state.macroLedger.npcHeldBasis)} G</span>
+                <span>NPC 账户</span>
+                <span>{formatGold(state.macroLedger.npcHeldBasis, 4)} G</span>
               </div>
               <div className="ledger-row">
-                <span>中央国库 M_treasury</span>
-                <span>{formatGold(state.macroLedger.treasuryHeldBasis)} G</span>
+                <span>财政余额</span>
+                <span>{formatGold(state.macroLedger.treasuryHeldBasis, 4)} G</span>
+              </div>
+              <div className="ledger-row">
+                <span>联盟准备金</span>
+                <span>{formatGold(state.economy.reserveBasis, 4)} G</span>
+              </div>
+              <div className="ledger-row">
+                <span>公共采购（含托管）</span>
+                <span>{formatGold(state.economy.publicCashBasis, 4)} G</span>
+              </div>
+              <div className="ledger-row">
+                <span>公司资金（含托管）</span>
+                <span>{formatGold(state.economy.corporateCashBasis, 4)} G</span>
+              </div>
+              <div className="ledger-row">
+                <span>IPO 认购托管</span>
+                <span>{formatGold(state.economy.ipoEscrowBasis, 4)} G</span>
               </div>
               <hr className="ink-divider" />
               <div className="ledger-row">
-                <span>累计销毁税</span>
+                <span>联盟累计注销</span>
                 <strong className="cost-lack">
-                  -{formatGold(state.macroLedger.permanentlyBurnedBasis, 3)} G
+                  {formatGold(state.economy.cancelledBasis, 4)} G
                 </strong>
               </div>
             </div>

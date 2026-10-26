@@ -46,6 +46,25 @@ func main() {
 	}
 
 	svc := app.NewService(txMgr, repo)
+	clockCtx, stopClock := context.WithCancel(context.Background())
+	defer stopClock()
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-clockCtx.Done():
+				return
+			case <-ticker.C:
+				tickCtx, cancelTick := context.WithTimeout(clockCtx, 30*time.Second)
+				err := svc.TickEconomy(tickCtx)
+				cancelTick()
+				if err != nil {
+					slog.Error("economy tick failed", "error", err)
+				}
+			}
+		}
+	}()
 	handler := httpadapter.NewHTTPHandler(svc, readyFn)
 	slog.Info("starting Drop to Empire (D2E) Hertz server", "addr", addr)
 	httpx.Serve(addr, handler)

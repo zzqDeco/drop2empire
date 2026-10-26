@@ -641,6 +641,8 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 	visRadius, revealBeacons := computeRaidVisionRadius(p)
 
 	switch action {
+	case "use_consumable":
+		return useRaidConsumable(p, itemKey, dx, dy, now)
 	case "move":
 		absDx := dx
 		if absDx < 0 {

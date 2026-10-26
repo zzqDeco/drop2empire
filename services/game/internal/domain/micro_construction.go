@@ -169,11 +169,22 @@ func ConstructBuilding(p *PlayerState, code string, quantity int32, seq int64, n
 		if err != nil {
 			return err
 		}
+		useTool := p.Professional != nil && p.Professional.ConstructionTool && p.BuildingCounts[code] > 0 && quantity == 1
+		if useTool {
+			for k, n := range costs {
+				if !isCorporateGood(k) {
+					costs[k] = (n*9 + 9) / 10
+				}
+			}
+		}
 		if reason := CostsBlockReason(p, costs); reason != "" {
 			return ErrPrecondition("insufficient_resource", reason)
 		}
 		for key, cost := range costs {
 			p.ResourcesMilli[key] -= cost
+		}
+		if useTool {
+			p.Professional.ConstructionTool = false
 		}
 		p.BuildingCounts[code] += quantity
 		if b.EffectCode != "" {
