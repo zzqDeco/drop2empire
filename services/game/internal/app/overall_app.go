@@ -30,18 +30,20 @@ func IsPublicSurface(ctx context.Context) bool {
 }
 
 type Service struct {
-	tx      domain.TxManager
-	repo    domain.WorldRepository
-	players domain.PlayerRepository
-	now     func() time.Time
+	tx                  domain.TxManager
+	repo                domain.WorldRepository
+	players             domain.PlayerRepository
+	now                 func() time.Time
+	bootstrapInviteCode string
 }
 
 func NewService(tx domain.TxManager, repo domain.GameRepository) *Service {
 	return &Service{
-		tx:      tx,
-		repo:    repo,
-		players: repo,
-		now:     func() time.Time { return time.Now().UTC() },
+		tx:                  tx,
+		repo:                repo,
+		players:             repo,
+		now:                 func() time.Time { return time.Now().UTC() },
+		bootstrapInviteCode: "teamie-bootstrap",
 	}
 }
 
@@ -143,8 +145,11 @@ func (s *Service) RegisterAccount(ctx context.Context, handle, password, inviteC
 		if _, exists := w.Players[clean]; exists {
 			return domain.ErrPrecondition("handle_taken", "该领主名号已被注册，请直接登录或更换名称")
 		}
-		if err := domain.ConsumeInvite(w, inviteCode, clean, now); err != nil {
-			return err
+		bootstrap := len(w.Players) == 0 && domain.HashInviteCode(inviteCode) == domain.HashInviteCode(s.bootstrapInviteCode)
+		if !bootstrap {
+			if err := domain.ConsumeInvite(w, inviteCode, clean, now); err != nil {
+				return err
+			}
 		}
 		p := domain.NewBlankPlayer(clean, now)
 		p.PasswordHash = domain.HashPassword(clean, password)

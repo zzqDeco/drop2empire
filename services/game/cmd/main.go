@@ -46,6 +46,11 @@ func main() {
 	}
 
 	svc := app.NewService(txMgr, repo)
+	svc.ConfigureBootstrapInvite(httpx.Env("D2E_BOOTSTRAP_INVITE_CODE", "teamie-bootstrap"))
+	if err := svc.BootstrapAdmin(ctx, os.Getenv("D2E_ADMIN_PASSWORD")); err != nil {
+		slog.Error("administrator bootstrap failed", "error", err)
+		os.Exit(1)
+	}
 	clockCtx, stopClock := context.WithCancel(context.Background())
 	defer stopClock()
 	go func() {

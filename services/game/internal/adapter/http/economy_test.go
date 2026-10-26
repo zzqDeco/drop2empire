@@ -63,3 +63,25 @@ func TestEconomyHTTPPoliciesIsolationAndRetry(t *testing.T) {
 		t.Fatal("opening reveals economy catalogs")
 	}
 }
+
+func TestProfessionCostProjectionIncludesIronCapacityAndProduction(t *testing.T) {
+	w := domain.NewDefaultWorld(time.Now())
+	p := w.Players["archon_demo"]
+	p.BuildingCounts[domain.BPWaterCistern] = 1
+	p.UnlockedBlueprints[domain.BPStoneVault] = false
+	p.ResourcesMilli[domain.ResWater] = 0
+	p.Professional = &domain.ProfessionalState{Level: 1}
+	dto := mapEconomy(w, p, false)
+	var water, iron *empire.CostItemDTO
+	for _, c := range dto.Professional.BuildCosts {
+		if c.ResourceKey == domain.ResWater {
+			water = c
+		}
+		if c.ResourceKey == domain.ResIronIngot {
+			iron = c
+		}
+	}
+	if water == nil || iron == nil || water.CapacityMilli != 750000 || water.EtaSeconds != -1 || iron.CapacityMilli == 0 {
+		t.Fatal("professional costs hide a capacity or input blocker")
+	}
+}

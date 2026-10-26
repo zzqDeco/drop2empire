@@ -66,3 +66,5 @@ jobs:
           (cd services/game && go run ./cmd/economy-sim -consumables) > /tmp/s1-consumables-costs.json
           cmp /tmp/s1-industry-14d.json docs/design/04-seasons/simulation/s1-industry-14d.json
           cmp /tmp/s1-consumables-costs.json docs/design/04-seasons/simulation/s1-consumables-costs.json
+          (cd services/game && go run ./cmd/economy-sim -launch) > /tmp/s1-launch-progression.json
+          cmp /tmp/s1-launch-progression.json docs/design/04-seasons/simulation/s1-launch-progression.json

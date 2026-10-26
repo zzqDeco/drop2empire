@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { ICON } from "./icons";
 import { formatGold, formatResource } from "./format";
+import { fixedInput } from "./economy";
 import { ProceduralRelicSVG } from "./ProceduralRelicSVG";
 import { WarGraphMapSVG } from "./WarGraphMapSVG";
 import { CivilizationSilhouetteSVG } from "./RaidSpritesSVG";
@@ -38,15 +39,55 @@ interface SceneProps {
 /**
  * Scene III: Workshop Crafting, Cross-Profession Equipment Rack & Global CLOB Spot Market
  */
-export function MarketSceneView({ state, runAction }: SceneProps) {
+export function MarketSceneView({ state, runAction, busy }: SceneProps) {
   const [selectedMarketItem, setSelectedMarketItem] = useState("water");
-  const [orderSide, setOrderSide] = useState<"BID" | "ASK">("BID");
+  const [orderSide, setOrderSide] = useState<"BID" | "ASK">(
+    state.player.goldBasis > 0 ? "BID" : "ASK",
+  );
   const [orderPriceGold, setOrderPriceGold] = useState("0.1");
   const [orderQtyUnits, setOrderQtyUnits] = useState("1");
 
   const selectedMarketMeta =
     state.marketSummaries.find((m) => m.itemKey === selectedMarketItem) ??
     state.marketSummaries[0];
+
+  let ticket:
+    | { priceBasis: number; quantityMilli: number; totalBasis: number }
+    | undefined;
+  let ticketError = "";
+  try {
+    const priceBasis = fixedInput(orderPriceGold, 4);
+    const units = fixedInput(orderQtyUnits, 0);
+    const total = BigInt(priceBasis) * BigInt(units);
+    if (
+      priceBasis < 100 ||
+      priceBasis > 100_000_000 ||
+      units < 1 ||
+      units > 1_000_000_000
+    ) {
+      throw new Error(
+        "单价范围 0.01–10,000 Gold，数量须为 1–1,000,000,000 的整数",
+      );
+    }
+    if (total > BigInt(Number.MAX_SAFE_INTEGER))
+      throw new Error("订单总额超出界面精确范围，请拆单");
+    ticket = {
+      priceBasis,
+      quantityMilli: units * 1000,
+      totalBasis: Number(total),
+    };
+    if (orderSide === "BID" && ticket.totalBasis > state.player.goldBasis)
+      ticketError = "可用金币不足";
+    if (
+      orderSide === "ASK" &&
+      ticket.quantityMilli >
+        (state.resources.find((r) => r.key === selectedMarketItem)
+          ?.amountMilli ?? 0)
+    )
+      ticketError = "可用库存不足";
+  } catch (error) {
+    ticketError = error instanceof Error ? error.message : "订单输入无效";
+  }
 
   return (
     <div className="lower-workspace" aria-label="工坊制造与全球现货市场">
@@ -223,18 +264,22 @@ export function MarketSceneView({ state, runAction }: SceneProps) {
                           : orderSide === "ASK" && m.bestBidBasis > 0
                             ? m.bestBidBasis
                             : m.lastPriceBasis;
-                      setOrderPriceGold((refPrice / 10000).toFixed(2));
+                      if (refPrice > 0)
+                        setOrderPriceGold((refPrice / 10000).toFixed(4));
                     }}
                   >
                     <td>
                       <strong>{m.itemName}</strong>
                     </td>
                     <td className="num-col mono-num">
-                      {m.lastPriceBasis ? formatGold(m.lastPriceBasis) : "暂无成交"}
+                      {m.lastPriceBasis
+                        ? formatGold(m.lastPriceBasis, 4)
+                        : "暂无成交"}
                     </td>
                     <td className="num-col mono-num">
-                      {m.bestBidBasis > 0 ? formatGold(m.bestBidBasis) : "—"} /{" "}
-                      {m.bestAskBasis > 0 ? formatGold(m.bestAskBasis) : "—"}
+                      {m.bestBidBasis > 0 ? formatGold(m.bestBidBasis, 4) : "—"}{" "}
+                      /{" "}
+                      {m.bestAskBasis > 0 ? formatGold(m.bestAskBasis, 4) : "—"}
                     </td>
                     <td className="num-col mono-num">
                       {formatResource(m.volume24hMilli, 0)}
@@ -255,8 +300,8 @@ export function MarketSceneView({ state, runAction }: SceneProps) {
             className="order-ticket"
             onSubmit={(e) => {
               e.preventDefault();
-              const priceBasis = Math.round(Number(orderPriceGold) * 10000);
-              const quantityMilli = Math.round(Number(orderQtyUnits) * 1000);
+              if (!ticket || ticketError || busy) return;
+              const { priceBasis, quantityMilli } = ticket;
               void runAction(() =>
                 api.placeMarketOrder({
                   itemKey: selectedMarketItem,
@@ -289,7 +334,7 @@ export function MarketSceneView({ state, runAction }: SceneProps) {
                 <span>单价 (Gold)</span>
                 <input
                   type="number"
-                  step="0.01"
+                  step="0.0001"
                   min="0.01"
                   className="mono-num"
                   value={orderPriceGold}
@@ -311,18 +356,16 @@ export function MarketSceneView({ state, runAction }: SceneProps) {
 
             <div className="order-summary mono-num">
               <span>
-                总额{" "}
-                {(
-                  Number(orderPriceGold || 0) * Number(orderQtyUnits || 0)
-                ).toFixed(2)}{" "}
-                G
+                总额 {ticket ? formatGold(ticket.totalBasis, 4) : "—"} G
               </span>
-              <span>交易税 1% · 全额进入财政账户</span>
+              <span>卖方每笔成交扣税 1% · 进入财政账户</span>
+              {ticketError && <span role="status">{ticketError}</span>}
             </div>
 
             <button
               type="submit"
               className="btn-primary btn-block"
+              disabled={busy || !ticket || Boolean(ticketError)}
               data-pop={
                 orderSide === "BID"
                   ? `挂买 ${orderQtyUnits}×${selectedMarketMeta.itemName}`
@@ -359,7 +402,7 @@ export function MarketSceneView({ state, runAction }: SceneProps) {
                           </span>
                         </td>
                         <td className="num-col mono-num">
-                          {formatGold(o.priceBasis)}
+                          {formatGold(o.priceBasis, 4)}
                         </td>
                         <td className="num-col mono-num">
                           {formatResource(o.remainingMilli, 0)}
@@ -387,7 +430,7 @@ export function MarketSceneView({ state, runAction }: SceneProps) {
                               onClick={() => {
                                 setOrderSide(o.side === "ASK" ? "BID" : "ASK");
                                 setOrderPriceGold(
-                                  (o.priceBasis / 10000).toFixed(2),
+                                  (o.priceBasis / 10000).toFixed(4),
                                 );
                                 setOrderQtyUnits(
                                   String(
@@ -431,7 +474,7 @@ export function MarketSceneView({ state, runAction }: SceneProps) {
                     <td className="mono-num">{tr.executedAt}</td>
                     <td>{tr.itemName}</td>
                     <td className="num-col mono-num">
-                      {formatGold(tr.priceBasis)}
+                      {formatGold(tr.priceBasis, 4)}
                     </td>
                     <td className="num-col mono-num">
                       {formatResource(tr.quantityMilli, 0)}

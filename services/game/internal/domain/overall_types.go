@@ -153,7 +153,6 @@ type ProfessionSpec struct {
 	MarketRoleText        string
 	PassiveBonusText      string
 	JobEfficiencyBonusPct map[string]int64 // JobKey -> +efficiency%
-	StarterGrantUnits     map[string]int64 // ResourceKey -> initial units granted
 	ArmamentOutputMultPct int64            // e.g. 125 for Artisan (+25% armament batch output)
 }
 
@@ -449,6 +448,7 @@ type PlayerState struct {
 	LastSettledAt           time.Time              `json:"lastSettledAt"`
 	LastOfflineSummary      string                 `json:"lastOfflineSummary"`
 	EventLogs               []EventEntry           `json:"eventLogs"`
+	NextEventSeq            int64                  `json:"nextEventSeq"`
 }
 
 type MarketOrder struct {

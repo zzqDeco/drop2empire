@@ -258,7 +258,8 @@ func TestPendingCollectiblesAuditedIncrementally(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		p := w.Players["archon_demo"]
+		p := domain.NewBlankPlayer("collectible-test", now)
+		w.Players[p.Handle] = p
 		p.ResourcesMilli[domain.ResSeasonChest] = domain.ResourceScale
 		if err := domain.OpenSeasonChest(w, p, 0, now); err != nil {
 			return err

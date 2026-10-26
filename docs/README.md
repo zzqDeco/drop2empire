@@ -48,5 +48,5 @@
 - [公司、供应链与股东治理](design/02-macro/companies-and-governance.md)
 - [职业设施与耗材使用](design/03-micro/profession-consumables.md)
 - [S1 产业与十二种职业制品目录](design/04-seasons/s1-industry-catalog.md)
-- [经济仿真与校准结果](design/04-seasons/economy-calibration.md)
+- [经济仿真与校准结果](design/04-seasons/economy-calibration.md) — 14 天压力场景、职业成本与 12 小时真实生产回放
 - [清档重开、验收与回滚](operations/economy-clean-start.md)

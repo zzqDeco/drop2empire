@@ -1,11 +1,9 @@
 package domain
 
-// MacroBalance centralizes numerical parameters for Profession starter grants, Workshop crafting fees,
+// MacroBalance centralizes numerical parameters for Workshop crafting fees,
 // Spot Market bounds, Guild creation/donation rules, and Chamber War combat & reward formulas.
 var MacroBalance = struct {
-	MaxCraftBatchesPerReq  int32
-	StarterUniversalGrants map[string]int64
-	StarterActivityPoints  int32
+	MaxCraftBatchesPerReq int32
 
 	// Spot Market order validation bounds:
 	MinOrderPriceBasis int64
@@ -50,14 +48,6 @@ var MacroBalance = struct {
 	MaxWarHistoryEntries    int
 }{
 	MaxCraftBatchesPerReq: 20,
-	StarterUniversalGrants: map[string]int64{
-		ResIronIngot:   10 * ResourceScale,
-		ResRation:      12 * ResourceScale,
-		ResInfantryKit: 6 * ResourceScale,
-		ResArcherKit:   6 * ResourceScale,
-		ResCavalryKit:  6 * ResourceScale,
-	},
-	StarterActivityPoints: 120,
 
 	MinOrderPriceBasis: 100,
 	MaxOrderPriceBasis: 100_000_000,
@@ -168,7 +158,6 @@ var ProfessionCatalog = []ProfessionSpec{
 			JobWood:  15,
 			JobStone: 15,
 		},
-		StarterGrantUnits:     map[string]int64{ResAutoPump: 2},
 		ArmamentOutputMultPct: 100,
 	},
 	{
@@ -186,7 +175,6 @@ var ProfessionCatalog = []ProfessionSpec{
 			JobWater:      10,
 			JobCharcoal:   15,
 		},
-		StarterGrantUnits:     map[string]int64{ResAlchCatalyst: 2},
 		ArmamentOutputMultPct: 100,
 	},
 	{
@@ -203,7 +191,6 @@ var ProfessionCatalog = []ProfessionSpec{
 			JobStone:      20,
 			JobPrepRation: 15,
 		},
-		StarterGrantUnits:     map[string]int64{ResEnchantScroll: 2},
 		ArmamentOutputMultPct: 100,
 	},
 	{
@@ -221,7 +208,6 @@ var ProfessionCatalog = []ProfessionSpec{
 			JobWood:      15,
 			JobCharcoal:  20,
 		},
-		StarterGrantUnits:     map[string]int64{ResHeavyToolset: 2},
 		ArmamentOutputMultPct: 125,
 	},
 }

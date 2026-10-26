@@ -128,35 +128,11 @@ func EnsureDefaultAccounts(w *WorldState, now time.Time) {
 		EnsureSettlementState(pl)
 		EnsureRaidState(pl)
 	}
-	if p, ok := w.Players["pioneer"]; ok {
-		if p.PasswordHash == "" {
-			p.PasswordHash = HashPassword("pioneer", "pioneer123")
-		}
-	} else {
-		pioneer := NewBlankPlayer("pioneer", now)
-		pioneer.PasswordHash = HashPassword("pioneer", "pioneer123")
-		w.Players["pioneer"] = pioneer
-	}
-	if vet, ok := w.Players["archon_demo"]; ok {
-		if vet.PasswordHash == "" {
-			vet.PasswordHash = HashPassword("archon_demo", "demo123456")
-		}
-	}
-	if adm, ok := w.Players["admin"]; ok {
-		adm.IsAdmin = true
-		if adm.PasswordHash == "" {
-			adm.PasswordHash = HashPassword("admin", "admin123456")
-		}
-	} else {
-		adm := NewBlankPlayer("admin", now)
-		adm.IsAdmin = true
-		adm.PasswordHash = HashPassword("admin", "admin123456")
-		w.Players["admin"] = adm
-	}
 	EnsureGuildState(w)
 }
 
-func NewDefaultWorld(now time.Time) *WorldState {
+// NewEmptyWorld is the production bootstrap: no demo identities, stock or currency.
+func NewEmptyWorld(now time.Time) *WorldState {
 	lastPrices := make(map[string]int64, len(ResourceCatalog))
 	openPrices := make(map[string]int64, len(ResourceCatalog))
 	for _, r := range ResourceCatalog {
@@ -199,6 +175,15 @@ func NewDefaultWorld(now time.Time) *WorldState {
 		NextTradeSeq:           500,
 		NextCollectibleSeq:     1,
 	}
+
+	EnsureGuildState(w)
+	EnsureEconomy(w, now)
+	return w
+}
+
+// NewDefaultWorld is an explicit fixture used by local simulations and tests.
+func NewDefaultWorld(now time.Time) *WorldState {
+	w := NewEmptyWorld(now)
 
 	// Primary player starts at 0 water, 0 population.
 	pioneer := NewBlankPlayer("pioneer", now)
@@ -297,8 +282,9 @@ func NewBlankPlayer(handle string, now time.Time) *PlayerState {
 }
 
 func AppendLog(p *PlayerState, now time.Time, category, msg string) {
+	p.NextEventSeq++
 	entry := EventEntry{
-		ID:        fmt.Sprintf("ev_%d_%d", now.UnixNano(), len(p.EventLogs)+1),
+		ID:        fmt.Sprintf("ev_%d_%d", now.UnixNano(), p.NextEventSeq),
 		Timestamp: now.UTC().Format("15:04:05"),
 		Category:  category,
 		Message:   msg,

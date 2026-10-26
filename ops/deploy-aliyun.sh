@@ -7,8 +7,18 @@ ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 SSH_HOST=${1:-${DEPLOY_SSH_HOST:-120.25.210.202}}
 PUBLIC_PORT=${PUBLIC_HTTPS_PORT:-8443}
 VERSION=${VERSION:-v1.0.0}
+CLEAN_START_DATABASE=${CLEAN_START_DATABASE:-}
+EXPECTED_PREVIOUS_SHA=${EXPECTED_PREVIOUS_SHA:-}
 COMMIT_SHA=$(git -C "$ROOT_DIR" rev-parse HEAD)
 SHORT_SHA=$(git -C "$ROOT_DIR" rev-parse --short=12 HEAD)
+if [[ -n "$CLEAN_START_DATABASE" && ! "$CLEAN_START_DATABASE" =~ ^d2e_restart_[a-z0-9_]+$ ]]; then
+  echo "CLEAN_START_DATABASE must be a new d2e_restart_* database name" >&2
+  exit 1
+fi
+if [[ -n "$(git -C "$ROOT_DIR" status --porcelain)" ]]; then
+  echo "Release requires a clean, committed checkout" >&2
+  exit 1
+fi
 
 echo "==> [1/6] Running architecture guard and building artifacts locally for linux/amd64 ($VERSION @ $SHORT_SHA)..."
 bash "$ROOT_DIR/ops/check-architecture.sh"
@@ -61,16 +71,19 @@ ssh -o ConnectTimeout=10 "$SSH_HOST" "mkdir -p /srv/drop2empire/config /srv/drop
 scp -q "$STAGE_DIR/release.tar.gz" "$SSH_HOST:/srv/drop2empire/releases/$SHORT_SHA/release.tar.gz"
 
 echo "==> [4/6] Building runtime images & rolling out compose project 'drop2empire' on $SSH_HOST..."
-ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s" -- "$VERSION" "$COMMIT_SHA" "$SHORT_SHA" "$PUBLIC_PORT" "$SSH_HOST" <<'EOF'
-set -euo pipefail
+ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s" -- "$VERSION" "$COMMIT_SHA" "$SHORT_SHA" "$PUBLIC_PORT" "$SSH_HOST" "$CLEAN_START_DATABASE" "$EXPECTED_PREVIOUS_SHA" <<'EOF'
+set -Eeuo pipefail
 VERSION="$1"
 COMMIT_SHA="$2"
 SHORT_SHA="$3"
 PUBLIC_PORT="$4"
 HOST_IP="$5"
+NEW_DB="$6"
+EXPECTED_PREVIOUS_SHA="$7"
 RELEASE_DIR="/srv/drop2empire/releases/$SHORT_SHA"
 ENV_FILE="/srv/drop2empire/config/production.env"
 TLS_DIR="/srv/drop2empire/tls"
+PREVIOUS_DIR=$(readlink -f /srv/drop2empire/current || true)
 
 cd "$RELEASE_DIR"
 tar -xzf release.tar.gz 2>/dev/null
@@ -87,7 +100,7 @@ fi
 
 # Initialize production.env once if not present; never overwrite existing DB password
 if [[ ! -f "$ENV_FILE" ]]; then
-  RAND_PASS=$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 28)
+  RAND_PASS=$(openssl rand -hex 24)
   umask 077
   cat > "$ENV_FILE" <<ENVEOF
 PUBLIC_HTTPS_PORT=${PUBLIC_PORT}
@@ -113,6 +126,7 @@ docker tag "$PG_ID" drop2empire-postgres:17-alpine
 cat > Dockerfile.game.runtime <<DOCKEREOF
 FROM drop2empire-base-alpine:local
 USER root
+LABEL org.opencontainers.image.version=${VERSION} org.opencontainers.image.revision=${COMMIT_SHA}
 WORKDIR /app
 COPY service /app/service
 RUN chmod 0755 /app/service
@@ -143,6 +157,50 @@ WEB_IMAGE=${WEB_IMG}
 POSTGRES_IMAGE=drop2empire-postgres:17-alpine
 IMGEOF
 
+BACKUP_DIR="/srv/drop2empire/backups/$(date -u +%Y%m%dT%H%M%SZ)-${SHORT_SHA}"
+mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+cp -p "$ENV_FILE" "$BACKUP_DIR/production.env"
+printf '%s\n' "$PREVIOUS_DIR" > "$BACKUP_DIR/previous-release"
+docker inspect drop2empire-game-1 drop2empire-web-1 --format '{{.Name}} {{.Image}}' > "$BACKUP_DIR/previous-images" 2>/dev/null || true
+ROLLBACK_NEEDED=0
+rollback() {
+  rc=$?
+  trap - ERR
+  if [[ "$ROLLBACK_NEEDED" == 1 && -f "$PREVIOUS_DIR/images.env" ]]; then
+    echo "Rollout failed; restoring the previous code and database connection" >&2
+    cp -p "$BACKUP_DIR/production.env" "$ENV_FILE"
+    docker compose -p drop2empire --project-directory "$PREVIOUS_DIR/deploy" --env-file "$ENV_FILE" --env-file "$PREVIOUS_DIR/images.env" -f "$PREVIOUS_DIR/deploy/compose.production.yaml" up -d --remove-orphans
+    ln -sfn "$PREVIOUS_DIR" /srv/drop2empire/current
+  fi
+  exit "$rc"
+}
+trap rollback ERR
+
+if [[ -n "$NEW_DB" ]]; then
+  [[ "$NEW_DB" =~ ^d2e_restart_[a-z0-9_]+$ ]]
+  [[ -n "$EXPECTED_PREVIOUS_SHA" && -f "$PREVIOUS_DIR/images.env" ]]
+  OLD_SHA=$(docker exec drop2empire-game-1 wget -qO- http://127.0.0.1:8080/version | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])')
+  [[ "$OLD_SHA" == "$EXPECTED_PREVIOUS_SHA" ]]
+  EXISTS=$(docker exec drop2empire-postgres-1 sh -c 'psql -U "$POSTGRES_USER" -d postgres -Atc "$1"' sh "SELECT 1 FROM pg_database WHERE datname='$NEW_DB'")
+  [[ -z "$EXISTS" ]] # Never erase or reuse a previous attempt's database.
+  OLD_DB=$(sed -n 's/^POSTGRES_DB=//p' "$ENV_FILE" | tail -1)
+  [[ "$OLD_DB" =~ ^[a-zA-Z0-9_]+$ ]]
+  ROLLBACK_NEEDED=1
+  docker stop drop2empire-web-1 drop2empire-game-1 >/dev/null
+  docker exec drop2empire-postgres-1 sh -c 'exec pg_dump -U "$POSTGRES_USER" -Fc "$1"' sh "$OLD_DB" > "$BACKUP_DIR/database.dump"
+  chmod 600 "$BACKUP_DIR/database.dump"
+  docker exec -i drop2empire-postgres-1 pg_restore --list < "$BACKUP_DIR/database.dump" > "$BACKUP_DIR/database-contents.txt"
+  docker exec drop2empire-postgres-1 sh -c 'exec createdb -U "$POSTGRES_USER" "$1"' sh "$NEW_DB"
+  sed -i "s/^POSTGRES_DB=.*/POSTGRES_DB=${NEW_DB}/" "$ENV_FILE"
+fi
+# The password is generated and retained on the production host, never in Git or logs.
+if ! grep -q '^D2E_ADMIN_PASSWORD=.' "$ENV_FILE"; then
+  umask 077
+  printf '\nD2E_ADMIN_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> "$ENV_FILE"
+fi
+chmod 600 "$ENV_FILE"
+ROLLBACK_NEEDED=1
 docker compose -p drop2empire \
   --project-directory "$RELEASE_DIR/deploy" \
   --env-file "$ENV_FILE" \
@@ -150,7 +208,25 @@ docker compose -p drop2empire \
   -f "$RELEASE_DIR/deploy/compose.production.yaml" \
   up -d --remove-orphans
 
+# Verify both immutable revisions before publishing the current-release pointer.
+for i in {1..30}; do
+  if curl -fsS --resolve "${HOST_IP}:${PUBLIC_PORT}:127.0.0.1" "https://${HOST_IP}:${PUBLIC_PORT}/readyz" >/dev/null 2>&1; then break; fi
+  sleep 1
+done
+curl -fsS --resolve "${HOST_IP}:${PUBLIC_PORT}:127.0.0.1" "https://${HOST_IP}:${PUBLIC_PORT}/readyz" >/dev/null
+WEB_SHA=$(curl -fsS --resolve "${HOST_IP}:${PUBLIC_PORT}:127.0.0.1" "https://${HOST_IP}:${PUBLIC_PORT}/version.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])')
+GAME_SHA=$(docker exec drop2empire-game-1 wget -qO- http://127.0.0.1:8080/version | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])')
+[[ "$WEB_SHA" == "$COMMIT_SHA" && "$GAME_SHA" == "$COMMIT_SHA" ]]
+for path in /admin /api/v1/empire/admin/economy/policy; do
+  [[ "$(curl -s -o /dev/null -w '%{http_code}' --resolve "${HOST_IP}:${PUBLIC_PORT}:127.0.0.1" "https://${HOST_IP}:${PUBLIC_PORT}${path}")" == 403 ]]
+done
+[[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18480/admin)" == 200 ]]
+printf '%s\n' "$COMMIT_SHA" > "$BACKUP_DIR/new-sha"
+printf '%s\n' "${NEW_DB:-unchanged}" > "$BACKUP_DIR/new-database"
 ln -sfn "$RELEASE_DIR" /srv/drop2empire/current
+ROLLBACK_NEEDED=0
+trap - ERR
+echo "Rollback records: $BACKUP_DIR"
 EOF
 
 echo "==> [5/6] Verifying Drop to Empire HTTPS health & API readiness on $SSH_HOST:$PUBLIC_PORT..."
@@ -168,10 +244,10 @@ curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/h
 curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/readyz" >/dev/null
 curl -fsS --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/version.json"
 echo ""
-# Verify public /admin is blocked (404) while loopback SSH tunnel port 18480 serves /admin (200)
+# Verify public /admin is blocked while loopback SSH tunnel port serves the console.
 PUB_ADMIN_STATUS=$(curl -s -o /dev/null -w '%{http_code}' --resolve "${HOST_IP}:${PORT}:127.0.0.1" "https://${HOST_IP}:${PORT}/admin")
-if [[ "$PUB_ADMIN_STATUS" != "404" ]]; then
-  echo "ERROR: Expected public /admin to return 404, got ${PUB_ADMIN_STATUS}" >&2
+if [[ "$PUB_ADMIN_STATUS" != "403" ]]; then
+  echo "ERROR: Expected public /admin to return 403, got ${PUB_ADMIN_STATUS}" >&2
   exit 1
 fi
 TUNNEL_ADMIN_STATUS=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:18480/admin")
