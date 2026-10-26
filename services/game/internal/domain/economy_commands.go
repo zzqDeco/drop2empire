@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -44,6 +45,11 @@ func ApplyEconomyCommand(w *WorldState, p *PlayerState, seq int64, cmd EconomyCo
 func HasFinancialPosition(w *WorldState, p *PlayerState) bool {
 	if w.Economy == nil {
 		return false
+	}
+	for _, order := range w.Orders {
+		if order.MakerHandle == p.Handle && order.Status == "OPEN" && order.RemainingMilli > 0 && strings.HasPrefix(order.ItemKey, "share:") {
+			return true
+		}
 	}
 	for id, c := range w.Economy.Companies {
 		if p.ResourcesMilli[ShareKey(id)]+p.FrozenResourcesMilli[ShareKey(id)] > 0 || c.Status == "subscription" && c.Subscriptions[p.Handle] > 0 {

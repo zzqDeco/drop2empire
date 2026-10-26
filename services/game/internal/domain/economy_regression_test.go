@@ -7,6 +7,40 @@ import (
 	"time"
 )
 
+func TestSeasonalShareBidKeepsPortfolioAccessibleAfterSellingLastShare(t *testing.T) {
+	w, p, now := fundedEconomy(t)
+	c := listedCompany(t, w, p, "alloy", now)
+	RolloverSeason(w, "S2", now.Add(30*24*time.Hour))
+	now = now.Add(30 * 24 * time.Hour)
+	q := NewBlankPlayer("share-buyer", now)
+	q.Profession = ProfMage
+	w.Players[q.Handle] = q
+	fundPlayerByProcurement(t, w, q, 1000*GoldScale, now)
+	key := ShareKey(c.ID)
+	mustEconomy(t, PlaceMarketOrder(w, p, key, "BID", 500, 1000, now))
+	bidID := w.Orders[0].ID
+	mustEconomy(t, PlaceMarketOrder(w, p, key, "ASK", 1000, c.Shares*ResourceScale, now))
+	mustEconomy(t, PlaceMarketOrder(w, q, key, "BID", 1000, c.Shares*ResourceScale, now))
+	if p.Profession != ProfNone || p.ResourcesMilli[key] != 0 || p.FrozenResourcesMilli[key] != 0 || p.GoldFrozenBasis != 500 {
+		t.Fatal("fixture must retain only an open share bid after the season")
+	}
+	if !HasFinancialPosition(w, p) {
+		t.Fatal("open share bid hid the retained portfolio and cancellation controls")
+	}
+	mustEconomy(t, PlaceMarketOrder(w, p, key, "BID", 400, 1000, now))
+	secondBidID := w.Orders[0].ID
+	mustEconomy(t, CancelMarketOrder(w, p, bidID, now))
+	if !HasFinancialPosition(w, p) {
+		t.Fatal("remaining share bid lost its management access")
+	}
+	mustEconomy(t, CancelMarketOrder(w, p, secondBidID, now))
+	mustEconomy(t, PlaceMarketOrder(w, q, key, "BID", 400, 1000, now))
+	if HasFinancialPosition(w, p) || p.GoldFrozenBasis != 0 {
+		t.Fatal("cancelled or another player's orders kept financial access or frozen cash")
+	}
+	mustEconomy(t, CheckEconomy(w))
+}
+
 func TestCompanyExpansionBudgetCanBeReducedAndCancelled(t *testing.T) {
 	w, p, now := fundedEconomy(t)
 	c := listedCompany(t, w, p, "alloy", now)
