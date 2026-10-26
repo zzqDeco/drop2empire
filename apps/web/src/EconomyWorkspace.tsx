@@ -6,7 +6,8 @@ import {
   type CostItemDTO,
   type DashboardStateResp,
 } from "@drop2empire/api-client";
-import { formatGold as gold, formatResource } from "./format";
+import { formatGold as gold, formatResource, formatETA } from "./format";
+import { costStatus, craftPreview, facilityPreview } from "./professionPreview";
 import { economyCommand, fixedInput } from "./economy";
 import { MarketSceneView as SpotMarket } from "./MacroEmpireWorkspace";
 
@@ -42,6 +43,18 @@ function Costs({ costs }: { costs: CostItemDTO[] }) {
           <span className="mono-num">
             {formatResource(c.currentMilli)} / {formatResource(c.requiredMilli)}
           </span>
+          {costStatus(c) && (
+            <small>
+              {" "}
+              · {costStatus(c)}
+              {c.etaSeconds > 0 && (
+                <>
+                  ，约{" "}
+                  <span className="mono-num">{formatETA(c.etaSeconds)}</span>
+                </>
+              )}
+            </small>
+          )}
         </li>
       ))}
     </ul>
@@ -59,30 +72,18 @@ export function ProfessionWorkshop({
     state.war.nodes[0]?.nodeId ?? "",
   );
   const [batches, setBatches] = useState("1");
-  const facilityCosts = ps.buildCosts.map((c) => ({
-    ...c,
-    requiredMilli:
-      ps.level > 0 && pack ? (c.requiredMilli * 8) / 10 : c.requiredMilli,
-  }));
-  if (ps.level > 0 && pack)
-    facilityCosts.push({
-      resourceKey: pack,
-      resourceName: packOptions.find((p) => p.value === pack)!.name,
-      requiredMilli: 4000,
-      currentMilli:
-        state.resources.find((r) => r.key === pack)?.amountMilli ?? 0,
-      etaSeconds: -1,
-      capacityMilli: 0,
-    });
+  const facilityCosts = facilityPreview(state, pack);
+  const batchCount = /^\d+$/.test(batches.trim()) ? Number(batches) : NaN;
+  const hasWarConsumables = ps.consumables.some(
+    (c) => c.use === "war" && c.inventoryMilli > 0,
+  );
   return (
     <div className="economy-stack">
       <section className="subpanel" aria-label="职业设施">
         <h3>
           {professionNames[state.player.profession]} · {ps.facilityName}
         </h3>
-        <p>
-          专属制造资格已解锁。支付建造材料后启用产线，任何职业都能购买和使用制品。
-        </p>
+        {ps.level === 0 && <p>先安排炼铁岗位，再支付材料启用产线。</p>}
         {ps.level < 2 && (
           <>
             <Costs costs={facilityCosts} />
@@ -129,8 +130,10 @@ export function ProfessionWorkshop({
               {ps.consumables.find((c) => c.itemKey === ps.queueItem)?.name} ·
               剩余 <span className="mono-num">{ps.remainingSeconds}</span> 秒
             </>
-          ) : (
+          ) : ps.level > 0 ? (
             "产线空闲"
+          ) : (
+            "产线尚未建造"
           )}
         </p>
         {ps.productionCharges > 0 && (
@@ -138,6 +141,18 @@ export function ProfessionWorkshop({
             已装载
             {ps.consumables.find((c) => c.itemKey === ps.productionMode)?.name}
             ，剩余 <span className="mono-num">{ps.productionCharges}</span> 批。
+          </p>
+        )}
+        {ps.constructionTool && (
+          <p role="status">精锻刀具已装载，下次重复建设消耗。</p>
+        )}
+        {ps.guildTool && (
+          <p role="status">工事包已装载，下次公会后勤建设消耗。</p>
+        )}
+        {ps.sigilSeconds > 0 && (
+          <p role="status">
+            定向符印剩余 <span className="mono-num">{ps.sigilSeconds}</span>{" "}
+            秒采石作业。
           </p>
         )}
         <label>
@@ -155,54 +170,76 @@ export function ProfessionWorkshop({
       <div className="economy-grid">
         {ps.consumables
           .filter((c) => c.profession === state.player.profession)
-          .map((c) => (
-            <article className="subpanel" key={c.itemKey}>
-              <h3>{c.name}</h3>
-              <p>{c.effect}</p>
-              <p>基础每批材料：</p>
-              <Costs costs={c.costs} />
-              <p>
-                每批{" "}
-                <span className="mono-num">
-                  {formatResource(c.outputMilli)}
-                </span>{" "}
-                件 · 基础耗时 <span className="mono-num">{c.seconds}</span>{" "}
-                秒；设施和已装载耗材效果在入列时结算。
-              </p>
-              <button
-                className="btn-primary"
-                disabled={busy || ps.level === 0 || Boolean(ps.queueItem)}
-                onClick={() =>
-                  void runAction(
-                    () =>
-                      economyCommand(state, "craft", {
-                        target: c.itemKey,
-                        quantity: fixedInput(batches, 0),
-                      }),
-                    "制造任务已入列",
-                  )
-                }
-              >
-                制造
-              </button>
-            </article>
-          ))}
+          .map((c) => {
+            const preview = craftPreview(c, state, batchCount);
+            const shortage = preview?.costs.find(
+              (cost) => cost.currentMilli < cost.requiredMilli,
+            );
+            return (
+              <article className="subpanel" key={c.itemKey}>
+                <h3>{c.name}</h3>
+                <p>{c.effect}</p>
+                <p>本次制造材料：</p>
+                {preview && <Costs costs={preview.costs} />}
+                <p>
+                  本次产出{" "}
+                  <span className="mono-num">
+                    {formatResource(preview?.outputMilli ?? 0, 0)}
+                  </span>{" "}
+                  件 · 耗时{" "}
+                  <span className="mono-num">{preview?.seconds ?? "—"}</span> 秒
+                </p>
+                <button
+                  className="btn-primary"
+                  disabled={
+                    busy ||
+                    ps.level === 0 ||
+                    Boolean(ps.queueItem) ||
+                    !preview ||
+                    Boolean(shortage)
+                  }
+                  onClick={() =>
+                    void runAction(
+                      () =>
+                        economyCommand(state, "craft", {
+                          target: c.itemKey,
+                          quantity: fixedInput(batches, 0),
+                        }),
+                      "制造任务已入列",
+                    )
+                  }
+                >
+                  {!preview
+                    ? "请输入 1–20 的整数批次"
+                    : ps.level === 0
+                      ? "先建造职业工坊"
+                      : ps.queueItem
+                        ? "产线忙碌"
+                        : shortage
+                          ? `${shortage.resourceName}不足`
+                          : "制造"}
+                </button>
+              </article>
+            );
+          })}
       </div>
       <section className="subpanel">
         <h3>耗材仓库</h3>
-        <label>
-          战争支援节点{" "}
-          <select
-            value={targetNode}
-            onChange={(e) => setTargetNode(e.target.value)}
-          >
-            {state.war.nodes.map((n) => (
-              <option key={n.nodeId} value={n.nodeId}>
-                {n.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {hasWarConsumables && (
+          <label>
+            战争支援节点{" "}
+            <select
+              value={targetNode}
+              onChange={(e) => setTargetNode(e.target.value)}
+            >
+              {state.war.nodes.map((n) => (
+                <option key={n.nodeId} value={n.nodeId}>
+                  {n.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {ps.consumables
           .filter((c) => c.inventoryMilli > 0)
           .map((c) => (
@@ -469,8 +506,9 @@ function CompanyGovernance({
         <>
           <p>
             本期快照票权 <span className="mono-num">{c.vote.myWeight}</span>
-            ；赞成 <span className="mono-num">{c.vote.yesShares}</span>，反对{" "}
-            <span className="mono-num">{c.vote.noShares}</span>。
+            ；赞成 <span className="mono-num">
+              {c.vote.yesShares}
+            </span>，反对 <span className="mono-num">{c.vote.noShares}</span>。
           </p>
           <p>
             截止{" "}

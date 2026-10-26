@@ -126,3 +126,10 @@ Shares trade through the existing order endpoint with `itemKey="share:<companyId
 A persisted minute cursor drives corporate production/IPO/vote settlement from both the background ticker and global state requests. Catch-up is capped at eight hours. High-frequency raid commands retain player-only locking and do not advance companies. Legacy economic snapshots are rejected by both load paths with `economy_restart_required`; this release requires the documented full clean start, not an automatic legacy migration.
 
 Company cards expose actual cash/revenue/realized profit, inventory, built/running lines, current/alternative recipes, IPO, share holdings/order book, plan, vote snapshot totals and pending expansion budget. Prices are integer Basis; no float accumulators. Important company event acknowledgements are client-local and do not change authoritative financial state.
+
+
+### Empty-database bootstrap
+
+Before opening HTTP listeners, the service requires a 16–64 character `D2E_ADMIN_PASSWORD` to create the sole `admin` account in an empty database. Existing administrators are never replaced or re-passworded. Nonempty databases without an administrator fail closed. Production does not seed `pioneer`, `archon_demo`, default passwords, player progress, currency, quotes or companies. Administrative login remains restricted to the SSH loopback path.
+
+`D2E_BOOTSTRAP_INVITE_CODE` (default `teamie-bootstrap`) applies only if there are zero accounts and never grants administrator rights. Normal production bootstrap has already created the administrator, so public players require a fresh single-use invitation. This changes initialization behavior, not the Thrift wire schema.

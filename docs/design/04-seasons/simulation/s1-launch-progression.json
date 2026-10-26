@@ -1,0 +1,136 @@
+{
+  "hours": 12,
+  "players": [
+    {
+      "profession": "scientist",
+      "openingSeconds": 920,
+      "facilitySeconds": 1100,
+      "firstCraftSeconds": 1290,
+      "firstSaleSeconds": 960,
+      "upgradeSeconds": 18240,
+      "productionUseSeconds": 1620,
+      "crossProfessionPurchases": 1,
+      "craftedUnits": {
+        "fire_control_pack": 12,
+        "overload_battery": 5,
+        "portable_detector": 1
+      },
+      "goldBasis": 16418115
+    },
+    {
+      "profession": "alchemist",
+      "openingSeconds": 920,
+      "facilitySeconds": 1110,
+      "firstCraftSeconds": 1310,
+      "firstSaleSeconds": 960,
+      "upgradeSeconds": 18240,
+      "productionUseSeconds": 1620,
+      "crossProfessionPurchases": 0,
+      "craftedUnits": {
+        "field_medkit": 12,
+        "industrial_catalyst": 5,
+        "recovery_potion": 2
+      },
+      "goldBasis": 16595945
+    },
+    {
+      "profession": "mage",
+      "openingSeconds": 920,
+      "facilitySeconds": 1140,
+      "firstCraftSeconds": 1270,
+      "firstSaleSeconds": 960,
+      "upgradeSeconds": 18240,
+      "productionUseSeconds": 1860,
+      "crossProfessionPurchases": 1,
+      "craftedUnits": {
+        "blink_scroll": 1,
+        "defense_ward": 12,
+        "direction_sigil": 3
+      },
+      "goldBasis": 17708580
+    },
+    {
+      "profession": "artisan",
+      "openingSeconds": 920,
+      "facilitySeconds": 1140,
+      "firstCraftSeconds": 1270,
+      "firstSaleSeconds": 960,
+      "upgradeSeconds": 18240,
+      "productionUseSeconds": 1560,
+      "crossProfessionPurchases": 1,
+      "craftedUnits": {
+        "breach_tool": 1,
+        "fine_tool": 2,
+        "fortification_pack": 120
+      },
+      "goldBasis": 15411380
+    }
+  ],
+  "companies": [
+    {
+      "id": "alloy",
+      "batches": 4,
+      "cashBasis": 3101200,
+      "revenueBasis": 5821200,
+      "realizedProfitBasis": 1189200,
+      "unsoldUnits": 16,
+      "state": "库存达到两批覆盖，等待销量"
+    },
+    {
+      "id": "control",
+      "batches": 4,
+      "cashBasis": 2551600,
+      "revenueBasis": 3999600,
+      "realizedProfitBasis": 775600,
+      "unsoldUnits": 8,
+      "state": "库存达到两批覆盖，等待销量"
+    },
+    {
+      "id": "crystal",
+      "batches": 3,
+      "cashBasis": 2726000,
+      "revenueBasis": 4356000,
+      "realizedProfitBasis": 820000,
+      "unsoldUnits": 14,
+      "state": "库存达到两批覆盖，等待销量"
+    },
+    {
+      "id": "heavy",
+      "batches": 4,
+      "cashBasis": 2031200,
+      "revenueBasis": 4831200,
+      "realizedProfitBasis": 931200,
+      "unsoldUnits": 8,
+      "state": "库存达到两批覆盖，等待销量"
+    },
+    {
+      "id": "precision",
+      "batches": 2,
+      "cashBasis": 1009600,
+      "revenueBasis": 3999600,
+      "realizedProfitBasis": 803600,
+      "unsoldUnits": 12,
+      "state": "库存达到两批覆盖，等待销量"
+    },
+    {
+      "id": "works",
+      "batches": 2,
+      "cashBasis": 1120400,
+      "revenueBasis": 3920400,
+      "realizedProfitBasis": 800400,
+      "unsoldUnits": 12,
+      "state": "库存达到两批覆盖，等待销量"
+    }
+  ],
+  "terminalPacksConsumed": 16,
+  "ledgerChecks": 705,
+  "issuedBasis": 80000000,
+  "holdingsBasis": 80000000,
+  "assumptions": [
+    "Four deterministic operators, one per profession; not a forecast of human behaviour.",
+    "Ten opening water clicks, then actual production, storage, construction and manufacturing commands; no injected stocks or starter grants.",
+    "One finite 8000 Gold issue and public procurement of real surplus at catalog reference prices; no further funding or guaranteed company sales.",
+    "Companies introduced in three pairs after upstream output and saved cash exist; 1000 shares at 0.5 Gold, one-hour subscription, full subscription required.",
+    "Terminal demand is four workpacks per actual facility upgrade; demand ends when all four facilities are upgraded."
+  ]
+}

@@ -12,7 +12,21 @@ import (
 
 func main() {
 	consumables := flag.Bool("consumables", false, "report profession recipe reference costs only")
+	launch := flag.Bool("launch", false, "replay real settlement production through four professions and company upgrades")
 	flag.Parse()
+	if *launch {
+		r, err := domain.RunLaunchProgression()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		e := json.NewEncoder(os.Stdout)
+		e.SetIndent("", "  ")
+		if err := e.Encode(r); err != nil {
+			panic(err)
+		}
+		return
+	}
 	if *consumables {
 		e := json.NewEncoder(os.Stdout)
 		e.SetIndent("", "  ")

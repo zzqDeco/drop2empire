@@ -19,6 +19,7 @@ func TestPostgresStoreRoundTrip(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		w.Players["pioneer"] = domain.NewBlankPlayer("pioneer", now)
 		if err := domain.GatherWater(w.Players["pioneer"], 10, now); err != nil {
 			return err
 		}

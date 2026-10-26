@@ -57,14 +57,15 @@ func mapEconomy(w *domain.WorldState, p *domain.PlayerState, admin bool) *empire
 		return out
 	}
 	if p.Profession != domain.ProfNone || admin {
-		professional.BuildCosts = economyCosts(domain.ProfessionFacilityCosts(ps.Level, ""), p.ResourcesMilli)
+		rates := domain.NetResourceRatesPerSecMilli(p)
+		professional.BuildCosts = settlementCosts(p, domain.ProfessionFacilityCosts(ps.Level, ""), rates)
 		if ps.Queue != nil {
 			professional.QueueItem = ps.Queue.Item
 			professional.QueueOutputMilli = ps.Queue.Output
 			professional.RemainingSeconds = ps.Queue.RemainingSeconds
 		}
 		for _, s := range domain.ConsumableCatalog {
-			professional.Consumables = append(professional.Consumables, &empire.ConsumableDTO{ItemKey: s.Key, Name: s.Name, Profession: s.Profession, Use: s.Use, Effect: s.Effect, InventoryMilli: p.ResourcesMilli[s.Key], OutputMilli: s.Output * 1000, Seconds: s.Seconds, Costs: economyCosts(s.Inputs, p.ResourcesMilli)})
+			professional.Consumables = append(professional.Consumables, &empire.ConsumableDTO{ItemKey: s.Key, Name: s.Name, Profession: s.Profession, Use: s.Use, Effect: s.Effect, InventoryMilli: p.ResourcesMilli[s.Key], OutputMilli: s.Output * 1000, Seconds: s.Seconds, Costs: settlementCosts(p, s.Inputs, rates)})
 		}
 	}
 	for _, s := range domain.CompanyCatalog {

@@ -17,10 +17,11 @@ export function SettlementCosts({ costs }: { costs: CostItemDTO[] }) {
 type Props = {
   state: DashboardStateResp;
   busy: boolean;
+  onOpenIndustry?: () => void;
   runAction: (fn: () => Promise<DashboardStateResp>, successMessage?: string) => Promise<void>;
 };
 
-export function SettlementPanel({ state, busy, runAction }: Props) {
+export function SettlementPanel({ state, busy, runAction, onOpenIndustry }: Props) {
   const [tab, setTab] = useState<"build" | "research" | "caravan">("build");
   const { player, settlement } = state;
   const housingFull = player.populationTotal >= settlement.housingCapacity;
@@ -37,6 +38,11 @@ export function SettlementPanel({ state, busy, runAction }: Props) {
       <div className="panel-title"><h2>招募与建设</h2></div>
       <span className="tag-badge mono-num">住房 {player.populationTotal} / {settlement.housingCapacity}</span>
     </div>
+    {player.profession !== "none" && <div className="bp-card" aria-label="职业发展">
+      <strong>{settlement.guideTitle}</strong>
+      <p className="bp-desc">{settlement.guideText}</p>
+      {onOpenIndustry && <button type="button" className="btn-primary" onClick={onOpenIndustry}>进入职业工坊与市场</button>}
+    </div>}
     <div className="recruit-card">
       <div className="recruit-meta">
         <div className="recruit-head"><strong>招募居民</strong><span className="tag-badge mono-num">

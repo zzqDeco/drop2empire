@@ -18,6 +18,7 @@ func TestConcurrentConstructionRetriesPersistOnePayment(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		w.Players["pioneer"] = domain.NewBlankPlayer("pioneer", now)
 		p := w.Players["pioneer"]
 		p.PopulationTotal = 4
 		p.Workers[domain.JobWater] = 4
@@ -71,4 +72,3 @@ func TestConcurrentConstructionRetriesPersistOnePayment(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-

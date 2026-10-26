@@ -9,7 +9,7 @@ import (
 
 func settlementCosts(p *domain.PlayerState, costs map[string]int64, rates map[string]int64) []*empire.CostItemDTO {
 	out := make([]*empire.CostItemDTO, 0, len(costs))
-	for _, key := range []string{domain.ResWater, domain.ResWood, domain.ResStone, domain.ResCharcoal, domain.ResFlint, domain.ResAncientShard} {
+	for _, key := range sortedInventoryKeys(costs) {
 		need, ok := costs[key]
 		if !ok {
 			continue

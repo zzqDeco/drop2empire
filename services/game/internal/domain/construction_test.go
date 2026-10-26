@@ -167,9 +167,9 @@ func TestSiphonSluiceRationOrderAndForageEdictsAndGuideProgression(t *testing.T)
 		t.Fatalf("expected trade guide before profession choice, got %s", g.Code)
 	}
 	p.Profession = ProfAlchemist
-	// After choosing a profession, guide transitions to "empire"
-	if g := CurrentSettlementGuide(p); g.Code != "empire" {
-		t.Fatalf("expected empire guide after profession choice, got %s", g.Code)
+	// Profession selection starts the paid facility loop.
+	if g := CurrentSettlementGuide(p); g.Code != "profession_facility" {
+		t.Fatalf("expected facility guide after profession choice, got %s", g.Code)
 	}
 
 	// A funded night shift boosts forage by +45%; zero-stock recovery is tested separately.

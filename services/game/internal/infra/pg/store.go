@@ -85,7 +85,7 @@ func (s *Store) LoadWorld(ctx context.Context, now time.Time) (*domain.WorldStat
 	err := s.db.QueryRow(ctx, `SELECT state_json FROM d2e_world_state WHERE realm_id = 'realm-main' FOR UPDATE`).Scan(&raw)
 	if err != nil {
 		if postgres.IsNoRows(err) {
-			w := domain.NewDefaultWorld(now)
+			w := domain.NewEmptyWorld(now)
 			meta := *w
 			meta.Players = nil
 			initial, marshalErr := json.Marshal(&meta)

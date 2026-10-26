@@ -81,7 +81,7 @@ func BuildingCosts(b BuildingSpec, owned, quantity int32) (map[string]int64, err
 }
 
 func CostsBlockReason(p *PlayerState, costs map[string]int64) string {
-	for _, key := range []string{ResWater, ResWood, ResStone, ResCharcoal, ResFlint, ResAncientShard} {
+	for _, key := range sortedKeys(costs) {
 		need := costs[key]
 		if p.ResourcesMilli[key] >= need {
 			continue
@@ -252,7 +252,21 @@ type SettlementGuide struct{ Code, Title, Text string }
 func CurrentSettlementGuide(p *PlayerState) SettlementGuide {
 	switch {
 	case p.Profession != ProfNone:
-		return SettlementGuide{"empire", "专精与帝国", "已择定终身职业。可在工坊制造专精物资，或前往世界舆图参与现货交易、商会战区与荒原探索。"}
+		ps := EnsureProfessional(p)
+		if ps.Level == 0 {
+			text := "安排炼铁岗位，再到职业工坊支付材料建造专属设施。"
+			if reason := CostsBlockReason(p, ProfessionFacilityCosts(0, "")); reason != "" {
+				text = reason + "。" + text
+			}
+			return SettlementGuide{"profession_facility", "建造" + ProfessionFacilityName(p.Profession, 1), text}
+		}
+		if ps.Queue != nil {
+			return SettlementGuide{"profession_queue", "制造进行中", "产线正在加工，可继续经营聚落或前往市场查看真实买卖盘。"}
+		}
+		if ps.Level == 1 {
+			return SettlementGuide{"profession_trade", "制造、自用与交易", "制造一批专属耗材，自用或挂到现货市场。金币来自实际成交；升级设施可选择普通材料或公司作业包。"}
+		}
+		return SettlementGuide{"empire", "经营你的产业", "继续制造耗材，比较自用收益和市场需求；有公司上市时可选择持股并参与经营投票。"}
 	case p.UnlockedBlueprints[BPMysteryTreasure]:
 		return SettlementGuide{"trade", "专精与贸易", "古代装置已经复苏。了解四个职业的产品与分工，选择自己的长期生产方向。"}
 	case p.UnlockedBlueprints[BPBasicWorkshop]:

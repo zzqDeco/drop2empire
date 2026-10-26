@@ -648,7 +648,7 @@ export function App() {
     state.collectibles.length > 0;
 
   const unlockedResources = resources.filter((r) => r.unlocked &&
-    (!['consumable', 'corporate'].includes(r.tier) || r.amountMilli > 0 || r.frozenMilli > 0));
+    (r.capacityMilli > 0 || r.amountMilli > 0 || r.frozenMilli > 0));
   const unlockedJobs = jobs.filter((j) => j.unlocked);
   const unlockedEdicts = (state.edicts ?? []).filter((e) => e.unlocked);
   const waterJob = jobs.find((j) => j.jobKey === "water");
@@ -667,7 +667,7 @@ export function App() {
         ? "workshop"
         : "empire";
 
-  const currentAckChapterKey = `${player.handle}:${storyChapter.key}`;
+  const currentAckChapterKey = `${player.handle}:${showAdvancedWorld ? `profession:${player.profession}` : storyChapter.key}`;
   const showCivChapterPopup = treasureUnlocked && dismissedChapterKey !== currentAckChapterKey;
 
   const zoneTitleMap: Record<WorldZoneKey, string> = {
@@ -733,7 +733,7 @@ export function App() {
             </div>
           )}
 
-          {(player.profession !== "none" || player.activityPoints > 0) && (
+          {player.activityPoints > 0 && (
             <div className="metric-cell imperial-plaque">
               <span className="metric-label">战功积分</span>
               <span className="metric-value mono-num">
@@ -1279,7 +1279,7 @@ export function App() {
               </section>
             )}
 
-            <SettlementPanel state={state} busy={busy} runAction={runAction} />
+            <SettlementPanel state={state} busy={busy} runAction={runAction} onOpenIndustry={() => setActiveScene("market")} />
           </main>
         </div>
       )}

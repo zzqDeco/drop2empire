@@ -26,16 +26,9 @@ func ChooseProfession(p *PlayerState, prof string, now time.Time) error {
 	p.ArtifactName = spec.ArtifactName
 	p.Phase = 3
 
-	// Grant starter batch of profession goods & basic war kits from declarative table
-	for resKey, units := range spec.StarterGrantUnits {
-		p.ResourcesMilli[resKey] += units * ResourceScale
-	}
-	for resKey, milli := range MacroBalance.StarterUniversalGrants {
-		p.ResourcesMilli[resKey] += milli
-	}
-	p.ActivityPoints += MacroBalance.StarterActivityPoints
-
-	AppendLog(p, now, "PROFESSION", fmt.Sprintf("已执掌神器【%s】并就职为【%s】！全球现货交易所、跨职业工坊与七日商会战争已全面开放。", spec.ArtifactName, spec.Name))
+	// A profession grants knowledge and passive specialization, never stock,
+	// facilities or rewards for a war the player has not participated in.
+	AppendLog(p, now, "PROFESSION", fmt.Sprintf("已就职【%s】。安排炼铁和制粮岗位，积攒材料建造%s，开始制造专属耗材。", spec.Name, ProfessionFacilityName(spec.Code, 1)))
 	return nil
 }
 
