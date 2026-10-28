@@ -1,0 +1,487 @@
+/* Tab 1: Equipment & Recipes */
+.equip-slot-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.equip-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.equip-main p {
+  margin: 4px 0 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.equip-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.equip-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+
+.recipe-card {
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.recipe-other-prof {
+  opacity: 0.72;
+  background: var(--surface-sunken);
+}
+
+.recipe-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--font-base);
+}
+
+.recipe-head > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recipe-desc {
+  margin: 6px 0 8px;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.recipe-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Tab 2: Spot Market */
+.order-ticket {
+  padding: var(--space-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-strong);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.side-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.side-btn {
+  padding: 7px;
+  font-size: var(--font-sm);
+  font-weight: 700;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+}
+
+.active-bid {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+
+.active-ask {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.form-row-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.form-row-2 label,
+.form-row-3 label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.form-row-2 input,
+.form-row-3 input {
+  padding: 6px 8px;
+  font-size: var(--font-base);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+}
+
+.order-summary {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.orderbook-box {
+  padding: var(--space-2) var(--space-3);
+}
+
+.orderbook-box h4 {
+  margin: 4px 0 8px;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+/* Tab 3: Chamber War */
+.war-layout {
+  display: grid;
+  grid-template-columns: 1.75fr 1fr;
+  gap: var(--space-3);
+}
+
+.war-main-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.war-scoreboard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+}
+
+.guild-score-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.guild-tag {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.guild-score-block strong {
+  font-size: var(--font-2xl);
+}
+
+.war-day-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.war-map-canvas {
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  padding: var(--space-2);
+}
+
+.war-map-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.war-node-group {
+  cursor: pointer;
+}
+
+.war-node-circle {
+  fill: var(--surface);
+}
+
+.war-owner-obsidian {
+  fill: var(--ink-wash);
+}
+
+.war-owner-argent {
+  fill: var(--warning-bg);
+}
+
+.war-owner-neutral {
+  fill: var(--surface);
+}
+
+.war-history-box {
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+}
+
+.settlement-list {
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.settlement-item {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: var(--space-2);
+}
+
+.settlement-item summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: var(--font-sm);
+  margin-bottom: var(--space-2);
+}
+
+.war-side-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.war-guild-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-xs);
+  font-weight: 600;
+}
+
+.node-intel-card {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--font-sm);
+}
+
+.intel-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.intel-note {
+  margin: 6px 0 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.deploy-form {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.deploy-form h4 {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.settle-trigger-box {
+  padding: 12px;
+}
+
+/* Tab 4: Season Chests & Collectibles */
+.chest-console {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+}
+
+.chest-console-info h3 {
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-md);
+}
+
+.chest-console-info p {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.chest-console-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.collectibles-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.collectible-card {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.relic-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.collectible-meta {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.collectible-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  font-size: var(--font-sm);
+}
+
+.special-tag-row {
+  font-size: var(--font-xs);
+  font-weight: 700;
+  color: var(--warning-text);
+}
+
+.collectible-kv {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: var(--font-xs);
+}
+
+.collectible-kv div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.collectible-kv dt {
+  color: var(--text-muted);
+}
+
+.collectible-kv dd {
+  margin: 0;
+  text-align: right;
+}
+
+/* Tab 5: Macro & Notices & Event Logs */
+.notice-stack {
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.season-notice-card {
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: var(--font-xs);
+}
+
+.season-notice-card p {
+  margin: 6px 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.season-notice-card ul {
+  margin: 0;
+  padding-left: 16px;
+  line-height: 1.6;
+}
+
+.ledger-audit-box {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--font-sm);
+}
+
+.ledger-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.event-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.event-log-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-xs);
+}
+
+.event-time {
+  color: var(--text-muted);
+}
+
+.event-cat {
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+}
+
+.event-msg {
+  flex: 1;
+}

@@ -1,0 +1,576 @@
+.raid-scene-shell {
+  margin: var(--space-3) 18px var(--space-6);
+}
+
+.raid-item-icon-svg {
+  flex-shrink: 0;
+}
+
+.raid-inline-item-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.raid-settlement-cta {
+  margin-top: var(--space-4);
+}
+
+.lord-profile-costs {
+  margin-top: 6px;
+}
+
+.lord-profile-wardrobe-actions {
+  margin-top: var(--space-2);
+}
+
+/* Act 2: 3D Spring-Physics Etched Buff Card Stage */
+.etched-card-stage {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: radial-gradient(circle at center, var(--surface) 0%, var(--surface-sunken) 100%);
+  border: 2px solid var(--border-strong);
+}
+
+.etched-buff-card {
+  position: relative;
+  min-height: 292px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: linear-gradient(
+    var(--shine-deg, 155deg),
+    var(--surface) 0%,
+    var(--bg) 62%,
+    var(--surface-sunken) 100%
+  );
+  border: 2px solid var(--border-strong);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+  will-change: transform;
+  transform: perspective(900px) rotateX(var(--rot-x, 0deg)) rotateY(var(--rot-y, 0deg));
+  animation-delay: var(--anim-delay, 0ms);
+  transition: box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.etched-buff-card:hover {
+  box-shadow: var(--shadow-pop);
+}
+
+.etched-card-border {
+  position: absolute;
+  inset: 5px;
+  border: 1px dashed var(--border-strong);
+  pointer-events: none;
+  opacity: 0.48;
+}
+
+.etched-card-hatch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background: radial-gradient(
+    circle at var(--etch-x, 50%) var(--etch-y, 50%),
+    var(--warning-border) 0%,
+    transparent 65%
+  );
+}
+
+.etched-card-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.etched-card-cat {
+  font-size: var(--font-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.etched-card-emblem {
+  position: relative;
+  z-index: 1;
+  margin: 12px auto 8px;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  transform: rotate(calc(var(--emblem-deg, 45deg) * 0.04));
+}
+
+.etched-card-title-wrap {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.etched-card-title {
+  margin: 0;
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--text-strong);
+  text-align: center;
+}
+
+.etched-card-effect {
+  margin: 0;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.etched-card-footer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+/* Act 3: Full-Screen 2D Wasteland Raid Viewport + Tactical Minimap */
+.raid-fullscreen-viewport {
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.raid-fullscreen-hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 10px 18px;
+  background: var(--surface);
+  border-bottom: 2px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.raid-fullscreen-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+  overflow: auto;
+  background: radial-gradient(circle at center, var(--surface) 0%, var(--bg) 78%);
+}
+
+.raid-battlefield-layout {
+  display: grid;
+  grid-template-columns: auto 296px;
+  align-items: start;
+  gap: var(--space-4);
+  max-width: 100%;
+}
+
+.raid-map-board-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.raid-map-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 64px);
+  grid-template-rows: repeat(9, 64px);
+  gap: 3px;
+  padding: 8px;
+  background: var(--surface-sunken);
+  border: 2px solid var(--border-strong);
+  box-shadow: var(--shadow-lg);
+}
+
+.raid-tile-cell {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  transition:
+    transform 0.14s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+.tile-adjacent {
+  border-color: var(--warning-border);
+  box-shadow: inset 0 0 0 1px var(--warning-border);
+}
+
+.tile-adjacent:hover:not(:disabled) {
+  transform: scale(1.04);
+  z-index: 2;
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.tile-player {
+  background: var(--warning-bg);
+  border: 2px solid var(--border-strong);
+  box-shadow: 0 0 0 2px var(--warning-border);
+  z-index: 3;
+}
+
+.tile-wall {
+  background: var(--surface-sunken);
+  border-color: var(--border-strong);
+  cursor: not-allowed;
+}
+
+.tile-fog {
+  background: var(--ink-wash);
+  border-color: var(--border);
+  opacity: 0.72;
+}
+
+.tile-fog-pattern {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  color: var(--text-subtle);
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 5px,
+    var(--hover-bg) 5px,
+    var(--hover-bg) 10px
+  );
+}
+
+.tile-micro-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  padding: 1px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  background: var(--surface);
+  color: var(--text-strong);
+  border: 1px solid var(--border-strong);
+  pointer-events: none;
+}
+
+.raid-map-action-dock {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.raid-live-log-ticker {
+  width: 100%;
+  text-align: center;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tactical Radar & 4-Zone Portal Topology Minimap */
+.raid-minimap-dock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 12px;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.minimap-zone-topology {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.minimap-zone-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  font-size: var(--font-xs);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.zone-pill-visited {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.zone-pill-active {
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  font-weight: 700;
+}
+
+.raid-minimap-radar-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+}
+
+.raid-minimap-grid {
+  display: grid;
+  grid-template-columns: repeat(9, 18px);
+  grid-template-rows: repeat(9, 18px);
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-strong);
+}
+
+.minimap-cell {
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+}
+
+.minimap-floor {
+  background: var(--surface);
+}
+
+.minimap-fog {
+  background: var(--ink-wash);
+  opacity: 0.45;
+}
+
+.minimap-wall {
+  background: var(--text-subtle);
+}
+
+.minimap-player {
+  background: var(--brand);
+  border: 2px solid var(--warning-border);
+  box-shadow: 0 0 0 1px var(--surface);
+}
+
+.minimap-portal {
+  background: var(--info-text);
+}
+
+.minimap-extract {
+  background: var(--success-text);
+}
+
+.minimap-chest {
+  background: var(--warning-text);
+}
+
+.minimap-merchant {
+  background: var(--warning-border);
+}
+
+.minimap-enemy {
+  background: var(--danger-text);
+}
+
+.minimap-coord-bar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.minimap-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 8px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.minimap-legend-grid span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 2px;
+  border: 1px solid var(--border-strong);
+}
+
+/* 3-Column Looting, Caravan & Paperdoll Inventory Modal */
+.raid-loot-modal-backdrop {
+  z-index: 54;
+}
+
+.raid-loot-3col-sheet {
+  width: min(1220px, 100%);
+}
+
+.loot-dropzone {
+  padding: 10px;
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  min-height: 112px;
+}
+
+.loot-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.loot-item-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  cursor: grab;
+  text-align: left;
+}
+
+.loot-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-xs);
+}
+
+.raid-center-avatar-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Integrated Personal Lord Profile Card */
+.lord-main-profile-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 14px;
+  background: var(--bg);
+}
+
+.lord-voxel-showcase {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.voxel-turn-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.lord-profile-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Act 4: Ceremonial Post-Raid Settlement Scroll */
+.raid-settlement-scroll {
+  width: min(860px, 100%);
+}
+
+.raid-settlement-header {
+  align-items: center;
+}
+
+.raid-settlement-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.raid-cinnabar-seal {
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: var(--font-base);
+  font-weight: 700;
+  border: 2px solid var(--border-strong);
+  transform: rotate(-4deg);
+  box-shadow: var(--shadow-sm);
+}
+
+.seal-victory {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+
+.seal-mia {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+
+.raid-settlement-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+}

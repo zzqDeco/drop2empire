@@ -1,4 +1,5 @@
 import type { EquippedCosmeticsDTO } from "@drop2empire/api-client";
+import { LORD_VOXEL_PALETTE } from "./theme/svgPalettes";
 
 export type FacingDirection = "down" | "up" | "left" | "right";
 
@@ -54,12 +55,14 @@ export function LordAvatarSVG({
   const verdigris = "var(--success-text)";
 
   // Rich tactile palette for Minecraft-proportioned Blueprint & Ink figure
-  const skinFront = "#F3E1C8";
-  const skinSide = "#D9BD98";
-  const hairInk = "#231F1C";
-  const tunicFront = "#28415E";
-  const tunicSide = "#1B2C40";
-  const legFront = "#3D3630";
+  const {
+    skinFront,
+    skinSide,
+    hairInk,
+    tunicFront,
+    tunicSide,
+    legFront,
+  } = LORD_VOXEL_PALETTE;
 
   // True 4-directional perspective shift (no mirror inversion of light source)
   const rigShiftX = isLeft ? -3 : isRight ? 3 : 0;
