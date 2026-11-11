@@ -10,7 +10,7 @@
 ## 0. 零信任服务端权威状态机与反作弊架构 (`Zero-Trust Server-Authoritative Raid Engine`)
 
 为杜绝客户端伪造战利品或透视战争迷雾，单局荒原 2D 搜打撤采用**纯服务端权威状态机 (`ActiveRaidSession`)**：
-- **服务端地图生成与迷雾裁剪 (`Fog-of-War Server Clipping`)**：`StartRaid` 时由服务端生成 4 区块 `9×9` 地图网格 (`RaidZoneState`)；在序列化响应 DTO (`RaidZoneViewDTO`) 时，所有 `Explored == false` 的格子统一被服务端脱敏裁剪为 `kind: "fog"`，客户端无法通过抓包获知未探明区域的宝箱或游商坐标。
+- **服务端地图生成与迷雾裁剪 (`Fog-of-War Server Clipping`)**：`StartRaid` 时由服务端生成 4 区块异构尺寸（`11×7 / 9×9 / 10×8 / 8×8`）地图网格 (`RaidZoneState`)；在序列化响应 DTO (`RaidZoneViewDTO`) 时，所有 `Explored == false` 的格子统一被服务端脱敏裁剪为 `kind: "fog"`，客户端无法通过抓包获知未探明区域的宝箱或游商坐标。
 - **步进式意图校验 (`POST /api/v1/empire/colony/raid/action`)**：前端仅发送玩家动作意图（`MOVE` / `LOOT_TILE` / `TAKE_CHEST_ITEM` / `MOVE_TO_SAFEBOX` / `USE_POTION` / `BUY_MERCHANT`），由服务端逐格校验曼哈顿距离 (`|Δx| + |Δy| == 1`)、墙体阻挡、实时沙暴倒计时 (`ExpiresAtUnixMs`)、CSPRNG 宝箱掉落以及安全保险箱/随身背囊容量。
 - **权威撤离判定 (`POST /api/v1/empire/colony/raid/finish`)**：`FinishRaidReq` 不接受任何客户端战利品数组；当 `status == "EXTRACTED"` 时，服务端强制校验玩家当前坐标是否处于撤离信标 (`extract`) 格或相邻 1 格内，并仅结算服务端 `ActiveRaidSession` 中真实获取的背囊与安全箱战利品。
 
@@ -36,11 +36,11 @@ flowchart LR
 | `Zone 3` | **核心 · 沉没黑曜圣殿** | `8 × 8` | 基础半径 `2` | 高危终局圣殿；盘踞黑曜圣殿巨像 (`ATK 38`)，集中分布**深渊黑曜秘宝库 (`💎`)** 与一座高危紧急撤离信标 (`🚁`) |
 
 ### 1.1 全屏 2D 搜打撤战场与裂隙战术小地图 (`Full-Screen Battlefield & Tactical Radar Minimap`)
-- **全屏沉浸视口 (`.raid-fullscreen-viewport`)**：踏入裂隙后切换为全屏战场，左侧主区为 `9×9` 手绘矢量生态战棋盘（`.raid-map-grid`，每格 `64px×64px`，含领主当前格高亮、相邻可交互格脉冲边框、战争迷雾斜纹遮罩与微章标注）。
+- **全屏沉浸视口 (`.raid-fullscreen-viewport`)**：踏入裂隙后切换为全屏战场，左侧主区为动态适配当前区块 `W×H`（`--zone-cols` × `--zone-rows`，每格 `56px×56px`）的手绘矢量生态战棋盘（`.raid-map-grid`，含领主当前格高亮、相邻可交互格脉冲边框、确定性战损与致死告警微章、战争迷雾斜纹遮罩），底部设有一键饮用药剂快捷腰带与药效倒计时。
 - **右侧常驻裂隙战术小地图 (`.raid-minimap-dock`)**：
   1. **四区块传送门拓扑带 (`.minimap-zone-topology`)**：实时显示 `Z1 ~ Z4` 四大生态区块的当前驻留状态与已踏足状态。
-  2. **实时 `9×9` 像素雷达盘 (`.raid-minimap-grid`)**：以高对比战术色块实时标绘领主位置 (`minimap-player`)、星门传送阵 (`minimap-portal`)、撤离信标 (`minimap-extract`)、未开启宝箱 (`minimap-chest`)、局内游商营帐 (`minimap-merchant`)、存活魔物 (`minimap-enemy`)、黑曜岩壁 (`minimap-wall`) 与未探明迷雾 (`minimap-fog`)，并同步显示当前坐标 `(X, Y)` 与区域探明率 (`已探明 XX%`)。
-- **三栏式搜刮与游商交互弹窗 (`.raid-loot-3col-sheet`)**：平时隐藏随身背囊；按 `B / Tab` 或搜开宝箱、踏入局内游商营帐时弹出「左：本季安全保险箱 + 随身背囊 / 中：领主四向披挂立绘 + 药水饮用 / 右：当前开启宝箱格子或局内游商易物台」三栏拖拽交互界面。
+  2. **实时 `W×H` 像素雷达盘 (`.raid-minimap-grid`)**：按当前区块 `width × height` 动态标绘领主位置 (`minimap-player`)、星门传送阵 (`minimap-portal`)、撤离信标 (`minimap-extract`)、未开启宝箱 (`minimap-chest`)、局内游商营帐 (`minimap-merchant`)、存活魔物 (`minimap-enemy`)、黑曜岩壁 (`minimap-wall`) 与未探明迷雾 (`minimap-fog`)，并同步显示当前坐标 `(X, Y)` 与区域探明率 (`已探明 XX%`)。
+- **三栏式搜刮与游商交互弹窗 (`.raid-loot-3col-sheet`)**：平时隐藏随身背囊；按 `B / Tab` 或搜开宝箱、踏入局内游商营帐时弹出「左：本季安全保险箱 + 随身背囊 / 中：领主四向披挂立绘 + 药水饮用 / 右：当前开启宝箱格子或局内游商易物台」三栏界面（同时支持桌面拖拽与触屏一键移入安全箱/拾取，并标注战利品的交易所参考价与蓝图/外观收集状态）。
 
 ---
 

@@ -1,41 +1,63 @@
-import { api } from "@drop2empire/api-client";
+import { api, type DashboardStateResp } from "@drop2empire/api-client";
 import { Droplets, Moon, Plus, Sun } from "lucide-react";
 import { ICON } from "../../icons";
 import { formatResource } from "../../format";
 import type { ThemeMode } from "../../theme";
 import type { ServerUpdate } from "../../serverState";
 import type { WaterBurstItem } from "../../hooks/useWaterGather";
-import { deriveOpeningStory } from "../../domain/settlementSelectors";
+import { useLiveInterpolation } from "../../hooks/useLiveInterpolation";
+import {
+  computeLiveWaterMetrics,
+  deriveOpeningStory,
+} from "../../domain/settlementSelectors";
 
 interface OpeningStageViewProps {
-  handle: string;
+  state: DashboardStateResp;
+  firstResBpUnlocked: boolean;
+  inFlightClicks: number;
+  lastSyncAtMs: number;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
-  liveWaterMilli: number;
-  hasAnyWaterYet: boolean;
-  canSeeFirstRecruit: boolean;
-  firstTenProgressPct: number;
   waterBursts: WaterBurstItem[];
   onGatherWater: () => void;
   onGlobalButtonPop: (e: React.MouseEvent<HTMLDivElement>) => void;
   onLogout: () => Promise<void>;
-  runAction: (fn: () => Promise<ServerUpdate>, successMsg?: string) => Promise<void>;
+  runAction: (
+    fn: () => Promise<ServerUpdate>,
+    successMsg?: string,
+    scope?: string,
+  ) => Promise<void>;
 }
 
 export function OpeningStageView({
-  handle,
+  state,
+  firstResBpUnlocked,
+  inFlightClicks,
+  lastSyncAtMs,
   theme,
   setTheme,
-  liveWaterMilli,
-  hasAnyWaterYet,
-  canSeeFirstRecruit,
-  firstTenProgressPct,
   waterBursts,
   onGatherWater,
   onGlobalButtonPop,
   onLogout,
   runAction,
 }: OpeningStageViewProps) {
+  const interpSeconds = useLiveInterpolation(
+    lastSyncAtMs,
+    state.player.speedMultiplier,
+    true,
+  );
+  const {
+    liveWaterMilli,
+    hasAnyWaterYet,
+    canSeeFirstRecruit,
+    firstTenProgressPct,
+  } = computeLiveWaterMetrics(
+    state,
+    firstResBpUnlocked,
+    inFlightClicks,
+    interpSeconds,
+  );
   const openingStory = deriveOpeningStory(
     hasAnyWaterYet,
     liveWaterMilli,
@@ -48,7 +70,7 @@ export function OpeningStageView({
       onClickCapture={onGlobalButtonPop}
     >
       <div className="corner-utility-bar">
-        <span className="tag-badge mono-num">{handle}</span>
+        <span className="tag-badge mono-num">{state.player.handle}</span>
         <button
           type="button"
           className="btn-icon"

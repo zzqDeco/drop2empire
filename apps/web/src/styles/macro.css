@@ -78,6 +78,24 @@
 }
 
 /* Tab 2: Spot Market */
+.market-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.market-filter-bar input {
+  width: 100%;
+  padding: 6px 9px;
+  font-size: var(--font-xs);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+}
+
 .order-ticket {
   padding: var(--space-3);
   background: var(--surface);
@@ -147,6 +165,27 @@
   display: flex;
   justify-content: space-between;
   font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.order-balance-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: var(--font-xs);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+}
+
+.orderbook-spread-bar td {
+  text-align: center;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  background: var(--surface-sunken);
   color: var(--text-muted);
 }
 
@@ -313,6 +352,35 @@
   color: var(--text-muted);
 }
 
+.march-budget-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  font-size: var(--font-xs);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+}
+
+.war-tactics-legend {
+  padding: 10px 12px;
+  font-size: var(--font-xs);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+
+.war-tactics-legend strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-strong);
+}
+
+.war-tactics-legend p {
+  margin: 2px 0;
+  line-height: 1.45;
+}
+
 .settle-trigger-box {
   padding: 12px;
 }
@@ -411,6 +479,23 @@
 .collectible-kv dd {
   margin: 0;
   text-align: right;
+}
+
+.relic-reveal-sheet {
+  width: min(620px, 100%);
+}
+
+.relic-reveal-body {
+  padding: var(--space-4);
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.relic-reveal-stage {
+  border: 2px solid var(--border-strong);
+  background: var(--bg);
 }
 
 /* Tab 5: Macro & Notices & Event Logs */

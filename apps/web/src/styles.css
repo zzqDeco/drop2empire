@@ -10,6 +10,7 @@ body {
 
 button,
 input,
+textarea,
 select {
   font: inherit;
   color: inherit;
@@ -56,6 +57,25 @@ button:disabled {
 
 .btn-primary:active:not(:disabled) {
   transform: translate(1px, 1px);
+}
+
+.btn-danger-solid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: 7px 13px;
+  font-size: var(--font-base);
+  font-weight: 700;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 2px solid var(--danger-border);
+  border-radius: var(--r-xs);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-danger-solid:hover:not(:disabled) {
+  border-color: var(--border-strong);
 }
 
 .btn-water-strike {
@@ -456,8 +476,9 @@ button:disabled {
 }
 
 .status-info {
-  background: var(--warning-bg);
-  color: var(--warning-text);
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-bottom-color: var(--info-border);
 }
 
 .status-danger {

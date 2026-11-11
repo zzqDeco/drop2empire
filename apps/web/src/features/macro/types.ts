@@ -8,5 +8,6 @@ export interface SceneProps {
   runAction: (
     fn: () => Promise<DashboardStateResp>,
     successMsg?: string,
+    scope?: string,
   ) => Promise<void>;
 }

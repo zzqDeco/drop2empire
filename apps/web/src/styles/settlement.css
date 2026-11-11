@@ -1,4 +1,52 @@
-/* Profession Selection Gate */
+/* Settlement Chapter Guide & Profession Selection Gate */
+.settlement-guide-banner {
+  margin: var(--space-3) 18px 0;
+  padding: 9px 14px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+}
+
+.settlement-guide-inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.settlement-guide-inner p {
+  margin: 0;
+  font-size: var(--font-base);
+  color: var(--text-strong);
+}
+
+.batch-pill-group {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.bp-inline-jump {
+  margin: 6px 0;
+}
+
+.res-desc-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--font-xs);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.panel-summary-trigger {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-size: var(--font-base);
+  font-weight: 700;
+  background: var(--surface-sunken);
+}
+
 .profession-gate-banner {
   margin: var(--space-3) 18px 0;
   padding: var(--space-4);
@@ -373,6 +421,7 @@
   align-items: center;
   position: relative;
   padding: var(--space-6);
+  padding-bottom: var(--space-6);
 }
 
 .opening-stage {

@@ -14,6 +14,7 @@ interface WastelandRaidPanelProps {
   runAction: (
     fn: () => Promise<ServerUpdate>,
     msg?: string,
+    scope?: string,
   ) => Promise<void>;
 }
 

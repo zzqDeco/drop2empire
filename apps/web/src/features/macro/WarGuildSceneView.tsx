@@ -50,11 +50,16 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
   const canCreateGuild =
     waterMilli >= 100000 && woodMilli >= 60000 && stoneMilli >= 30000;
 
+  const totalTroopBoxes = deployInf + deployArc + deployCav;
   const hasEnoughKits =
     infKitMilli >= deployInf * 1000 &&
     arcKitMilli >= deployArc * 1000 &&
     cavKitMilli >= deployCav * 1000 &&
-    deployInf + deployArc + deployCav > 0;
+    totalTroopBoxes > 0;
+
+  const remainingBudget = Math.max(0, war.dailyBudgetCap - war.dailyBudgetUsed);
+  const marchCostPts = totalTroopBoxes;
+  const withinBudget = totalTroopBoxes > 0 && marchCostPts <= remainingBudget;
 
   return (
     <div className="lower-workspace" aria-label="公会大厅与城池战区">
@@ -306,8 +311,12 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
               <strong className="mono-num">{war.obsidianTotalScore}</strong>
             </div>
             <div className="war-day-banner">
-              <span className="tag-badge">战役日 D{war.currentDay} / 7</span>
-              <small>每日 20:00 锁定快照结算</small>
+              <span className="tag-badge mono-num">
+                战役日 D{war.currentDay} / 7
+              </span>
+              <small className="mono-num">
+                {war.nextSettlementLabel || "每日 20:00 锁定快照结算"}
+              </small>
             </div>
             <div className="guild-score-block">
               <span className="guild-tag">白银同盟 (ARGENT)</span>
@@ -319,6 +328,7 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
             nodes={war.nodes}
             edges={war.edges}
             selectedNodeId={selectedWarNode.nodeId}
+            rallyNodeId={joinedGuild?.rallyNodeId}
             onSelectNode={(id) => setSelectedNodeId(id)}
           />
 
@@ -392,7 +402,9 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
           <div className="war-guild-bar">
             <span>{war.playerGuildName}</span>
             {joinedGuild?.rallyNodeId === selectedWarNode.nodeId && (
-              <span className="tag-badge tag-warning">🎯 公会集结目标 (+5积分)</span>
+              <span className="tag-badge tag-warning">
+                🎯 公会集结目标 (+5积分)
+              </span>
             )}
           </div>
 
@@ -402,10 +414,17 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
               <strong className="mono-num">{selectedWarNode.ownerGuild}</strong>
             </div>
             <div className="intel-row">
-              <span>驻军 (步 / 弓 / 骑)</span>
+              <span>总驻军 (步 / 弓 / 骑)</span>
               <strong className="mono-num">
                 {selectedWarNode.infantryCount}/{selectedWarNode.archerCount}/
                 {selectedWarNode.cavalryCount}
+              </strong>
+            </div>
+            <div className="intel-row">
+              <span>我的驻军 (步 / 弓 / 骑)</span>
+              <strong className="mono-num">
+                {selectedWarNode.myInfantry}/{selectedWarNode.myArcher}/
+                {selectedWarNode.myCavalry}
               </strong>
             </div>
             <div className="intel-row">
@@ -429,7 +448,8 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
             <div className="intel-row">
               <span>今日个人行军额度</span>
               <strong className="mono-num">
-                {war.dailyBudgetUsed} / {war.dailyBudgetCap}
+                {war.dailyBudgetUsed} / {war.dailyBudgetCap} (余{" "}
+                {remainingBudget})
               </strong>
             </div>
             <p className="intel-note">{selectedWarNode.intelNote}</p>
@@ -452,57 +472,90 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
             <h4>代表公会派兵出征</h4>
             <div className="form-row-3">
               <label>
-                <span>步兵箱</span>
+                <span className="mono-num">步兵箱 (1点)</span>
                 <input
                   type="number"
                   min="0"
-                  max="50"
+                  max={war.dailyBudgetCap}
                   className="mono-num"
                   value={deployInf}
-                  onChange={(e) => setDeployInf(Number(e.target.value))}
+                  onChange={(e) =>
+                    setDeployInf(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                  }
                 />
               </label>
               <label>
-                <span>弓兵箱</span>
+                <span className="mono-num">弓兵箱 (1点)</span>
                 <input
                   type="number"
                   min="0"
-                  max="50"
+                  max={war.dailyBudgetCap}
                   className="mono-num"
                   value={deployArc}
-                  onChange={(e) => setDeployArc(Number(e.target.value))}
+                  onChange={(e) =>
+                    setDeployArc(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                  }
                 />
               </label>
               <label>
-                <span>骑兵箱</span>
+                <span className="mono-num">骑兵箱 (1点)</span>
                 <input
                   type="number"
                   min="0"
-                  max="50"
+                  max={war.dailyBudgetCap}
                   className="mono-num"
                   value={deployCav}
-                  onChange={(e) => setDeployCav(Number(e.target.value))}
+                  onChange={(e) =>
+                    setDeployCav(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                  }
                 />
               </label>
+            </div>
+
+            <div
+              className={`march-budget-bar mono-num ${marchCostPts > remainingBudget ? "cost-lack" : ""}`}
+            >
+              <span>本次行军预算消耗</span>
+              <strong>
+                {marchCostPts} / 剩余 {remainingBudget} 点
+              </strong>
             </div>
 
             <button
               type="submit"
               className="btn-primary btn-block"
-              data-pop={`⚔ 出兵 +${deployInf + deployArc + deployCav} 团`}
+              data-pop={`⚔ 出兵 +${totalTroopBoxes} 团`}
               disabled={
-                !joinedGuild || !selectedWarNode.canDeploy || !hasEnoughKits
+                !joinedGuild ||
+                !selectedWarNode.canDeploy ||
+                !hasEnoughKits ||
+                !withinBudget
               }
             >
               {!joinedGuild
                 ? "请先在上方公会大厅加入公会"
                 : !selectedWarNode.canDeploy
                   ? "补给线未连通"
-                  : !hasEnoughKits
-                    ? "军备箱库存不足（工坊制造或市场采购）"
-                    : `代表 [${joinedGuild.tag}] 出兵部署`}
+                  : totalTroopBoxes <= 0
+                    ? "请至少调拨 1 团兵力"
+                    : marchCostPts > remainingBudget
+                      ? `超出今日剩余行军额度 (${marchCostPts}/${remainingBudget})`
+                      : !hasEnoughKits
+                        ? "军备箱库存不足（工坊制造或市场采购）"
+                        : `代表 [${joinedGuild.tag}] 出兵部署`}
             </button>
           </form>
+
+          <div className="war-tactics-legend">
+            <strong>兵种克制与会战损耗法则</strong>
+            <p className="mono-num">
+              步兵 克 弓兵 → 弓兵 克 骑兵 → 骑兵 克 步兵（压制 1.15x / 被克
+              0.90x）
+            </p>
+            <p className="mono-num">
+              每晚 20:00 锁定结算：胜方损耗 20% 留守城防，败方损耗 40% 残部退回。
+            </p>
+          </div>
         </aside>
       </div>
     </div>

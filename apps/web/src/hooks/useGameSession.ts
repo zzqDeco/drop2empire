@@ -1,24 +1,82 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, ApiError, type DashboardStateResp } from "@drop2empire/api-client";
-import { belongsToSession, mergeServerUpdate, type ServerUpdate } from "../serverState";
+import { useCallback, useEffect, useState } from "react";
+import {
+  api,
+  ApiError,
+  type DashboardStateResp,
+} from "@drop2empire/api-client";
+import {
+  belongsToSession,
+  mergeServerUpdate,
+  type ServerUpdate,
+} from "../serverState";
 import { SETTLEMENT_UI_CONFIG } from "../config/gameConfig";
 import { applyTheme, getInitialTheme, type ThemeMode } from "../theme";
 import type { WorldZoneKey } from "../features/macro/types";
+
+const VALID_SCENES = new Set<WorldZoneKey>([
+  "settlement",
+  "scout",
+  "market",
+  "war",
+  "lord",
+]);
+
+export function parseHashRoute(hash: string): {
+  scene: WorldZoneKey;
+  marketItem?: string;
+} {
+  const cleaned = hash.replace(/^#\/?/, "").trim();
+  if (!cleaned || cleaned.startsWith("admin")) {
+    return { scene: "settlement" };
+  }
+  const sepIdx = cleaned.indexOf(":");
+  const rawScene = sepIdx >= 0 ? cleaned.slice(0, sepIdx) : cleaned;
+  const rawParam = sepIdx >= 0 ? cleaned.slice(sepIdx + 1) : "";
+  if (VALID_SCENES.has(rawScene as WorldZoneKey)) {
+    let marketItem: string | undefined;
+    if (rawParam) {
+      try {
+        marketItem = decodeURIComponent(rawParam);
+      } catch {
+        marketItem = undefined;
+      }
+    }
+    return {
+      scene: rawScene as WorldZoneKey,
+      marketItem,
+    };
+  }
+  return { scene: "settlement" };
+}
 
 export function useGameSession(isAdminRoute: boolean) {
   const [state, setState] = useState<DashboardStateResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [pendingScopes, setPendingScopes] = useState<Record<string, number>>(
+    {},
+  );
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [noticeBanner, setNoticeBanner] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme());
-  const [activeScene, setActiveScene] = useState<WorldZoneKey>("settlement");
+
+  const initialRoute =
+    typeof window !== "undefined" && !isAdminRoute
+      ? parseHashRoute(window.location.hash)
+      : { scene: "settlement" as WorldZoneKey };
+
+  const [activeScene, setActiveSceneState] = useState<WorldZoneKey>(
+    initialRoute.scene,
+  );
+  const [marketFocusItemKey, setMarketFocusItemKey] = useState<string | null>(
+    initialRoute.marketItem ?? null,
+  );
+
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [showWorldMapModal, setShowWorldMapModal] = useState(false);
 
   const [lastSyncAtMs, setLastSyncAtMs] = useState<number>(() => Date.now());
-  const [nowTickMs, setNowTickMs] = useState<number>(() => Date.now());
 
   useEffect(() => {
     applyTheme(theme);
@@ -30,11 +88,60 @@ export function useGameSession(isAdminRoute: boolean) {
     return () => window.clearTimeout(timer);
   }, [noticeBanner]);
 
+  const setActiveScene = useCallback(
+    (scene: WorldZoneKey, marketItem?: string) => {
+      setActiveSceneState(scene);
+      if (marketItem) {
+        setMarketFocusItemKey(marketItem);
+      }
+      if (typeof window !== "undefined" && !isAdminRoute) {
+        const nextHash =
+          scene === "market" && marketItem
+            ? `#market:${encodeURIComponent(marketItem)}`
+            : `#${scene}`;
+        if (window.location.hash !== nextHash) {
+          window.history.pushState(null, "", nextHash);
+        }
+      }
+    },
+    [isAdminRoute],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined" || isAdminRoute) return;
+    const onHashOrPop = () => {
+      if (showWorldMapModal) {
+        setShowWorldMapModal(false);
+      }
+      if (showAnnouncementModal) {
+        setShowAnnouncementModal(false);
+      }
+      if (showSettingsModal) {
+        setShowSettingsModal(false);
+      }
+      const parsed = parseHashRoute(window.location.hash);
+      setActiveSceneState(parsed.scene);
+      if (parsed.marketItem) {
+        setMarketFocusItemKey(parsed.marketItem);
+      }
+    };
+    window.addEventListener("popstate", onHashOrPop);
+    window.addEventListener("hashchange", onHashOrPop);
+    return () => {
+      window.removeEventListener("popstate", onHashOrPop);
+      window.removeEventListener("hashchange", onHashOrPop);
+    };
+  }, [
+    isAdminRoute,
+    showWorldMapModal,
+    showAnnouncementModal,
+    showSettingsModal,
+  ]);
+
   const applyServerState = useCallback((next: ServerUpdate) => {
     setState((current) => mergeServerUpdate(current, next));
     if ("player" in next) {
       setLastSyncAtMs(Date.now());
-      setNowTickMs(Date.now());
     }
   }, []);
 
@@ -82,30 +189,58 @@ export function useGameSession(isAdminRoute: boolean) {
     if (!hasState || !hasActivePopulation || raidActive) return;
     let active = true;
     const token = api.getSessionToken();
-    const timer = window.setInterval(() => {
+
+    const syncNow = () => {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      ) {
+        return;
+      }
       api
         .getDashboard()
         .then((res) => {
           if (active && api.getSessionToken() === token) applyServerState(res);
         })
         .catch(() => {});
-    }, SETTLEMENT_UI_CONFIG.syncPollIntervalMs);
+    };
+
+    const timer = window.setInterval(
+      syncNow,
+      SETTLEMENT_UI_CONFIG.syncPollIntervalMs,
+    );
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        syncNow();
+      }
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibility);
+    }
     return () => {
       active = false;
       window.clearInterval(timer);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibility);
+      }
     };
-  }, [hasState, hasActivePopulation, activeHandle, raidActive, applyServerState]);
+  }, [
+    hasState,
+    hasActivePopulation,
+    activeHandle,
+    raidActive,
+    applyServerState,
+  ]);
 
   useEffect(() => {
-    if (!hasState || !hasActivePopulation || raidActive || activeScene !== "settlement") return;
-    const id = window.setInterval(() => {
-      setNowTickMs(Date.now());
-    }, SETTLEMENT_UI_CONFIG.interpTickMs);
-    return () => window.clearInterval(id);
-  }, [hasState, hasActivePopulation, raidActive, activeScene]);
-
-  useEffect(() => {
-    if (!hasState || !hasActivePopulation || !canNavigateWorld || raidActive || isAdminRoute) return;
+    if (
+      !hasState ||
+      !hasActivePopulation ||
+      !canNavigateWorld ||
+      raidActive ||
+      isAdminRoute
+    )
+      return;
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -116,13 +251,30 @@ export function useGameSession(isAdminRoute: boolean) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [hasState, hasActivePopulation, canNavigateWorld, raidActive, isAdminRoute]);
+  }, [
+    hasState,
+    hasActivePopulation,
+    canNavigateWorld,
+    raidActive,
+    isAdminRoute,
+  ]);
 
   const runAction = useCallback(
-    async (fn: () => Promise<ServerUpdate>, successMsg?: string) => {
+    async (
+      fn: () => Promise<ServerUpdate>,
+      successMsg?: string,
+      actionScope?: string,
+    ) => {
       setErrorBanner(null);
       setNoticeBanner(null);
-      setBusy(true);
+      if (actionScope) {
+        setPendingScopes((prev) => ({
+          ...prev,
+          [actionScope]: (prev[actionScope] ?? 0) + 1,
+        }));
+      } else {
+        setBusy(true);
+      }
       const token = api.getSessionToken();
       try {
         const next = await fn();
@@ -143,10 +295,27 @@ export function useGameSession(isAdminRoute: boolean) {
           setErrorBanner("操作未完成");
         }
       } finally {
-        setBusy(false);
+        if (actionScope) {
+          setPendingScopes((prev) => {
+            const nextCount = (prev[actionScope] ?? 1) - 1;
+            if (nextCount <= 0) {
+              const rest = { ...prev };
+              delete rest[actionScope];
+              return rest;
+            }
+            return { ...prev, [actionScope]: nextCount };
+          });
+        } else {
+          setBusy(false);
+        }
       }
     },
     [applyServerState],
+  );
+
+  const isScopeBusy = useCallback(
+    (scope: string) => busy || Boolean(pendingScopes[scope]),
+    [busy, pendingScopes],
   );
 
   const handleLogout = useCallback(async () => {
@@ -162,19 +331,11 @@ export function useGameSession(isAdminRoute: boolean) {
     }
   }, []);
 
-  const interpSeconds = useMemo(() => {
-    if (!state) return 0;
-    const elapsedSec = Math.max(0, (nowTickMs - lastSyncAtMs) / 1000);
-    return (
-      Math.min(SETTLEMENT_UI_CONFIG.maxInterpSec, elapsedSec) *
-      state.player.speedMultiplier
-    );
-  }, [state, nowTickMs, lastSyncAtMs]);
-
   return {
     state,
     loading,
     busy,
+    isScopeBusy,
     errorBanner,
     noticeBanner,
     setErrorBanner,
@@ -183,6 +344,8 @@ export function useGameSession(isAdminRoute: boolean) {
     setTheme,
     activeScene,
     setActiveScene,
+    marketFocusItemKey,
+    setMarketFocusItemKey,
     showSettingsModal,
     setShowSettingsModal,
     showAnnouncementModal,
@@ -192,6 +355,6 @@ export function useGameSession(isAdminRoute: boolean) {
     applyServerState,
     runAction,
     handleLogout,
-    interpSeconds,
+    lastSyncAtMs,
   };
 }
