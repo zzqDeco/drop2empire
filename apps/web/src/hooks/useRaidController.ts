@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
+  ApiError,
   type DashboardStateResp,
   type RaidActionReq,
   type RaidLootItemDTO,
@@ -8,7 +9,10 @@ import {
 import { advanceChannelingProgress, type ServerUpdate } from "../serverState";
 import type { FacingDirection } from "../LordAvatarSVG";
 import type { RaidTileSpriteKind } from "../RaidSpritesSVG";
-import { CHEST_CHANNEL_LABELS } from "../config/gameConfig";
+import {
+  CHEST_CHANNEL_LABELS,
+  EARLY_EXTRACT_CUTOFF_MS,
+} from "../config/gameConfig";
 
 export type LootDrop = RaidLootItemDTO;
 
@@ -24,7 +28,11 @@ export interface ChannelingState {
 
 export function useRaidController(
   state: DashboardStateResp,
-  runAction: (fn: () => Promise<ServerUpdate>, msg?: string) => Promise<void>,
+  runAction: (
+    fn: () => Promise<ServerUpdate>,
+    msg?: string,
+    scope?: string,
+  ) => Promise<void>,
 ) {
   const { raidLoadout } = state;
   const activeSession = raidLoadout.activeSession ?? null;
@@ -42,6 +50,8 @@ export function useRaidController(
 
   const [facing, setFacing] = useState<FacingDirection>("right");
   const [timeLeftMs, setTimeLeftMs] = useState(180000);
+  const [galeLeftMs, setGaleLeftMs] = useState(0);
+  const [scavLeftMs, setScavLeftMs] = useState(0);
   const [lastMoveAtMs, setLastMoveAtMs] = useState(0);
 
   const [showLootModal, setShowLootModal] = useState(false);
@@ -55,18 +65,29 @@ export function useRaidController(
   const settlingRef = useRef(false);
   const activeRaidId = activeSession?.raidId ?? "";
   const serverTimeRemMs = activeSession?.timeRemainingMs ?? 0;
+  const serverGaleRemMs = activeSession?.galeRemainingMs ?? 0;
+  const serverScavRemMs = activeSession?.scavRemainingMs ?? 0;
   const countdownDeadlineRef = useRef(0);
+  const galeDeadlineRef = useRef(0);
+  const scavDeadlineRef = useRef(0);
   const serverFacing = activeSession?.facing ?? "right";
 
   useEffect(() => {
     if (!inRaid || !activeRaidId) {
       setChanneling(null);
       setShowLootModal(false);
+      setGaleLeftMs(0);
+      setScavLeftMs(0);
       settlingRef.current = false;
       return;
     }
-    countdownDeadlineRef.current = performance.now() + serverTimeRemMs;
+    const nowPerf = performance.now();
+    countdownDeadlineRef.current = nowPerf + serverTimeRemMs;
+    galeDeadlineRef.current = nowPerf + serverGaleRemMs;
+    scavDeadlineRef.current = nowPerf + serverScavRemMs;
     setTimeLeftMs(serverTimeRemMs);
+    setGaleLeftMs(serverGaleRemMs);
+    setScavLeftMs(serverScavRemMs);
     if (
       serverFacing === "up" ||
       serverFacing === "down" ||
@@ -76,7 +97,14 @@ export function useRaidController(
       setFacing(serverFacing);
     }
     settlingRef.current = false;
-  }, [inRaid, activeRaidId, serverTimeRemMs, serverFacing]);
+  }, [
+    inRaid,
+    activeRaidId,
+    serverTimeRemMs,
+    serverGaleRemMs,
+    serverScavRemMs,
+    serverFacing,
+  ]);
 
   const commandPendingRef = useRef(false);
   const sessionRef = useRef(activeSession);
@@ -133,6 +161,21 @@ export function useRaidController(
                 progressPct: 0,
               };
             }
+            const isExtractTile =
+              tile.kind === "extract_deep" ||
+              (tile.kind === "extract_early" &&
+                next.timeRemainingMs >= EARLY_EXTRACT_CUTOFF_MS);
+            if (command.action === "move" && isExtractTile) {
+              return {
+                label: CHEST_CHANNEL_LABELS[tile.kind] ?? "正在引导撤离信标",
+                kind: tile.kind as RaidTileSpriteKind,
+                x: next.playerX,
+                y: next.playerY,
+                startedAt: Date.now(),
+                durationMs: Math.max(1, next.channelRemainingMs) + 60,
+                progressPct: 0,
+              };
+            }
             const continuingExtraction =
               current &&
               (tile.kind === "extract_early" || tile.kind === "extract_deep") &&
@@ -172,7 +215,29 @@ export function useRaidController(
       setShowLootModal(false);
       setPreStage("armory");
 
-      void runAction(() => sendRaidCommand({ status })).finally(() => {
+      void runAction(
+        async () => {
+          try {
+            return await sendRaidCommand({ status });
+          } catch (err: unknown) {
+            const isIncomplete =
+              status === "EXTRACTED" &&
+              ((err instanceof ApiError &&
+                err.code === "channeling_incomplete") ||
+                (err instanceof Error &&
+                  (err.message.includes("channeling_incomplete") ||
+                    err.message.includes("读条") ||
+                    err.message.includes("引导"))));
+            if (isIncomplete) {
+              await new Promise((resolve) => window.setTimeout(resolve, 260));
+              return await sendRaidCommand({ status });
+            }
+            throw err;
+          }
+        },
+        undefined,
+        "raid:finish",
+      ).finally(() => {
         settlingRef.current = false;
       });
     },
@@ -183,11 +248,11 @@ export function useRaidController(
     if (!inRaid || !activeRaidId) return;
     const id = window.setInterval(() => {
       const now = Date.now();
-      const remaining = Math.max(
-        0,
-        countdownDeadlineRef.current - performance.now(),
-      );
+      const nowPerf = performance.now();
+      const remaining = Math.max(0, countdownDeadlineRef.current - nowPerf);
       setTimeLeftMs(remaining);
+      setGaleLeftMs(Math.max(0, galeDeadlineRef.current - nowPerf));
+      setScavLeftMs(Math.max(0, scavDeadlineRef.current - nowPerf));
       if (remaining === 0 && !commandPendingRef.current)
         triggerFinishRaid("MIA");
 
@@ -214,7 +279,11 @@ export function useRaidController(
     }
 
     setShowLootModal(true);
-    void runAction(() => sendRaidAction({ action: "open_chest" }));
+    void runAction(
+      () => sendRaidAction({ action: "open_chest" }),
+      undefined,
+      "raid:chest",
+    );
   }, [channeling, triggerFinishRaid, runAction, sendRaidAction]);
 
   const zones = activeSession?.zones ?? [];
@@ -231,6 +300,7 @@ export function useRaidController(
   const maxHp = activeSession?.maxHp ?? raidLoadout.totalMaxHp;
   const atk = activeSession?.atk ?? raidLoadout.totalAtk;
   const def = activeSession?.def ?? raidLoadout.totalDef;
+  const cheatDeathActive = Boolean(activeSession?.cheatDeathActive);
   const effectiveMoveCooldownMs =
     activeSession?.effectiveMoveCooldownMs ?? raidLoadout.moveCooldownMs ?? 360;
   const usedPotions = useMemo(
@@ -248,6 +318,28 @@ export function useRaidController(
     if (!currentZone) return null;
     return currentZone.tiles[pos.y * currentZone.width + pos.x] ?? null;
   }, [currentZone, pos]);
+
+  const syncLandingInteraction = useCallback(
+    (
+      nextSess: NonNullable<DashboardStateResp["raidLoadout"]["activeSession"]>,
+      wasBossAlive: boolean,
+    ) => {
+      const nextZone = nextSess.zones.find(
+        (zone) => zone.id === nextSess.currentZoneId,
+      );
+      const landed =
+        nextZone?.tiles[nextSess.playerY * nextZone.width + nextSess.playerX];
+      if (!landed) return;
+
+      if (
+        (wasBossAlive && nextSess.activeChestDrops.length > 0) ||
+        landed.kind === "merchant"
+      ) {
+        setShowLootModal(true);
+      }
+    },
+    [],
+  );
 
   const handleStep = useCallback(
     (dx: number, dy: number) => {
@@ -287,29 +379,21 @@ export function useRaidController(
 
       const isBossAlive = dest.kind === "enemy_boss" && !dest.looted;
 
-      void runAction(async () => {
-        const resp = await sendRaidAction({ action: "move", dx, dy });
-        const nextSess = resp.raidLoadout.activeSession;
-        if (!nextSess) {
-          setChanneling(null);
-          setShowLootModal(false);
+      void runAction(
+        async () => {
+          const resp = await sendRaidAction({ action: "move", dx, dy });
+          const nextSess = resp.raidLoadout.activeSession;
+          if (!nextSess) {
+            setChanneling(null);
+            setShowLootModal(false);
+            return resp;
+          }
+          syncLandingInteraction(nextSess, isBossAlive);
           return resp;
-        }
-        const nextZone = nextSess.zones.find(
-          (zone) => zone.id === nextSess.currentZoneId,
-        );
-        const landed =
-          nextZone?.tiles[nextSess.playerY * nextZone.width + nextSess.playerX];
-        if (!landed) return resp;
-
-        if (
-          (isBossAlive && nextSess.activeChestDrops.length > 0) ||
-          landed.kind === "merchant"
-        ) {
-          setShowLootModal(true);
-        }
-        return resp;
-      });
+        },
+        undefined,
+        "raid:step",
+      );
     },
     [
       inRaid,
@@ -319,6 +403,7 @@ export function useRaidController(
       pos,
       runAction,
       sendRaidAction,
+      syncLandingInteraction,
     ],
   );
 
@@ -326,19 +411,38 @@ export function useRaidController(
     if (!inRaid) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (
+        e.defaultPrevented ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
         e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement
       ) {
         return;
       }
-      if (e.key === "b" || e.key === "B" || e.key === "Tab") {
+      if (
+        typeof document !== "undefined" &&
+        document.querySelector(
+          '[role="dialog"][aria-modal="true"]:not(.raid-loot-modal-backdrop)',
+        ) !== null
+      ) {
+        return;
+      }
+      if (
+        e.key === "b" ||
+        e.key === "B" ||
+        (!showLootModal && e.key === "Tab")
+      ) {
         e.preventDefault();
         setShowLootModal((v) => !v);
         return;
       }
-      if (e.key === "Escape" && showLootModal) {
-        e.preventDefault();
-        setShowLootModal(false);
+      if (showLootModal) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setShowLootModal(false);
+        }
         return;
       }
       if (e.key === "w" || e.key === "W" || e.key === "ArrowUp") {
@@ -365,14 +469,27 @@ export function useRaidController(
     }
     setChanneling(null);
     setShowLootModal(false);
-    void runAction(() => sendRaidAction({ action: "use_portal" }));
-  }, [currentTile, runAction, sendRaidAction]);
+    void runAction(
+      async () => {
+        const resp = await sendRaidAction({ action: "use_portal" });
+        const nextSess = resp.raidLoadout.activeSession;
+        if (nextSess) {
+          syncLandingInteraction(nextSess, false);
+        }
+        return resp;
+      },
+      undefined,
+      "raid:portal",
+    );
+  }, [currentTile, runAction, sendRaidAction, syncLandingInteraction]);
 
   const handleDrinkPotion = useCallback(
     (potKey: string) => {
       if (usedPotions.includes(potKey)) return;
-      void runAction(() =>
-        sendRaidAction({ action: "drink_potion", itemKey: potKey }),
+      void runAction(
+        () => sendRaidAction({ action: "drink_potion", itemKey: potKey }),
+        undefined,
+        "raid:potion",
       );
     },
     [usedPotions, runAction, sendRaidAction],
@@ -389,13 +506,16 @@ export function useRaidController(
         return;
       if (to === "backpack" && backpack.length >= raidLoadout.backpackCapacity)
         return;
-      void runAction(() =>
-        sendRaidAction({
-          action: "transfer_loot",
-          itemId: item.id,
-          fromContainer: from,
-          toContainer: to,
-        }),
+      void runAction(
+        () =>
+          sendRaidAction({
+            action: "transfer_loot",
+            itemId: item.id,
+            fromContainer: from,
+            toContainer: to,
+          }),
+        undefined,
+        "raid:transfer",
       );
     },
     [safeBox.length, backpack.length, raidLoadout, runAction, sendRaidAction],
@@ -403,13 +523,19 @@ export function useRaidController(
 
   const lootAllFromChest = useCallback(() => {
     if (activeChestDrops.length === 0) return;
-    void runAction(() => sendRaidAction({ action: "loot_all" }));
+    void runAction(
+      () => sendRaidAction({ action: "loot_all" }),
+      undefined,
+      "raid:loot",
+    );
   }, [activeChestDrops.length, runAction, sendRaidAction]);
 
   const handleMerchantBuy = useCallback(
     (offer: "heal" | "mystery_bp") => {
-      void runAction(() =>
-        sendRaidAction({ action: "merchant_buy", itemKey: offer }),
+      void runAction(
+        () => sendRaidAction({ action: "merchant_buy", itemKey: offer }),
+        undefined,
+        "raid:merchant",
       );
     },
     [runAction, sendRaidAction],
@@ -417,16 +543,21 @@ export function useRaidController(
 
   const startExtractionChannel = useCallback(() => {
     if (!currentTile) return;
+    const rem = channelDeadlineRef.current - performance.now();
+    if (rem <= 0) {
+      triggerFinishRaid("EXTRACTED");
+      return;
+    }
     setChanneling({
-      label: "正在呼叫信标撤离",
+      label: CHEST_CHANNEL_LABELS[currentTile.kind] ?? "正在引导撤离信标",
       kind: currentTile.kind as RaidTileSpriteKind,
       x: pos.x,
       y: pos.y,
       startedAt: Date.now(),
-      durationMs: Math.max(1, channelDeadlineRef.current - performance.now()),
+      durationMs: Math.max(250, rem + 60),
       progressPct: 0,
     });
-  }, [currentTile, pos.x, pos.y]);
+  }, [currentTile, pos.x, pos.y, triggerFinishRaid]);
 
   const serverReport = raidLoadout.lastSettlementReport ?? null;
   const reportKey = serverReport ? serverReport.raidId : "";
@@ -451,6 +582,9 @@ export function useRaidController(
     facing,
     setFacing,
     timeLeftMs,
+    galeLeftMs,
+    scavLeftMs,
+    cheatDeathActive,
     lastMoveAtMs,
     showLootModal,
     setShowLootModal,

@@ -24,6 +24,37 @@
   margin-top: var(--space-2);
 }
 
+.buff-slot-pill {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+}
+
+.buff-slot-target {
+  box-shadow: var(--shadow-sm);
+}
+
+.buff-slot-pill .btn-chip {
+  border: 0;
+  border-radius: 0;
+}
+
+.buff-slot-remove {
+  padding: 2px 7px;
+  font-size: var(--font-xs);
+  font-weight: 700;
+  background: var(--surface-sunken);
+  color: var(--danger-text);
+  border: 0;
+  border-left: 1px solid var(--border);
+}
+
+.buff-slot-remove:hover {
+  background: var(--danger-bg);
+}
+
 /* Act 2: 3D Spring-Physics Etched Buff Card Stage */
 .etched-card-stage {
   display: grid;
@@ -199,8 +230,14 @@
 
 .raid-map-grid {
   display: grid;
-  grid-template-columns: repeat(var(--zone-cols, 9), 64px);
-  grid-template-rows: repeat(var(--zone-rows, 9), 64px);
+  grid-template-columns: repeat(
+    var(--zone-cols, 9),
+    clamp(30px, calc((100vw - 48px) / var(--zone-cols, 9)), 64px)
+  );
+  grid-template-rows: repeat(
+    var(--zone-rows, 9),
+    clamp(30px, calc((100vw - 48px) / var(--zone-cols, 9)), 64px)
+  );
   gap: 3px;
   padding: 8px;
   background: var(--surface-sunken);
@@ -210,8 +247,8 @@
 
 .raid-tile-cell {
   position: relative;
-  width: 64px;
-  height: 64px;
+  width: 100%;
+  height: 100%;
   padding: 0;
   display: flex;
   align-items: center;
@@ -224,6 +261,11 @@
     transform 0.14s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.14s ease,
     box-shadow 0.14s ease;
+}
+
+.tile-lethal-warn {
+  border-color: var(--danger-border);
+  box-shadow: inset 0 0 0 2px var(--danger-text);
 }
 
 .tile-adjacent {
@@ -486,8 +528,16 @@
 .loot-item-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   font-size: var(--font-xs);
+  flex: 1;
+}
+
+.loot-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
 }
 
 .raid-center-avatar-stage {
@@ -573,4 +623,16 @@
   margin-bottom: var(--space-3);
   background: var(--bg);
   border: 1px solid var(--border-strong);
+}
+
+.raid-lost-gear-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 var(--space-3) var(--space-3);
+  padding: 10px 12px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
+  font-size: var(--font-xs);
 }

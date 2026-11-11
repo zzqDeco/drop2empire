@@ -6,6 +6,7 @@ set -euo pipefail
 ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 SSH_HOST=${1:-${DEPLOY_SSH_HOST:-120.25.210.202}}
 PUBLIC_PORT=${PUBLIC_HTTPS_PORT:-8443}
+PUBLIC_ORIGIN=${PUBLIC_ORIGIN:-https://${SSH_HOST}:${PUBLIC_PORT}}
 VERSION=${VERSION:-v1.0.0}
 CLEAN_START_DATABASE=${CLEAN_START_DATABASE:-}
 EXPECTED_PREVIOUS_SHA=${EXPECTED_PREVIOUS_SHA:-}
@@ -39,7 +40,7 @@ mkdir -p "$STAGE_DIR/bundle/deploy"
 
 (
   cd "$ROOT_DIR/apps/web"
-  npm run build
+  VITE_PUBLIC_ORIGIN="$PUBLIC_ORIGIN" npm run build
   cp -R dist "$STAGE_DIR/bundle/dist"
   VERSION="$VERSION" COMMIT_SHA="$COMMIT_SHA" node -e \
     'require("fs").writeFileSync(process.argv[1], JSON.stringify({version:process.env.VERSION,sha:process.env.COMMIT_SHA}))' \

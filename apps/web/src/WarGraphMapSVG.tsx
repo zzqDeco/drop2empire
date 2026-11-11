@@ -4,6 +4,7 @@ interface Props {
   nodes: WarNodeDTO[];
   edges: WarEdgeDTO[];
   selectedNodeId: string;
+  rallyNodeId?: string | null;
   onSelectNode: (nodeId: string) => void;
 }
 
@@ -17,6 +18,7 @@ export function WarGraphMapSVG({
   nodes,
   edges,
   selectedNodeId,
+  rallyNodeId,
   onSelectNode,
 }: Props) {
   const byId = new Map(nodes.map((n) => [n.nodeId, n]));
@@ -80,6 +82,9 @@ export function WarGraphMapSVG({
         {/* City Nodes */}
         {nodes.map((node) => {
           const isSelected = node.nodeId === selectedNodeId;
+          const isRally = Boolean(rallyNodeId && node.nodeId === rallyNodeId);
+          const myTotalTroops =
+            node.myInfantry + node.myArcher + node.myCavalry;
           const r = node.isTreasureVault ? 44 : 36;
           return (
             <g
@@ -88,9 +93,18 @@ export function WarGraphMapSVG({
               transform={`translate(${node.x}, ${node.y})`}
               onClick={() => onSelectNode(node.nodeId)}
             >
+              {node.canDeploy && (
+                <circle
+                  r={r + 4}
+                  fill="none"
+                  stroke="var(--success-border)"
+                  strokeWidth="1.5"
+                  strokeDasharray="3 2"
+                />
+              )}
               {isSelected && (
                 <circle
-                  r={r + 8}
+                  r={r + 9}
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -100,9 +114,20 @@ export function WarGraphMapSVG({
               <circle
                 r={r}
                 className={`war-node-circle war-owner-${node.ownerGuild.toLowerCase()}`}
-                stroke="currentColor"
-                strokeWidth={isSelected ? "2.8" : "1.8"}
+                stroke={isRally ? "var(--warning-border)" : "currentColor"}
+                strokeWidth={isSelected || isRally ? "2.8" : "1.8"}
               />
+              {isRally && (
+                <text
+                  y={-(r + 10)}
+                  textAnchor="middle"
+                  fontSize="11"
+                  fontWeight="700"
+                  fill="var(--warning-text)"
+                >
+                  🎯 集结目标
+                </text>
+              )}
               <text
                 y="-12"
                 textAnchor="middle"
@@ -110,7 +135,7 @@ export function WarGraphMapSVG({
                 fontWeight="700"
                 fill="currentColor"
               >
-                {node.name}
+                {node.isTreasureVault ? `★ ${node.name}` : node.name}
               </text>
               <text
                 y="4"
@@ -130,6 +155,18 @@ export function WarGraphMapSVG({
               >
                 步{node.infantryCount}/弓{node.archerCount}/骑{node.cavalryCount}
               </text>
+              {myTotalTroops > 0 && (
+                <text
+                  y={r + 14}
+                  textAnchor="middle"
+                  fontSize="11"
+                  fontFamily="monospace"
+                  fontWeight="700"
+                  fill="var(--success-text)"
+                >
+                  我驻 {myTotalTroops}团
+                </text>
+              )}
             </g>
           );
         })}

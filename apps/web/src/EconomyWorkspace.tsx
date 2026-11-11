@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   api,
   type CompanyDTO,
@@ -14,9 +14,12 @@ import { MarketSceneView as SpotMarket } from "./MacroEmpireWorkspace";
 export interface EconomyViewProps {
   state: DashboardStateResp;
   busy?: boolean;
+  focusItemKey?: string | null;
+  onClearFocusItem?: () => void;
   runAction: (
     fn: () => Promise<DashboardStateResp>,
     successMsg?: string,
+    scope?: string,
   ) => Promise<void>;
 }
 const professionNames: Record<string, string> = {
@@ -731,7 +734,14 @@ export function CompanyPortfolio(props: EconomyViewProps) {
 }
 
 export function EconomyWorkspace(props: EconomyViewProps) {
-  const [tab, setTab] = useState("profession");
+  const [tab, setTab] = useState(() =>
+    props.focusItemKey ? "spot" : "profession",
+  );
+  useEffect(() => {
+    if (props.focusItemKey) {
+      setTab("spot");
+    }
+  }, [props.focusItemKey]);
   const companies = props.state.economy.companies;
   return (
     <div className="economy-stack">

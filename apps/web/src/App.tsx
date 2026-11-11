@@ -1,12 +1,11 @@
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { Compass, Droplets } from "lucide-react";
 import { EconomyWorkspace, CompanyPortfolio } from "./EconomyWorkspace";
 import { EconomyEvents } from "./EconomyEvents";
 import "./economy.css";
-import { useMemo, useState } from "react";
-import { Compass, Droplets } from "lucide-react";
 import { ICON } from "./icons";
 import { CivilizationSilhouetteSVG } from "./RaidSpritesSVG";
 import { WastelandRaidPanel } from "./WastelandRaidPanel";
-import { AdminConsoleView } from "./AdminConsoleView";
 import {
   ImperialAnnouncementModal,
   SeasonRelicVaultPanel,
@@ -14,23 +13,22 @@ import {
   WarGuildSceneView,
   WorldMapCompassModal,
 } from "./MacroEmpireWorkspace";
+import { ModalShell } from "./components/ModalShell";
 import { useGameSession } from "./hooks/useGameSession";
 import { useWaterGather } from "./hooks/useWaterGather";
-import {
-  computeLiveWaterMetrics,
-  deriveProgressionFlags,
-} from "./domain/settlementSelectors";
+import { deriveProgressionFlags } from "./domain/settlementSelectors";
 import { AuthScreen } from "./features/auth/AuthScreen";
 import { OpeningStageView } from "./features/settlement/OpeningStageView";
 import { ImperialTopHeader } from "./features/settlement/ImperialTopHeader";
 import { SettlementDashboardView } from "./features/settlement/SettlementDashboardView";
 
+const LazyAdminConsoleView = lazy(() => import("./AdminConsoleView"));
+
 export function App() {
   const isAdminRoute = useMemo(
     () =>
       typeof window !== "undefined" &&
-      (window.location.pathname.startsWith("/admin") ||
-        window.location.hash.startsWith("#/admin")),
+      window.location.pathname.startsWith("/admin"),
     [],
   );
 
@@ -38,11 +36,13 @@ export function App() {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem("d2e_ack_chapter") ?? "";
   });
+  const [ackedOfflineSummary, setAckedOfflineSummary] = useState<string>("");
 
   const {
     state,
     loading,
     busy,
+    isScopeBusy,
     errorBanner,
     noticeBanner,
     setErrorBanner,
@@ -51,6 +51,8 @@ export function App() {
     setTheme,
     activeScene,
     setActiveScene,
+    marketFocusItemKey,
+    setMarketFocusItemKey,
     showSettingsModal,
     setShowSettingsModal,
     showAnnouncementModal,
@@ -60,8 +62,14 @@ export function App() {
     applyServerState,
     runAction,
     handleLogout,
-    interpSeconds,
+    lastSyncAtMs,
   } = useGameSession(isAdminRoute);
+
+  useEffect(() => {
+    if (!noticeBanner) return;
+    const id = window.setTimeout(() => setNoticeBanner(null), 5000);
+    return () => window.clearTimeout(id);
+  }, [noticeBanner, setNoticeBanner]);
 
   const firstResBpUnlocked =
     state?.blueprints.find((b) => b.code === "first_resident")?.unlocked ??
@@ -86,21 +94,32 @@ export function App() {
     );
   }
 
-  // ISOLATED ADMIN ROUTE (/admin)
+  // ISOLATED LOOPBACK ADMIN ROUTE (/admin)
   if (isAdminRoute) {
     return (
-      <AdminConsoleView
-        state={state}
-        busy={busy}
-        theme={theme}
-        setTheme={setTheme}
-        errorBanner={errorBanner}
-        noticeBanner={noticeBanner}
-        setErrorBanner={setErrorBanner}
-        setNoticeBanner={setNoticeBanner}
-        runAction={runAction}
-        handleLogout={handleLogout}
-      />
+      <Suspense
+        fallback={
+          <div className="loading-shell">
+            <div className="loading-box">
+              <Droplets size={ICON.lg} />
+              <span className="mono-num">加载管理后台</span>
+            </div>
+          </div>
+        }
+      >
+        <LazyAdminConsoleView
+          state={state}
+          busy={busy}
+          theme={theme}
+          setTheme={setTheme}
+          errorBanner={errorBanner}
+          noticeBanner={noticeBanner}
+          setErrorBanner={setErrorBanner}
+          setNoticeBanner={setNoticeBanner}
+          runAction={runAction}
+          handleLogout={handleLogout}
+        />
+      </Suspense>
     );
   }
 
@@ -118,19 +137,6 @@ export function App() {
   }
 
   const flags = deriveProgressionFlags(state);
-  const {
-    waterRes,
-    liveWaterMilli,
-    hasAnyWaterYet,
-    canSeeFirstRecruit,
-    firstTenProgressPct,
-  } = computeLiveWaterMetrics(
-    state,
-    flags.firstResBpUnlocked,
-    inFlightClicks,
-    interpSeconds,
-  );
-
   const retainedPortfolio =
     state.player.profession === "none" &&
     (state.economy?.companies?.length ?? 0) > 0;
@@ -139,13 +145,12 @@ export function App() {
     return (
       <>
         <OpeningStageView
-          handle={state.player.handle}
+          state={state}
+          firstResBpUnlocked={flags.firstResBpUnlocked}
+          inFlightClicks={inFlightClicks}
+          lastSyncAtMs={lastSyncAtMs}
           theme={theme}
           setTheme={setTheme}
-          liveWaterMilli={liveWaterMilli}
-          hasAnyWaterYet={hasAnyWaterYet}
-          canSeeFirstRecruit={canSeeFirstRecruit}
-          firstTenProgressPct={firstTenProgressPct}
           waterBursts={waterBursts}
           onGatherWater={handleGatherWater}
           onGlobalButtonPop={handleGlobalButtonPop}
@@ -168,6 +173,14 @@ export function App() {
     );
   }
 
+  const effectiveScene =
+    (activeScene === "scout" && !flags.showScoutScene) ||
+    ((activeScene === "market" || activeScene === "war") &&
+      !flags.showAdvancedWorld) ||
+    (activeScene === "lord" && !flags.showLordScene)
+      ? "settlement"
+      : activeScene;
+
   const storyChapter = {
     key: state.settlement.guideCode,
     tag: state.settlement.guideTitle,
@@ -176,6 +189,20 @@ export function App() {
   const currentAckChapterKey = `${state.player.handle}:${flags.showAdvancedWorld ? `profession:${state.player.profession}` : storyChapter.key}`;
   const showCivChapterPopup =
     flags.treasureUnlocked && dismissedChapterKey !== currentAckChapterKey;
+
+  const ackCivChapter = () => {
+    setDismissedChapterKey(currentAckChapterKey);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("d2e_ack_chapter", currentAckChapterKey);
+    }
+  };
+
+  const offlineSummary =
+    state.player.offlineAwardSummary &&
+    state.player.offlineAwardSummary !== ackedOfflineSummary
+      ? state.player.offlineAwardSummary
+      : "";
+  const bannerMessage = errorBanner || noticeBanner || offlineSummary;
 
   return (
     <div className="app-shell" onClickCapture={handleGlobalButtonPop}>
@@ -188,26 +215,29 @@ export function App() {
       )}
       <ImperialTopHeader
         state={state}
-        activeScene={activeScene}
+        activeScene={effectiveScene}
         setActiveScene={setActiveScene}
-        showAdvancedWorld={flags.showAdvancedWorld}
-        treasureUnlocked={flags.treasureUnlocked}
+        flags={flags}
+        onOpenWorldMap={() => setShowWorldMapModal(true)}
         onOpenAnnouncements={() => setShowAnnouncementModal(true)}
         onOpenSettings={() => setShowSettingsModal(true)}
       />
 
-      {(errorBanner || noticeBanner) && (
+      {bannerMessage && (
         <div
           className={`status-banner economy-toast ${errorBanner ? "status-danger" : "status-info"}`}
           role="status"
         >
-          <span>{errorBanner || noticeBanner}</span>
+          <span>{bannerMessage}</span>
           <button
             type="button"
             className="banner-close"
             onClick={() => {
               setErrorBanner(null);
               setNoticeBanner(null);
+              if (state.player.offlineAwardSummary) {
+                setAckedOfflineSummary(state.player.offlineAwardSummary);
+              }
             }}
           >
             ×
@@ -215,23 +245,24 @@ export function App() {
         </div>
       )}
 
-      {activeScene === "settlement" && (
+      {effectiveScene === "settlement" && (
         <SettlementDashboardView
+          key="scene-settlement"
           state={state}
           busy={busy}
+          isScopeBusy={isScopeBusy}
           flags={flags}
-          waterRes={waterRes}
-          liveWaterMilli={liveWaterMilli}
-          interpSeconds={interpSeconds}
+          inFlightClicks={inFlightClicks}
+          lastSyncAtMs={lastSyncAtMs}
           waterBursts={waterBursts}
           storyChapter={storyChapter}
           onGatherWater={handleGatherWater}
-          onOpenIndustry={() => setActiveScene("market")}
+          onNavigateScene={setActiveScene}
           runAction={runAction}
         />
       )}
 
-      {activeScene === "scout" && flags.showScoutScene && (
+      {effectiveScene === "scout" && flags.showScoutScene && (
         <section
           key="scene-scout"
           className="raid-scene-shell"
@@ -241,19 +272,25 @@ export function App() {
         </section>
       )}
 
-      {activeScene === "market" && flags.showAdvancedWorld && (
+      {effectiveScene === "market" && flags.showAdvancedWorld && (
         <div key="scene-market" className="scene-workspace-offset">
-          <EconomyWorkspace state={state} busy={busy} runAction={runAction} />
+          <EconomyWorkspace
+            state={state}
+            busy={busy}
+            runAction={runAction}
+            focusItemKey={marketFocusItemKey}
+            onClearFocusItem={() => setMarketFocusItemKey(null)}
+          />
         </div>
       )}
 
-      {activeScene === "war" && flags.showAdvancedWorld && (
+      {effectiveScene === "war" && flags.showAdvancedWorld && (
         <div key="scene-war" className="scene-workspace-offset">
           <WarGuildSceneView state={state} runAction={runAction} />
         </div>
       )}
 
-      {activeScene === "lord" && flags.showLordScene && (
+      {effectiveScene === "lord" && flags.showLordScene && (
         <div key="scene-lord" className="scene-workspace-offset">
           <SeasonRelicVaultPanel state={state} runAction={runAction} />
         </div>
@@ -272,57 +309,49 @@ export function App() {
           <div className="world-map-fab-text">
             <strong>世界舆图</strong>
             <span className="mono-num">
-              {activeScene === "settlement" ? "前往疆域 [M]" : "切换疆域 [M]"}
+              {effectiveScene === "settlement"
+                ? "前往疆域 [M]"
+                : "切换疆域 [M]"}
             </span>
           </div>
         </button>
       )}
 
       {showCivChapterPopup && (
-        <div
-          className="modal-backdrop civ-popup-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label="文明纪元推进昭告"
+        <ModalShell
+          ariaLabel="文明纪元推进昭告"
+          backdropClassName="modal-backdrop civ-popup-backdrop"
+          sheetClassName="civ-popup-card"
+          onClose={ackCivChapter}
         >
-          <div className="civ-popup-card">
-            <div className="civ-popup-kicker">
-              <span className="story-beacon-dot" />
-              <span className="story-chapter-tag">{storyChapter.tag}</span>
-            </div>
-            <div className="civ-popup-silhouette-wrap">
-              <CivilizationSilhouetteSVG era={flags.civEra} />
-            </div>
-            <p className="story-whisper-text">{storyChapter.text}</p>
-            <div className="civ-popup-footer">
-              <span className="muted-note">
-                （此章节指引随后将收纳于右上角【设置】面板中，不占用主界面视野）
-              </span>
-              <button
-                type="button"
-                className="btn-water-strike"
-                data-pop="★ 纪元推进"
-                onClick={() => {
-                  setDismissedChapterKey(currentAckChapterKey);
-                  if (typeof window !== "undefined") {
-                    window.localStorage.setItem(
-                      "d2e_ack_chapter",
-                      currentAckChapterKey,
-                    );
-                  }
-                }}
-              >
-                <span>铭记史册 · 继续开拓</span>
-              </button>
-            </div>
+          <div className="civ-popup-kicker">
+            <span className="story-beacon-dot" />
+            <span className="story-chapter-tag">{storyChapter.tag}</span>
           </div>
-        </div>
+          <div className="civ-popup-silhouette-wrap">
+            <CivilizationSilhouetteSVG era={flags.civEra} />
+          </div>
+          <p className="story-whisper-text">{storyChapter.text}</p>
+          <div className="civ-popup-footer">
+            <span className="muted-note">
+              （此章节指引随后将收纳于右上角【设置】面板中，不占用主界面视野）
+            </span>
+            <button
+              type="button"
+              className="btn-water-strike"
+              data-pop="★ 纪元推进"
+              onClick={ackCivChapter}
+            >
+              <span>铭记史册 · 继续开拓</span>
+            </button>
+          </div>
+        </ModalShell>
       )}
 
       {showWorldMapModal && flags.canNavigateWorld && (
         <WorldMapCompassModal
           state={state}
-          activeScene={activeScene}
+          activeScene={effectiveScene}
           showScoutScene={flags.showScoutScene}
           showAdvancedWorld={flags.showAdvancedWorld}
           showLordScene={flags.showLordScene}

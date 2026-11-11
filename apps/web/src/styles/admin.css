@@ -47,6 +47,41 @@
   padding: 0 12px;
 }
 
+.admin-notice-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.admin-notice-form input,
+.admin-notice-form textarea {
+  padding: 7px 9px;
+  font-size: var(--font-base);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  resize: vertical;
+}
+
+.invite-link-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.invite-link-controls input {
+  width: 230px;
+  padding: 5px 8px;
+  font-size: var(--font-xs);
+  background: var(--surface);
+  color: var(--text-strong);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+}
+
 @media (max-width: 1120px) {
   .dashboard-grid,
   .dashboard-grid-2col,
@@ -56,11 +91,27 @@
   .benchmark-grid,
   .world-map-zone-grid,
   .etched-card-stage,
-  .raid-battlefield-layout {
+  .raid-battlefield-layout,
+  .relic-reveal-body {
     grid-template-columns: 1fr;
   }
   .profession-grid,
   .collectibles-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .profession-grid,
+  .collectibles-grid,
+  .recipe-grid,
+  .loot-slot-grid,
+  .form-row-3 {
+    grid-template-columns: 1fr;
+  }
+  .world-map-fab {
+    right: 14px;
+    bottom: 14px;
+    padding: 9px 13px;
   }
 }

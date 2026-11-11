@@ -1,5 +1,5 @@
 import { EconomyAdmin } from "./EconomyAdmin";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   api,
   type Benchmark30mResp,
@@ -24,6 +24,28 @@ import {
 import { ICON } from "./icons";
 import { type ThemeMode } from "./theme";
 import { formatClockMMSS, formatGold } from "./format";
+import { ConfirmActionModal, ModalShell } from "./components/ModalShell";
+import { resolvePublicPlayerOrigin } from "./domain/settlementSelectors";
+import type { ServerUpdate } from "./serverState";
+
+const PUBLIC_ORIGIN_STORAGE_KEY = "d2e_public_origin";
+
+function getInitialPublicOriginInput(): string {
+  const envOrigin = (import.meta.env.VITE_PUBLIC_ORIGIN ?? "").trim();
+  if (typeof window !== "undefined") {
+    try {
+      const saved = window.localStorage
+        .getItem(PUBLIC_ORIGIN_STORAGE_KEY)
+        ?.trim();
+      if (saved) return saved;
+    } catch {
+      // Ignore localStorage access errors
+    }
+    if (envOrigin) return envOrigin;
+    return resolvePublicPlayerOrigin("", window.location);
+  }
+  return envOrigin;
+}
 
 export function AdminConsoleView({
   state,
@@ -46,14 +68,15 @@ export function AdminConsoleView({
   setErrorBanner: (msg: string | null) => void;
   setNoticeBanner: (msg: string | null) => void;
   runAction: (
-    fn: () => Promise<DashboardStateResp>,
+    fn: () => Promise<ServerUpdate>,
     successMsg?: string,
+    scope?: string,
   ) => Promise<void>;
   handleLogout: () => Promise<void>;
 }) {
   const [authHandle, setAuthHandle] = useState("");
   const [authPassword, setAuthPassword] = useState("");
-  const [customHandleInput, setCustomHandleInput] = useState("pioneer");
+  const [customHandleInput, setCustomHandleInput] = useState("");
   const [nextSeasonTitle, setNextSeasonTitle] = useState("");
   const [noticeTitle, setNoticeTitle] = useState("");
   const [noticeEffectiveIn, setNoticeEffectiveIn] = useState("即时生效");
@@ -63,6 +86,21 @@ export function AdminConsoleView({
     null,
   );
   const [showBenchmarkModal, setShowBenchmarkModal] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [confirmRolloverOpen, setConfirmRolloverOpen] = useState(false);
+  const [publicOriginInput, setPublicOriginInput] = useState<string>(() =>
+    getInitialPublicOriginInput(),
+  );
+
+  useEffect(() => {
+    if (!state) return;
+    setCustomHandleInput((cur) => {
+      if (!cur || !state.availableHandles.includes(cur)) {
+        return state.player.handle;
+      }
+      return cur;
+    });
+  }, [state]);
 
   if (!state || !state.player.isAdmin) {
     return (
@@ -133,6 +171,24 @@ export function AdminConsoleView({
       </div>
     );
   }
+
+  const targetAccount = customHandleInput.trim() || state.player.handle;
+  const currentSeasonCode = `S${state.currentSeason?.seasonNumber ?? 1}`;
+  const publicPlayerOrigin = resolvePublicPlayerOrigin(
+    publicOriginInput,
+    typeof window !== "undefined" ? window.location : undefined,
+  );
+
+  const copyToClipboard = (text: string, msg: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(text).then(
+        () => setNoticeBanner(msg),
+        () => setNoticeBanner(`请手动复制：${text}`),
+      );
+    } else {
+      setNoticeBanner(`请手动复制：${text}`);
+    }
+  };
 
   const handleOpenBenchmark = async () => {
     setErrorBanner(null);
@@ -209,7 +265,7 @@ export function AdminConsoleView({
               <Users size={ICON.xs} />
               <select
                 aria-label="目标账号"
-                value={customHandleInput}
+                value={targetAccount}
                 onChange={(e) => setCustomHandleInput(e.target.value)}
               >
                 {state.availableHandles.map((h) => (
@@ -224,9 +280,9 @@ export function AdminConsoleView({
               className="new-account-form"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!customHandleInput.trim()) return;
+                if (!targetAccount) return;
                 void runAction(() =>
-                  api.switchAccount({ handle: customHandleInput.trim() }),
+                  api.switchAccount({ handle: targetAccount }),
                 );
               }}
             >
@@ -252,7 +308,7 @@ export function AdminConsoleView({
                       api.controlSimulation({
                         action: "set_speed",
                         speedMultiplier: mult,
-                        targetHandle: customHandleInput,
+                        targetHandle: targetAccount,
                       }),
                     )
                   }
@@ -270,7 +326,7 @@ export function AdminConsoleView({
                   api.controlSimulation({
                     action: "fast_forward",
                     advanceSeconds: 60,
-                    targetHandle: customHandleInput,
+                    targetHandle: targetAccount,
                   }),
                 )
               }
@@ -288,7 +344,7 @@ export function AdminConsoleView({
                 void runAction(() =>
                   api.controlSimulation({
                     action: "unlock_treasure_ready",
-                    targetHandle: customHandleInput,
+                    targetHandle: targetAccount,
                   }),
                 )
               }
@@ -300,14 +356,7 @@ export function AdminConsoleView({
             <button
               type="button"
               className="btn-outline"
-              onClick={() =>
-                void runAction(() =>
-                  api.controlSimulation({
-                    action: "reset_player",
-                    targetHandle: customHandleInput,
-                  }),
-                )
-              }
+              onClick={() => setConfirmResetOpen(true)}
             >
               <RefreshCw size={ICON.xs} />
               <span>重置账号</span>
@@ -337,7 +386,7 @@ export function AdminConsoleView({
               onClick={() =>
                 void runAction(
                   () => api.createInvite(),
-                  "已生成新邀请码（仅展示一次，请立即复制）",
+                  "已生成新邀请码（仅明文展示一次，可使用右侧快捷复制）",
                 )
               }
             >
@@ -352,6 +401,64 @@ export function AdminConsoleView({
                 新生成邀请码：
                 <strong className="mono-num"> {state.createdInviteCode}</strong>
               </span>
+              <div className="invite-link-controls">
+                <input
+                  type="url"
+                  className="mono-num"
+                  aria-label="玩家公网入口地址"
+                  placeholder="https://公网域名或IP:8443"
+                  value={publicOriginInput}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setPublicOriginInput(next);
+                    try {
+                      if (next.trim()) {
+                        window.localStorage.setItem(
+                          PUBLIC_ORIGIN_STORAGE_KEY,
+                          next.trim(),
+                        );
+                      } else {
+                        window.localStorage.removeItem(
+                          PUBLIC_ORIGIN_STORAGE_KEY,
+                        );
+                      }
+                    } catch {
+                      // Ignore storage quota / privacy mode errors
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn-outline btn-sm"
+                  onClick={() =>
+                    copyToClipboard(
+                      state.createdInviteCode!,
+                      "已复制邀请码至剪贴板",
+                    )
+                  }
+                >
+                  复制邀请码
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary btn-sm"
+                  disabled={!publicPlayerOrigin}
+                  title={
+                    publicPlayerOrigin
+                      ? `${publicPlayerOrigin}/?invite=${encodeURIComponent(state.createdInviteCode)}`
+                      : "请先填写非回环的玩家公网入口地址（如 https://120.25.210.202:8443）"
+                  }
+                  onClick={() => {
+                    if (!publicPlayerOrigin) return;
+                    copyToClipboard(
+                      `${publicPlayerOrigin}/?invite=${encodeURIComponent(state.createdInviteCode!)}`,
+                      "已复制专属邀请注册链接",
+                    );
+                  }}
+                >
+                  复制注册链接
+                </button>
+              </div>
             </div>
           )}
 
@@ -530,7 +637,7 @@ export function AdminConsoleView({
               <div className="ledger-row mono-num">
                 <span>当前赛季</span>
                 <strong>
-                  S{state.currentSeason?.seasonNumber ?? 1} ·{" "}
+                  {currentSeasonCode} ·{" "}
                   {state.currentSeason?.title ?? state.war.seasonName}
                 </strong>
               </div>
@@ -538,14 +645,7 @@ export function AdminConsoleView({
                 className="new-account-form"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  void runAction(
-                    () =>
-                      api.rolloverSeason({
-                        nextTitle: nextSeasonTitle.trim() || undefined,
-                      }),
-                    "已完成跨赛季结算！聚落与宏观经济已重置，赛季限定外观与藏品永久保留。",
-                  );
-                  setNextSeasonTitle("");
+                  setConfirmRolloverOpen(true);
                 }}
               >
                 <input
@@ -579,7 +679,7 @@ export function AdminConsoleView({
 
           <div className="split-2col">
             <form
-              className="order-ticket"
+              className="order-ticket admin-notice-form"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!noticeTitle.trim() || !noticeSummary.trim()) return;
@@ -633,9 +733,11 @@ export function AdminConsoleView({
               </label>
               <label>
                 <span>物价与需求变动条目（每行一条，选填）</span>
-                <input
-                  type="text"
-                  placeholder="如：骑兵军备箱需求上升 +25%"
+                <textarea
+                  rows={3}
+                  placeholder={
+                    "如：骑兵军备箱需求上升 +25%\n精铁锭商会收购价上调 +10%"
+                  }
                   value={noticeShiftsText}
                   onChange={(e) => setNoticeShiftsText(e.target.value)}
                 />
@@ -665,59 +767,115 @@ export function AdminConsoleView({
       </main>
 
       {showBenchmarkModal && benchmarkData && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="modal-sheet">
-            <div className="modal-header">
-              <div>
-                <h2>30m 数值模拟</h2>
-                <p>{benchmarkData.note}</p>
-              </div>
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() => setShowBenchmarkModal(false)}
-              >
-                关闭
-              </button>
+        <ModalShell
+          ariaLabel="30m 数值模拟"
+          onClose={() => setShowBenchmarkModal(false)}
+        >
+          <div className="modal-header">
+            <div>
+              <h2>30m 数值模拟</h2>
+              <p>{benchmarkData.note}</p>
             </div>
-            <div className="benchmark-grid">
-              {benchmarkData.runs.map((run) => (
-                <div key={run.strategyCode} className="benchmark-col">
-                  <div className="benchmark-col-head">
-                    <h3>{run.strategyName}</h3>
-                    <span className="tag-badge tag-warning mono-num">
-                      {run.formattedTotal}
-                    </span>
-                  </div>
-                  <p className="bp-desc">{run.description}</p>
-                  <table className="ink-table">
-                    <thead>
-                      <tr>
-                        <th>节点</th>
-                        <th className="num-col">时间</th>
-                        <th className="num-col">人口</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {run.milestones.map((m) => (
-                        <tr key={m.code}>
-                          <td>
-                            <strong>{m.name}</strong>
-                          </td>
-                          <td className="num-col mono-num">
-                            {m.formattedTime}
-                          </td>
-                          <td className="num-col mono-num">{m.population}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-            </div>
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={() => setShowBenchmarkModal(false)}
+            >
+              关闭
+            </button>
           </div>
-        </div>
+          <div className="benchmark-grid">
+            {benchmarkData.runs.map((run) => (
+              <div key={run.strategyCode} className="benchmark-col">
+                <div className="benchmark-col-head">
+                  <h3>{run.strategyName}</h3>
+                  <span className="tag-badge tag-warning mono-num">
+                    {run.formattedTotal}
+                  </span>
+                </div>
+                <p className="bp-desc">{run.description}</p>
+                <table className="ink-table">
+                  <thead>
+                    <tr>
+                      <th>节点</th>
+                      <th className="num-col">时间</th>
+                      <th className="num-col">人口</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {run.milestones.map((m) => (
+                      <tr key={m.code}>
+                        <td>
+                          <strong>{m.name}</strong>
+                        </td>
+                        <td className="num-col mono-num">{m.formattedTime}</td>
+                        <td className="num-col mono-num">{m.population}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        </ModalShell>
+      )}
+
+      {confirmResetOpen && (
+        <ConfirmActionModal
+          title={`确认重置目标玩家「${targetAccount}」？`}
+          subtitle="将清空该账号本赛季聚落建筑、物资库存、职业与活跃远征状态"
+          severity="danger"
+          consequences={[
+            `目标账号「${targetAccount}」将退回人口 0 的干涸荒原起点。`,
+            "跨赛季永久藏品与已绑定账号身份保留，本季常规进度全部清零。",
+          ]}
+          requireMatchText={targetAccount}
+          requireMatchHint={`请输入目标账号名「${targetAccount}」以确认重置：`}
+          confirmLabel={`确认重置 ${targetAccount}`}
+          busy={busy}
+          onCancel={() => setConfirmResetOpen(false)}
+          onConfirm={() => {
+            setConfirmResetOpen(false);
+            void runAction(
+              () =>
+                api.controlSimulation({
+                  action: "reset_player",
+                  targetHandle: targetAccount,
+                }),
+              `已重置账号「${targetAccount}」本季状态`,
+            );
+          }}
+        />
+      )}
+
+      {confirmRolloverOpen && (
+        <ConfirmActionModal
+          title="确认触发全服跨赛季纪元轮换结算？"
+          subtitle={`即将结算当前赛季 ${currentSeasonCode} 并开启下一纪元${nextSeasonTitle.trim() ? `「${nextSeasonTitle.trim()}」` : ""}`}
+          severity="danger"
+          consequences={[
+            "全服所有玩家的聚落人口、建筑、常规物资、职业与市场挂单将执行跨赛季重置。",
+            "中央央行货币账本与八城战区积分将按新赛季初始基准重建。",
+            "全服玩家的赛季限定外观（cos_*）与唯一编号秘宝藏品将 100% 永久保留。",
+          ]}
+          requireMatchText={currentSeasonCode}
+          requireMatchHint={`请输入当前赛季代号「${currentSeasonCode}」以确认轮换：`}
+          confirmLabel="确认执行全服跨赛季轮换"
+          busy={busy}
+          onCancel={() => setConfirmRolloverOpen(false)}
+          onConfirm={() => {
+            const titleArg = nextSeasonTitle.trim() || undefined;
+            setConfirmRolloverOpen(false);
+            setNextSeasonTitle("");
+            void runAction(
+              () => api.rolloverSeason({ nextTitle: titleArg }),
+              "已完成跨赛季结算！聚落与宏观经济已重置，赛季限定外观与藏品永久保留。",
+            );
+          }}
+        />
       )}
     </div>
   );
 }
+
+export default AdminConsoleView;
