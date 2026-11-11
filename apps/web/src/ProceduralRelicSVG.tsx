@@ -1,28 +1,12 @@
 import type { CollectibleItemDTO } from "@drop2empire/api-client";
+import { getRelicPalette } from "./theme/svgPalettes";
 
 interface Props {
   item: CollectibleItemDTO;
 }
 
-function paletteStroke(paletteId: string): {
-  primary: string;
-  accent: string;
-  bg: string;
-} {
-  switch (paletteId) {
-    case "cinnabar_seal":
-      return { primary: "#141413", accent: "#9e2a2b", bg: "#faf6f2" };
-    case "oxidized_verdigris":
-      return { primary: "#141413", accent: "#1f5c3a", bg: "#f3f8f5" };
-    case "gilded_obsidian":
-      return { primary: "#faf8f5", accent: "#d9a441", bg: "#181715" };
-    default:
-      return { primary: "#141413", accent: "#52504c", bg: "#faf8f5" };
-  }
-}
-
 export function ProceduralRelicSVG({ item }: Props) {
-  const pal = paletteStroke(item.paletteId);
+  const pal = getRelicPalette(item.paletteId);
   const clipId = `clip-${item.itemId}`;
   const scale = Math.max(0.65, Math.min(1.85, item.uvScale / 1000));
   const shiftX = ((item.uvOffsetX - 500) / 500) * 36;

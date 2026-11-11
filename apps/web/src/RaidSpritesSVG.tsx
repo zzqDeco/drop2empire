@@ -486,7 +486,7 @@ export function RaidItemIconSVG({
       height={size}
       viewBox="0 0 32 32"
       aria-hidden="true"
-      style={{ flexShrink: 0 }}
+      className="raid-item-icon-svg"
     >
       <rect
         x="2"
@@ -667,10 +667,11 @@ export function BlueprintEtchedCard({
 
   useEffect(() => {
     const p = physRef.current;
+    cardRef.current?.style.setProperty("--anim-delay", `${index * 95}ms`);
     return () => {
       if (p.rafId) cancelAnimationFrame(p.rafId);
     };
-  }, []);
+  }, [index]);
 
   const startLoop = () => {
     const p = physRef.current;
@@ -755,7 +756,6 @@ export function BlueprintEtchedCard({
     <div
       ref={cardRef}
       className={`etched-buff-card rarity-${card.rarity.toLowerCase()}`}
-      style={{ animationDelay: `${index * 95}ms` }}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
     >
