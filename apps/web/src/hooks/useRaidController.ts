@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   api,
   ApiError,
+  getCommandSyncOutcome,
   type DashboardStateResp,
   type RaidActionReq,
   type RaidLootItemDTO,
@@ -26,6 +34,37 @@ export interface ChannelingState {
   progressPct: number;
 }
 
+function computeRaidDeadlines(
+  baseSyncedAtMs: number,
+  inRaid: boolean,
+  activeRaidId: string,
+  serverTimeRemMs: number,
+  serverGaleRemMs: number,
+  serverScavRemMs: number,
+  serverChannelRemMs: number,
+  nowMs = Date.now(),
+) {
+  const countdownDeadlineMs = baseSyncedAtMs + serverTimeRemMs;
+  const galeDeadlineMs = baseSyncedAtMs + serverGaleRemMs;
+  const scavDeadlineMs = baseSyncedAtMs + serverScavRemMs;
+  const channelDeadlineMs = baseSyncedAtMs + serverChannelRemMs;
+  const remTime =
+    inRaid && activeRaidId ? Math.max(0, countdownDeadlineMs - nowMs) : 180000;
+  const remGale =
+    inRaid && activeRaidId ? Math.max(0, galeDeadlineMs - nowMs) : 0;
+  const remScav =
+    inRaid && activeRaidId ? Math.max(0, scavDeadlineMs - nowMs) : 0;
+  return {
+    countdownDeadlineMs,
+    galeDeadlineMs,
+    scavDeadlineMs,
+    channelDeadlineMs,
+    remTime,
+    remGale,
+    remScav,
+  };
+}
+
 export function useRaidController(
   state: DashboardStateResp,
   runAction: (
@@ -33,10 +72,36 @@ export function useRaidController(
     msg?: string,
     scope?: string,
   ) => Promise<void>,
+  raidSyncedAtMs?: number,
 ) {
   const { raidLoadout } = state;
   const activeSession = raidLoadout.activeSession ?? null;
   const inRaid = activeSession !== null;
+
+  const activeRaidId = activeSession?.raidId ?? "";
+  const serverTimeRemMs = activeSession?.timeRemainingMs ?? 0;
+  const serverGaleRemMs = activeSession?.galeRemainingMs ?? 0;
+  const serverScavRemMs = activeSession?.scavRemainingMs ?? 0;
+  const serverChannelRemMs = activeSession?.channelRemainingMs ?? 0;
+  const serverFacing = activeSession?.facing ?? "right";
+
+  const fallbackSnapshotKey = `${activeRaidId}:${state.revision}:${activeSession?.lastCommandSeq ?? 0}:${serverTimeRemMs}:${serverGaleRemMs}:${serverScavRemMs}:${serverChannelRemMs}`;
+  const fallbackSyncRef = useRef<{ key: string; syncedAtMs: number } | null>(
+    null,
+  );
+  const [initialDeadlines] = useState(() => {
+    const nowMs = Date.now();
+    return computeRaidDeadlines(
+      raidSyncedAtMs !== undefined ? raidSyncedAtMs : nowMs,
+      inRaid,
+      activeRaidId,
+      serverTimeRemMs,
+      serverGaleRemMs,
+      serverScavRemMs,
+      serverChannelRemMs,
+      nowMs,
+    );
+  });
 
   const [preStage, setPreStage] = useState<"armory" | "draft">("armory");
   const [armoryFacing, setArmoryFacing] = useState<FacingDirection>("down");
@@ -48,10 +113,17 @@ export function useRaidController(
   const [dismissedSettlementRaidId, setDismissedSettlementRaidId] =
     useState<string>("");
 
-  const [facing, setFacing] = useState<FacingDirection>("right");
-  const [timeLeftMs, setTimeLeftMs] = useState(180000);
-  const [galeLeftMs, setGaleLeftMs] = useState(0);
-  const [scavLeftMs, setScavLeftMs] = useState(0);
+  const [facing, setFacing] = useState<FacingDirection>(() =>
+    serverFacing === "up" ||
+    serverFacing === "down" ||
+    serverFacing === "left" ||
+    serverFacing === "right"
+      ? serverFacing
+      : "right",
+  );
+  const [timeLeftMs, setTimeLeftMs] = useState(initialDeadlines.remTime);
+  const [galeLeftMs, setGaleLeftMs] = useState(initialDeadlines.remGale);
+  const [scavLeftMs, setScavLeftMs] = useState(initialDeadlines.remScav);
   const [lastMoveAtMs, setLastMoveAtMs] = useState(0);
 
   const [showLootModal, setShowLootModal] = useState(false);
@@ -63,57 +135,21 @@ export function useRaidController(
   const [channeling, setChanneling] = useState<ChannelingState | null>(null);
 
   const settlingRef = useRef(false);
-  const activeRaidId = activeSession?.raidId ?? "";
-  const serverTimeRemMs = activeSession?.timeRemainingMs ?? 0;
-  const serverGaleRemMs = activeSession?.galeRemainingMs ?? 0;
-  const serverScavRemMs = activeSession?.scavRemainingMs ?? 0;
-  const countdownDeadlineRef = useRef(0);
-  const galeDeadlineRef = useRef(0);
-  const scavDeadlineRef = useRef(0);
-  const serverFacing = activeSession?.facing ?? "right";
+  const settledRaidIdRef = useRef("");
+  const activeRaidIdRef = useRef(activeRaidId);
+  const runActionRef = useRef(runAction);
 
-  useEffect(() => {
-    if (!inRaid || !activeRaidId) {
-      setChanneling(null);
-      setShowLootModal(false);
-      setGaleLeftMs(0);
-      setScavLeftMs(0);
-      settlingRef.current = false;
-      return;
-    }
-    const nowPerf = performance.now();
-    countdownDeadlineRef.current = nowPerf + serverTimeRemMs;
-    galeDeadlineRef.current = nowPerf + serverGaleRemMs;
-    scavDeadlineRef.current = nowPerf + serverScavRemMs;
-    setTimeLeftMs(serverTimeRemMs);
-    setGaleLeftMs(serverGaleRemMs);
-    setScavLeftMs(serverScavRemMs);
-    if (
-      serverFacing === "up" ||
-      serverFacing === "down" ||
-      serverFacing === "left" ||
-      serverFacing === "right"
-    ) {
-      setFacing(serverFacing);
-    }
-    settlingRef.current = false;
-  }, [
-    inRaid,
-    activeRaidId,
-    serverTimeRemMs,
-    serverGaleRemMs,
-    serverScavRemMs,
-    serverFacing,
-  ]);
-
+  const countdownDeadlineRef = useRef(initialDeadlines.countdownDeadlineMs);
+  const galeDeadlineRef = useRef(initialDeadlines.galeDeadlineMs);
+  const scavDeadlineRef = useRef(initialDeadlines.scavDeadlineMs);
   const commandPendingRef = useRef(false);
   const sessionRef = useRef(activeSession);
-  const channelDeadlineRef = useRef(0);
-  useEffect(() => {
+  const channelDeadlineRef = useRef(initialDeadlines.channelDeadlineMs);
+  useLayoutEffect(() => {
+    activeRaidIdRef.current = activeRaidId;
+    runActionRef.current = runAction;
     sessionRef.current = activeSession;
-    channelDeadlineRef.current =
-      performance.now() + (activeSession?.channelRemainingMs ?? 0);
-  }, [activeSession]);
+  }, [activeRaidId, runAction, activeSession]);
 
   const sendRaidCommand = useCallback(
     async (
@@ -135,6 +171,13 @@ export function useRaidController(
             ? await api.finishRaid({ ...command, ...identity })
             : await api.raidAction({ ...command, ...identity });
         sessionRef.current = response.raidLoadout.activeSession ?? null;
+        const executed = getCommandSyncOutcome(response).kind === "executed";
+        if (!executed) {
+          channelDeadlineRef.current =
+            Date.now() + (sessionRef.current?.channelRemainingMs ?? 0);
+          setChanneling(null);
+          return response;
+        }
         if (
           "action" in command &&
           (command.action === "move" || command.action === "use_consumable")
@@ -145,8 +188,8 @@ export function useRaidController(
             next && zone
               ? zone.tiles[next.playerY * zone.width + next.playerX]
               : undefined;
-          channelDeadlineRef.current =
-            performance.now() + (next?.channelRemainingMs ?? 0);
+          const nowMs = Date.now();
+          channelDeadlineRef.current = nowMs + (next?.channelRemainingMs ?? 0);
           setChanneling((current) => {
             if (!next || !tile) return null;
             const chest = tile.kind.startsWith("chest_") && !tile.looted;
@@ -156,7 +199,7 @@ export function useRaidController(
                 kind: tile.kind as RaidTileSpriteKind,
                 x: next.playerX,
                 y: next.playerY,
-                startedAt: Date.now(),
+                startedAt: nowMs,
                 durationMs: Math.max(1, next.channelRemainingMs),
                 progressPct: 0,
               };
@@ -171,7 +214,7 @@ export function useRaidController(
                 kind: tile.kind as RaidTileSpriteKind,
                 x: next.playerX,
                 y: next.playerY,
-                startedAt: Date.now(),
+                startedAt: nowMs,
                 durationMs: Math.max(1, next.channelRemainingMs) + 60,
                 progressPct: 0,
               };
@@ -185,7 +228,7 @@ export function useRaidController(
             if (continuingExtraction) {
               return {
                 ...current,
-                startedAt: Date.now(),
+                startedAt: nowMs,
                 durationMs: Math.max(1, next.channelRemainingMs),
                 progressPct: 0,
               };
@@ -209,58 +252,166 @@ export function useRaidController(
 
   const triggerFinishRaid = useCallback(
     (status: "EXTRACTED" | "MIA") => {
-      if (settlingRef.current || commandPendingRef.current) return;
+      const raidId = activeRaidIdRef.current;
+      if (
+        settlingRef.current ||
+        commandPendingRef.current ||
+        (raidId && settledRaidIdRef.current === raidId)
+      ) {
+        return;
+      }
       settlingRef.current = true;
       setChanneling(null);
       setShowLootModal(false);
       setPreStage("armory");
 
-      void runAction(
-        async () => {
-          try {
-            return await sendRaidCommand({ status });
-          } catch (err: unknown) {
-            const isIncomplete =
-              status === "EXTRACTED" &&
-              ((err instanceof ApiError &&
-                err.code === "channeling_incomplete") ||
-                (err instanceof Error &&
-                  (err.message.includes("channeling_incomplete") ||
-                    err.message.includes("读条") ||
-                    err.message.includes("引导"))));
-            if (isIncomplete) {
-              await new Promise((resolve) => window.setTimeout(resolve, 260));
-              return await sendRaidCommand({ status });
+      void runActionRef
+        .current(
+          async () => {
+            try {
+              const resp = await sendRaidCommand({ status });
+              if (!resp.raidLoadout.activeSession && raidId) {
+                settledRaidIdRef.current = raidId;
+              }
+              return resp;
+            } catch (err: unknown) {
+              const isIncomplete =
+                status === "EXTRACTED" &&
+                ((err instanceof ApiError &&
+                  err.code === "channeling_incomplete") ||
+                  (err instanceof Error &&
+                    (err.message.includes("channeling_incomplete") ||
+                      err.message.includes("读条") ||
+                      err.message.includes("引导"))));
+              if (isIncomplete) {
+                await new Promise((resolve) => window.setTimeout(resolve, 260));
+                const retryResp = await sendRaidCommand({ status });
+                if (!retryResp.raidLoadout.activeSession && raidId) {
+                  settledRaidIdRef.current = raidId;
+                }
+                return retryResp;
+              }
+              throw err;
             }
-            throw err;
-          }
-        },
-        undefined,
-        "raid:finish",
-      ).finally(() => {
-        settlingRef.current = false;
-      });
+          },
+          undefined,
+          "raid:finish",
+        )
+        .finally(() => {
+          settlingRef.current = false;
+        });
     },
-    [runAction, sendRaidCommand],
+    [sendRaidCommand],
   );
 
   useEffect(() => {
+    if (!inRaid || !activeRaidId) {
+      setChanneling(null);
+      setShowLootModal(false);
+      setTimeLeftMs(180000);
+      setGaleLeftMs(0);
+      setScavLeftMs(0);
+      settlingRef.current = false;
+      settledRaidIdRef.current = "";
+      return;
+    }
+    if (settledRaidIdRef.current && settledRaidIdRef.current !== activeRaidId) {
+      settledRaidIdRef.current = "";
+      settlingRef.current = false;
+    }
+    const nowMs = Date.now();
+    if (
+      raidSyncedAtMs === undefined &&
+      (fallbackSyncRef.current === null ||
+        fallbackSyncRef.current.key !== fallbackSnapshotKey)
+    ) {
+      fallbackSyncRef.current = {
+        key: fallbackSnapshotKey,
+        syncedAtMs: nowMs,
+      };
+    }
+    const baseSyncedAtMs =
+      raidSyncedAtMs !== undefined
+        ? raidSyncedAtMs
+        : (fallbackSyncRef.current?.syncedAtMs ?? nowMs);
+    const next = computeRaidDeadlines(
+      baseSyncedAtMs,
+      inRaid,
+      activeRaidId,
+      serverTimeRemMs,
+      serverGaleRemMs,
+      serverScavRemMs,
+      serverChannelRemMs,
+      nowMs,
+    );
+    countdownDeadlineRef.current = next.countdownDeadlineMs;
+    galeDeadlineRef.current = next.galeDeadlineMs;
+    scavDeadlineRef.current = next.scavDeadlineMs;
+    channelDeadlineRef.current = next.channelDeadlineMs;
+    setTimeLeftMs(next.remTime);
+    setGaleLeftMs(next.remGale);
+    setScavLeftMs(next.remScav);
+    if (
+      serverFacing === "up" ||
+      serverFacing === "down" ||
+      serverFacing === "left" ||
+      serverFacing === "right"
+    ) {
+      setFacing(serverFacing);
+    }
+    if (
+      next.remTime <= 0 &&
+      !commandPendingRef.current &&
+      !settlingRef.current
+    ) {
+      triggerFinishRaid("MIA");
+    }
+  }, [
+    inRaid,
+    activeRaidId,
+    raidSyncedAtMs,
+    fallbackSnapshotKey,
+    serverTimeRemMs,
+    serverGaleRemMs,
+    serverScavRemMs,
+    serverChannelRemMs,
+    serverFacing,
+    triggerFinishRaid,
+  ]);
+
+  useEffect(() => {
     if (!inRaid || !activeRaidId) return;
-    const id = window.setInterval(() => {
-      const now = Date.now();
-      const nowPerf = performance.now();
-      const remaining = Math.max(0, countdownDeadlineRef.current - nowPerf);
+
+    const syncCountdownsFromWallClock = () => {
+      const nowMs = Date.now();
+      const remaining = Math.max(0, countdownDeadlineRef.current - nowMs);
       setTimeLeftMs(remaining);
-      setGaleLeftMs(Math.max(0, galeDeadlineRef.current - nowPerf));
-      setScavLeftMs(Math.max(0, scavDeadlineRef.current - nowPerf));
-      if (remaining === 0 && !commandPendingRef.current)
+      setGaleLeftMs(Math.max(0, galeDeadlineRef.current - nowMs));
+      setScavLeftMs(Math.max(0, scavDeadlineRef.current - nowMs));
+      if (
+        remaining <= 0 &&
+        !commandPendingRef.current &&
+        !settlingRef.current
+      ) {
         triggerFinishRaid("MIA");
+      }
 
       setChanneling((cur) =>
-        advanceChannelingProgress(cur, now, commandPendingRef.current),
+        advanceChannelingProgress(cur, nowMs, commandPendingRef.current),
       );
-    }, 100);
-    return () => window.clearInterval(id);
+    };
+
+    const id = window.setInterval(syncCountdownsFromWallClock, 100);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncCountdownsFromWallClock();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [inRaid, activeRaidId, triggerFinishRaid]);
 
   useEffect(() => {
@@ -381,15 +532,20 @@ export function useRaidController(
 
       void runAction(
         async () => {
-          const resp = await sendRaidAction({ action: "move", dx, dy });
-          const nextSess = resp.raidLoadout.activeSession;
+          const response = await sendRaidAction({ action: "move", dx, dy });
+          const executed = getCommandSyncOutcome(response).kind === "executed";
+          const nextSess = response.raidLoadout.activeSession;
           if (!nextSess) {
             setChanneling(null);
             setShowLootModal(false);
-            return resp;
+            return response;
+          }
+          if (!executed) {
+            setChanneling(null);
+            return response;
           }
           syncLandingInteraction(nextSess, isBossAlive);
-          return resp;
+          return response;
         },
         undefined,
         "raid:step",
@@ -473,7 +629,7 @@ export function useRaidController(
       async () => {
         const resp = await sendRaidAction({ action: "use_portal" });
         const nextSess = resp.raidLoadout.activeSession;
-        if (nextSess) {
+        if (nextSess && getCommandSyncOutcome(resp).kind === "executed") {
           syncLandingInteraction(nextSess, false);
         }
         return resp;
@@ -543,7 +699,8 @@ export function useRaidController(
 
   const startExtractionChannel = useCallback(() => {
     if (!currentTile) return;
-    const rem = channelDeadlineRef.current - performance.now();
+    const nowMs = Date.now();
+    const rem = channelDeadlineRef.current - nowMs;
     if (rem <= 0) {
       triggerFinishRaid("EXTRACTED");
       return;
@@ -553,7 +710,7 @@ export function useRaidController(
       kind: currentTile.kind as RaidTileSpriteKind,
       x: pos.x,
       y: pos.y,
-      startedAt: Date.now(),
+      startedAt: nowMs,
       durationMs: Math.max(250, rem + 60),
       progressPct: 0,
     });

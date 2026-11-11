@@ -222,6 +222,198 @@ describe("settlementSelectors domain formulas", () => {
     expect(batch5.canBuildBatch).toBe(false);
   });
 
+  it("matches authoritative Go BuildingCosts (5/4)^n ceil escalation across all 6 repeatable buildings for owned={0,3} and ×{1,5,10}", () => {
+    const repeatableSpecs: Array<{
+      code: string;
+      name: string;
+      baseUnits: Array<{ key: string; name: string; units: number }>;
+    }> = [
+      {
+        code: "lumber_camp",
+        name: "伐木棚",
+        baseUnits: [
+          { key: "water", name: "净水", units: 20 },
+          { key: "wood", name: "木材", units: 10 },
+        ],
+      },
+      {
+        code: "house",
+        name: "木屋",
+        baseUnits: [
+          { key: "water", name: "净水", units: 30 },
+          { key: "wood", name: "木材", units: 15 },
+        ],
+      },
+      {
+        code: "water_cistern",
+        name: "蓄水池",
+        baseUnits: [
+          { key: "water", name: "净水", units: 60 },
+          { key: "wood", name: "木材", units: 25 },
+        ],
+      },
+      {
+        code: "lumber_yard",
+        name: "物资堆场",
+        baseUnits: [
+          { key: "water", name: "净水", units: 40 },
+          { key: "wood", name: "木材", units: 40 },
+        ],
+      },
+      {
+        code: "quarry",
+        name: "采石场",
+        baseUnits: [
+          { key: "water", name: "净水", units: 60 },
+          { key: "wood", name: "木材", units: 30 },
+        ],
+      },
+      {
+        code: "charcoal_kiln",
+        name: "炭窑",
+        baseUnits: [
+          { key: "water", name: "净水", units: 60 },
+          { key: "wood", name: "木材", units: 30 },
+          { key: "stone", name: "石材", units: 20 },
+        ],
+      },
+    ];
+
+    const authoritativeBuildingCostMilli = (
+      baseUnits: number,
+      owned: number,
+      quantity: number,
+    ): number => {
+      let totalMilli = 0n;
+      const base = BigInt(baseUnits);
+      for (let n = owned; n < owned + quantity; n++) {
+        const exp = BigInt(n);
+        const num = base * 5n ** exp;
+        const den = 4n ** exp;
+        const ceilUnits = (num + den - 1n) / den;
+        totalMilli += ceilUnits * 1000n;
+      }
+      return Number(totalMilli);
+    };
+
+    const buildResources = (
+      stocksMilli: Record<string, number>,
+    ): ResourceLineDTO[] =>
+      ["water", "wood", "stone"].map((key) => ({
+        key,
+        name: key === "water" ? "净水" : key === "wood" ? "木材" : "石材",
+        tier: "basic",
+        unlocked: true,
+        amountMilli: stocksMilli[key] ?? 0,
+        frozenMilli: 0,
+        capacityMilli: 50_000_000,
+        grossRatePerSecMilli: 1000,
+        drainRatePerSecMilli: 0,
+        netRatePerSecMilli: 1000,
+        description: "",
+      }));
+
+    const buildNodeAtOwned = (
+      spec: (typeof repeatableSpecs)[number],
+      owned: number,
+      stocksMilli: Record<string, number>,
+    ): BuildingNodeDTO => {
+      const singleCosts = spec.baseUnits.map((item) => {
+        const requiredMilli = authoritativeBuildingCostMilli(
+          item.units,
+          owned,
+          1,
+        );
+        const currentMilli = stocksMilli[item.key] ?? 0;
+        return {
+          resourceKey: item.key,
+          resourceName: item.name,
+          requiredMilli,
+          currentMilli,
+          capacityMilli: 50_000_000,
+          etaSeconds: 0,
+        };
+      });
+      return {
+        code: spec.code,
+        name: spec.name,
+        technologyName: "基础技术",
+        effectSummary: "",
+        owned,
+        limit: 128,
+        visible: true,
+        researched: true,
+        canBuild: singleCosts.every((c) => c.currentMilli >= c.requiredMilli),
+        blockedReason: "",
+        jobKey: "",
+        assigned: 0,
+        totalSlots: 0,
+        costs: singleCosts,
+      };
+    };
+
+    for (const spec of repeatableSpecs) {
+      for (const owned of [0, 3]) {
+        for (const qty of [1, 5, 10]) {
+          const expectedMilliByKey: Record<string, number> = {};
+          for (const item of spec.baseUnits) {
+            expectedMilliByKey[item.key] = authoritativeBuildingCostMilli(
+              item.units,
+              owned,
+              qty,
+            );
+          }
+
+          // 1. Exact milli-unit match allows batch construction
+          const exactResources = buildResources(expectedMilliByKey);
+          const exactNode = buildNodeAtOwned(spec, owned, expectedMilliByKey);
+          const exactBatch = computeBatchBuildingCosts(
+            exactNode,
+            qty,
+            exactResources,
+          );
+
+          expect(
+            exactBatch.quantity,
+            `${spec.code} owned=${owned} qty=${qty} quantity`,
+          ).toBe(qty);
+          for (const item of spec.baseUnits) {
+            const actualCost = exactBatch.costs.find(
+              (c) => c.resourceKey === item.key,
+            );
+            expect(
+              actualCost?.requiredMilli,
+              `${spec.code} owned=${owned} qty=${qty} ${item.key}`,
+            ).toBe(expectedMilliByKey[item.key]);
+          }
+          expect(
+            exactBatch.canBuildBatch,
+            `${spec.code} owned=${owned} qty=${qty} exact budget canBuildBatch`,
+          ).toBe(true);
+
+          // 2. Being 1 milli short on ANY cost resource blocks batch construction
+          for (const shortItem of spec.baseUnits) {
+            const shortStocks = {
+              ...expectedMilliByKey,
+              [shortItem.key]: expectedMilliByKey[shortItem.key] - 1,
+            };
+            const shortResources = buildResources(shortStocks);
+            const shortNode = buildNodeAtOwned(spec, owned, shortStocks);
+            const shortBatch = computeBatchBuildingCosts(
+              shortNode,
+              qty,
+              shortResources,
+            );
+            expect(
+              shortBatch.canBuildBatch,
+              `${spec.code} owned=${owned} qty=${qty} 1 milli short on ${shortItem.key}`,
+            ).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
   it("parses hash routes safely without throwing URIError on malformed percent-encoding", () => {
     expect(parseHashRoute("#market:auto_pump")).toEqual({
       scene: "market",
