@@ -44,6 +44,28 @@ export * from "./generated";
 
 const SESSION_STORAGE_KEY = "d2e-session-token";
 
+export type CommandSyncOutcome =
+  | { kind: "executed" }
+  | { kind: "conflict"; code: string; message: string }
+  | { kind: "uncertain"; message: string };
+
+const commandSyncOutcomes = new WeakMap<object, CommandSyncOutcome>();
+
+function markCommandSyncOutcome<T extends object>(
+  resp: T,
+  outcome: CommandSyncOutcome,
+): T {
+  commandSyncOutcomes.set(resp, outcome);
+  return resp;
+}
+
+export function getCommandSyncOutcome(resp: unknown): CommandSyncOutcome {
+  if (resp && typeof resp === "object") {
+    return commandSyncOutcomes.get(resp) ?? { kind: "executed" };
+  }
+  return { kind: "executed" };
+}
+
 export class ApiError extends Error {
   status: number;
   code: string;
@@ -67,6 +89,39 @@ function routePath(
 }
 
 export class EmpireClient {
+  #sessionListeners = new Set<
+    (token: string | null, source: "local" | "storage") => void
+  >();
+  #storageBound = false;
+
+  #ensureStorageListener() {
+    if (
+      this.#storageBound ||
+      typeof window === "undefined" ||
+      typeof window.addEventListener !== "function"
+    ) {
+      return;
+    }
+    this.#storageBound = true;
+    window.addEventListener("storage", (event: StorageEvent) => {
+      if (event.key !== null && event.key !== SESSION_STORAGE_KEY) return;
+      const next = this.getSessionToken();
+      for (const listener of this.#sessionListeners) {
+        listener(next, "storage");
+      }
+    });
+  }
+
+  subscribeSession(
+    listener: (token: string | null, source: "local" | "storage") => void,
+  ): () => void {
+    this.#ensureStorageListener();
+    this.#sessionListeners.add(listener);
+    return () => {
+      this.#sessionListeners.delete(listener);
+    };
+  }
+
   getSessionToken(): string | null {
     try {
       return window.localStorage.getItem(SESSION_STORAGE_KEY);
@@ -76,6 +131,7 @@ export class EmpireClient {
   }
 
   setSessionToken(token: string | null) {
+    const prev = this.getSessionToken();
     try {
       if (token) {
         window.localStorage.setItem(SESSION_STORAGE_KEY, token);
@@ -84,6 +140,11 @@ export class EmpireClient {
       }
     } catch {
       // Ignore storage errors in private mode
+    }
+    if (prev !== token) {
+      for (const listener of this.#sessionListeners) {
+        listener(token, "local");
+      }
     }
   }
 
@@ -193,16 +254,39 @@ export class EmpireClient {
 
   async #settlementRequest(path: string, init: RequestInit): Promise<DashboardStateResp> {
     const token = this.getSessionToken();
+    let retriedAfterTransportError = false;
     try {
       try { return await this.#request<DashboardStateResp>(path, init); }
       catch (error) {
         if (!(error instanceof TypeError) || this.getSessionToken() !== token) throw error;
+        retriedAfterTransportError = true;
         return await this.#request<DashboardStateResp>(path, init);
       }
     } catch (error) {
-      if (this.getSessionToken() === token && (error instanceof TypeError ||
-          (error instanceof ApiError && error.code === "settlement_sequence_conflict"))) {
-        return this.getDashboard();
+      if (this.getSessionToken() === token) {
+        if (error instanceof ApiError && error.code === "settlement_sequence_conflict") {
+          const synced = await this.getDashboard();
+          return markCommandSyncOutcome(
+            synced,
+            retriedAfterTransportError
+              ? {
+                  kind: "uncertain",
+                  message: "网络重试期间页面状态已推进，操作结果不确定，已同步最新状态，请核对后再操作",
+                }
+              : {
+                  kind: "conflict",
+                  code: error.code,
+                  message: `${error.message || "页面状态已变化"}（原操作未执行，已同步最新状态，请确认后重试）`,
+                },
+          );
+        }
+        if (error instanceof TypeError) {
+          const synced = await this.getDashboard();
+          return markCommandSyncOutcome(synced, {
+            kind: "uncertain",
+            message: "网络响应中断，操作结果不确定，已同步最新状态，请核对后再操作",
+          });
+        }
       }
       throw error;
     }
@@ -291,17 +375,44 @@ export class EmpireClient {
   async #raidRequest(path: string, init: RequestInit): Promise<RaidUpdateResp | DashboardStateResp> {
     const token = this.getSessionToken();
     let update: RaidUpdateResp;
+    let retriedAfterTransportError = false;
     try {
       try {
         update = await this.#request<RaidUpdateResp>(path, init);
       } catch (error) {
         if (!(error instanceof TypeError) || this.getSessionToken() !== token) throw error;
+        retriedAfterTransportError = true;
         update = await this.#request<RaidUpdateResp>(path, init);
       }
     } catch (error) {
-      const needsResync = error instanceof TypeError ||
-        (error instanceof ApiError && ["raid_sequence_conflict", "stale_raid"].includes(error.code));
-      if (needsResync && this.getSessionToken() === token) return this.getDashboard();
+      if (this.getSessionToken() === token) {
+        if (
+          error instanceof ApiError &&
+          ["raid_sequence_conflict", "stale_raid"].includes(error.code)
+        ) {
+          const synced = await this.getDashboard();
+          return markCommandSyncOutcome(
+            synced,
+            retriedAfterTransportError
+              ? {
+                  kind: "uncertain",
+                  message: "网络重试期间远征状态已推进，远征指令结果不确定，已同步最新状态",
+                }
+              : {
+                  kind: "conflict",
+                  code: error.code,
+                  message: `${error.message || "远征状态已变化"}（原指令未执行，已同步最新状态，请确认后重试）`,
+                },
+          );
+        }
+        if (error instanceof TypeError) {
+          const synced = await this.getDashboard();
+          return markCommandSyncOutcome(synced, {
+            kind: "uncertain",
+            message: "网络响应中断，远征指令结果不确定，已同步最新状态",
+          });
+        }
+      }
       throw error;
     }
     // Refresh settlement inventory once at the terminal transition, never per step.

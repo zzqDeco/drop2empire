@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Compass, Droplets } from "lucide-react";
 import { EconomyWorkspace, CompanyPortfolio } from "./EconomyWorkspace";
 import { EconomyEvents } from "./EconomyEvents";
@@ -62,14 +62,11 @@ export function App() {
     applyServerState,
     runAction,
     handleLogout,
+    boundSessionToken,
+    reconcileSessionMismatch,
     lastSyncAtMs,
+    raidSyncedAtMs,
   } = useGameSession(isAdminRoute);
-
-  useEffect(() => {
-    if (!noticeBanner) return;
-    const id = window.setTimeout(() => setNoticeBanner(null), 5000);
-    return () => window.clearTimeout(id);
-  }, [noticeBanner, setNoticeBanner]);
 
   const firstResBpUnlocked =
     state?.blueprints.find((b) => b.code === "first_resident")?.unlocked ??
@@ -81,7 +78,13 @@ export function App() {
     actionBursts,
     handleGatherWater,
     handleGlobalButtonPop,
-  } = useWaterGather(firstResBpUnlocked, applyServerState, setErrorBanner);
+  } = useWaterGather(firstResBpUnlocked, applyServerState, setErrorBanner, {
+    boundSessionToken,
+    playerHandle: state?.player.handle ?? "",
+    seasonId: state?.currentSeason.seasonId ?? "",
+    authoritativeClicks: state?.player.totalManualClicks ?? 0,
+    onSessionMismatch: reconcileSessionMismatch,
+  });
 
   if (loading) {
     return (
@@ -268,7 +271,11 @@ export function App() {
           className="raid-scene-shell"
           aria-label="荒原裂隙斥候营"
         >
-          <WastelandRaidPanel state={state} runAction={runAction} />
+          <WastelandRaidPanel
+            state={state}
+            raidSyncedAtMs={raidSyncedAtMs}
+            runAction={runAction}
+          />
         </section>
       )}
 

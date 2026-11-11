@@ -11,6 +11,7 @@ export { LordProfileWardrobeBar } from "./features/raid/LordProfileWardrobeBar";
 interface WastelandRaidPanelProps {
   state: DashboardStateResp;
   busy?: boolean;
+  raidSyncedAtMs?: number;
   runAction: (
     fn: () => Promise<ServerUpdate>,
     msg?: string,
@@ -20,9 +21,10 @@ interface WastelandRaidPanelProps {
 
 export function WastelandRaidPanel({
   state,
+  raidSyncedAtMs,
   runAction,
 }: WastelandRaidPanelProps) {
-  const ctrl = useRaidController(state, runAction);
+  const ctrl = useRaidController(state, runAction, raidSyncedAtMs);
 
   if (ctrl.settlementReport) {
     return (

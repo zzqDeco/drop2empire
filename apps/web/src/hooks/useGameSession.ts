@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   ApiError,
+  getCommandSyncOutcome,
   type DashboardStateResp,
 } from "@drop2empire/api-client";
 import {
+  applySnapshotUpdate,
   belongsToSession,
-  mergeServerUpdate,
+  type ClientSessionSnapshot,
   type ServerUpdate,
 } from "../serverState";
 import { SETTLEMENT_UI_CONFIG } from "../config/gameConfig";
@@ -50,7 +52,8 @@ export function parseHashRoute(hash: string): {
 }
 
 export function useGameSession(isAdminRoute: boolean) {
-  const [state, setState] = useState<DashboardStateResp | null>(null);
+  const [snapshot, setSnapshot] = useState<ClientSessionSnapshot | null>(null);
+  const [fallbackSyncMs] = useState<number>(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [pendingScopes, setPendingScopes] = useState<Record<string, number>>(
@@ -59,6 +62,11 @@ export function useGameSession(isAdminRoute: boolean) {
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [noticeBanner, setNoticeBanner] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(() => getInitialTheme());
+
+  const sessionEpochRef = useRef(0);
+  const activeTokenRef = useRef<string | null>(api.getSessionToken());
+  const boundTokenRef = useRef<string | null>(null);
+  const localAuthInFlightRef = useRef(0);
 
   const initialRoute =
     typeof window !== "undefined" && !isAdminRoute
@@ -75,8 +83,6 @@ export function useGameSession(isAdminRoute: boolean) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [showWorldMapModal, setShowWorldMapModal] = useState(false);
-
-  const [lastSyncAtMs, setLastSyncAtMs] = useState<number>(() => Date.now());
 
   useEffect(() => {
     applyTheme(theme);
@@ -138,41 +144,134 @@ export function useGameSession(isAdminRoute: boolean) {
     showSettingsModal,
   ]);
 
-  const applyServerState = useCallback((next: ServerUpdate) => {
-    setState((current) => mergeServerUpdate(current, next));
-    if ("player" in next) {
-      setLastSyncAtMs(Date.now());
-    }
-  }, []);
+  const applyServerStateForSession = useCallback(
+    (next: ServerUpdate, sessionToken: string | null) => {
+      const nowMs = Date.now();
+      activeTokenRef.current = sessionToken;
+      boundTokenRef.current = sessionToken;
+      setSnapshot((current) =>
+        applySnapshotUpdate(current, next, sessionToken, nowMs),
+      );
+    },
+    [],
+  );
+
+  const loadSessionDashboard = useCallback(
+    (token: string | null, epoch: number) => {
+      if (!token) {
+        setSnapshot(null);
+        boundTokenRef.current = null;
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      api
+        .getDashboard()
+        .then((res) => {
+          if (
+            sessionEpochRef.current !== epoch ||
+            api.getSessionToken() !== token
+          ) {
+            return;
+          }
+          applyServerStateForSession(res, token);
+          setLoading(false);
+        })
+        .catch((err: unknown) => {
+          if (
+            sessionEpochRef.current !== epoch ||
+            api.getSessionToken() !== token
+          ) {
+            return;
+          }
+          if (err instanceof ApiError && err.status === 401) {
+            localAuthInFlightRef.current += 1;
+            try {
+              api.setSessionToken(null);
+            } finally {
+              localAuthInFlightRef.current = Math.max(
+                0,
+                localAuthInFlightRef.current - 1,
+              );
+            }
+            activeTokenRef.current = null;
+            boundTokenRef.current = null;
+            setSnapshot(null);
+          } else {
+            setErrorBanner(err instanceof Error ? err.message : "加载失败");
+          }
+          setLoading(false);
+        });
+    },
+    [applyServerStateForSession],
+  );
+
+  const reconcileExternalSession = useCallback(
+    (nextToken: string | null, bannerMsg?: string) => {
+      sessionEpochRef.current += 1;
+      const nextEpoch = sessionEpochRef.current;
+      activeTokenRef.current = nextToken;
+      boundTokenRef.current = null;
+      setSnapshot(null);
+      setPendingScopes({});
+      setBusy(false);
+      setNoticeBanner(null);
+      setShowSettingsModal(false);
+      setShowAnnouncementModal(false);
+      setShowWorldMapModal(false);
+      setErrorBanner(bannerMsg ?? null);
+      loadSessionDashboard(nextToken, nextEpoch);
+    },
+    [loadSessionDashboard],
+  );
+
+  const reconcileSessionMismatch = useCallback(() => {
+    const liveToken = api.getSessionToken();
+    reconcileExternalSession(
+      liveToken,
+      liveToken
+        ? "当前会话已在其他页面切换，已同步最新账号状态，请确认后重试"
+        : "当前登录会话已退出，请重新登录",
+    );
+  }, [reconcileExternalSession]);
+
+  const applyServerState = useCallback(
+    (next: ServerUpdate) => {
+      const liveToken = api.getSessionToken();
+      if (boundTokenRef.current !== null && liveToken !== boundTokenRef.current) {
+        reconcileExternalSession(liveToken);
+        return;
+      }
+      const resolvedToken =
+        ("player" in next && next.sessionToken ? next.sessionToken : null) ??
+        liveToken;
+      applyServerStateForSession(next, resolvedToken);
+    },
+    [applyServerStateForSession, reconcileExternalSession],
+  );
 
   useEffect(() => {
-    let active = true;
-    const token = api.getSessionToken();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    api
-      .getDashboard()
-      .then((res) => {
-        if (!active || api.getSessionToken() !== token) return;
-        applyServerState(res);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (!active || api.getSessionToken() !== token) return;
-        if (err instanceof ApiError && err.status === 401) {
-          api.setSessionToken(null);
-          setState(null);
-        } else {
-          setErrorBanner(err instanceof Error ? err.message : "加载失败");
-        }
-        setLoading(false);
-      });
+    const initialToken = api.getSessionToken();
+    activeTokenRef.current = initialToken;
+    const epoch = sessionEpochRef.current;
+    loadSessionDashboard(initialToken, epoch);
     return () => {
-      active = false;
+      sessionEpochRef.current += 1;
     };
-  }, [applyServerState]);
+  }, [loadSessionDashboard]);
+
+  useEffect(() => {
+    return api.subscribeSession((nextToken, source) => {
+      if (source === "local" && localAuthInFlightRef.current > 0) return;
+      if (nextToken === activeTokenRef.current) return;
+      reconcileExternalSession(nextToken);
+    });
+  }, [reconcileExternalSession]);
+
+  const state: DashboardStateResp | null = snapshot?.state ?? null;
+  const boundSessionToken: string | null = snapshot?.sessionToken ?? null;
+  const lastSyncAtMs: number = snapshot?.lastSyncAtMs ?? fallbackSyncMs;
+  const raidSyncedAtMs: number = snapshot?.raidSyncedAtMs ?? lastSyncAtMs;
 
   const hasState = state !== null;
   const hasActivePopulation = (state?.player.populationTotal ?? 0) > 0;
@@ -186,9 +285,40 @@ export function useGameSession(isAdminRoute: boolean) {
       state.collectibles.length > 0);
 
   useEffect(() => {
-    if (!hasState || !hasActivePopulation || raidActive) return;
-    let active = true;
-    const token = api.getSessionToken();
+    if (!hasState) return;
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      const liveToken = api.getSessionToken();
+      if (liveToken !== boundTokenRef.current) {
+        reconcileExternalSession(liveToken);
+        return;
+      }
+      if (!hasActivePopulation || raidActive) return;
+      const epoch = sessionEpochRef.current;
+      api
+        .getDashboard()
+        .then((res) => {
+          if (
+            sessionEpochRef.current === epoch &&
+            api.getSessionToken() === liveToken
+          ) {
+            applyServerStateForSession(res, liveToken);
+          }
+        })
+        .catch(() => {});
+    };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibility);
+    }
+
+    if (!hasActivePopulation || raidActive) {
+      return () => {
+        if (typeof document !== "undefined") {
+          document.removeEventListener("visibilitychange", onVisibility);
+        }
+      };
+    }
 
     const syncNow = () => {
       if (
@@ -197,10 +327,22 @@ export function useGameSession(isAdminRoute: boolean) {
       ) {
         return;
       }
+      const liveToken = api.getSessionToken();
+      if (liveToken !== boundTokenRef.current) {
+        reconcileExternalSession(liveToken);
+        return;
+      }
+      if (!liveToken) return;
+      const epoch = sessionEpochRef.current;
       api
         .getDashboard()
         .then((res) => {
-          if (active && api.getSessionToken() === token) applyServerState(res);
+          if (
+            sessionEpochRef.current === epoch &&
+            api.getSessionToken() === liveToken
+          ) {
+            applyServerStateForSession(res, liveToken);
+          }
         })
         .catch(() => {});
     };
@@ -209,16 +351,7 @@ export function useGameSession(isAdminRoute: boolean) {
       syncNow,
       SETTLEMENT_UI_CONFIG.syncPollIntervalMs,
     );
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        syncNow();
-      }
-    };
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", onVisibility);
-    }
     return () => {
-      active = false;
       window.clearInterval(timer);
       if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", onVisibility);
@@ -229,7 +362,9 @@ export function useGameSession(isAdminRoute: boolean) {
     hasActivePopulation,
     activeHandle,
     raidActive,
-    applyServerState,
+    boundSessionToken,
+    applyServerStateForSession,
+    reconcileExternalSession,
   ]);
 
   useEffect(() => {
@@ -265,6 +400,15 @@ export function useGameSession(isAdminRoute: boolean) {
       successMsg?: string,
       actionScope?: string,
     ) => {
+      const liveToken = api.getSessionToken();
+      if (
+        boundTokenRef.current !== null &&
+        liveToken !== boundTokenRef.current
+      ) {
+        reconcileSessionMismatch();
+        return;
+      }
+
       setErrorBanner(null);
       setNoticeBanner(null);
       if (actionScope) {
@@ -275,19 +419,58 @@ export function useGameSession(isAdminRoute: boolean) {
       } else {
         setBusy(true);
       }
-      const token = api.getSessionToken();
+
+      const startedEpoch = sessionEpochRef.current;
+      const startedToken = liveToken;
+      const isAuthBootstrap = boundTokenRef.current === null;
+      if (isAuthBootstrap) {
+        localAuthInFlightRef.current += 1;
+      }
+
       try {
         const next = await fn();
-        if (!belongsToSession(next, token, api.getSessionToken())) return;
-        applyServerState(next);
-        if (successMsg) {
+        const currentToken = api.getSessionToken();
+        if (sessionEpochRef.current !== startedEpoch) return;
+        if (!belongsToSession(next, startedToken, currentToken)) {
+          if (currentToken !== startedToken) {
+            reconcileExternalSession(currentToken);
+          }
+          return;
+        }
+        const resolvedToken =
+          ("player" in next && next.sessionToken ? next.sessionToken : null) ??
+          currentToken;
+        applyServerStateForSession(next, resolvedToken);
+
+        const outcome = getCommandSyncOutcome(next);
+        if (outcome.kind !== "executed") {
+          setErrorBanner(outcome.message);
+        } else if (successMsg) {
           setNoticeBanner(successMsg);
         }
       } catch (err: unknown) {
-        if (api.getSessionToken() !== token) return;
+        if (sessionEpochRef.current !== startedEpoch) return;
+        const currentToken = api.getSessionToken();
+        if (currentToken !== startedToken) {
+          reconcileExternalSession(currentToken);
+          return;
+        }
         if (err instanceof ApiError && err.status === 401) {
-          api.setSessionToken(null);
-          setState(null);
+          localAuthInFlightRef.current += 1;
+          try {
+            api.setSessionToken(null);
+          } finally {
+            localAuthInFlightRef.current = Math.max(
+              0,
+              localAuthInFlightRef.current - 1,
+            );
+          }
+          sessionEpochRef.current += 1;
+          activeTokenRef.current = null;
+          boundTokenRef.current = null;
+          setSnapshot(null);
+          setPendingScopes({});
+          setBusy(false);
           setErrorBanner(err.message);
         } else if (err instanceof Error) {
           setErrorBanner(err.message);
@@ -295,22 +478,34 @@ export function useGameSession(isAdminRoute: boolean) {
           setErrorBanner("操作未完成");
         }
       } finally {
-        if (actionScope) {
-          setPendingScopes((prev) => {
-            const nextCount = (prev[actionScope] ?? 1) - 1;
-            if (nextCount <= 0) {
-              const rest = { ...prev };
-              delete rest[actionScope];
-              return rest;
-            }
-            return { ...prev, [actionScope]: nextCount };
-          });
-        } else {
-          setBusy(false);
+        if (isAuthBootstrap) {
+          localAuthInFlightRef.current = Math.max(
+            0,
+            localAuthInFlightRef.current - 1,
+          );
+        }
+        if (sessionEpochRef.current === startedEpoch) {
+          if (actionScope) {
+            setPendingScopes((prev) => {
+              const nextCount = (prev[actionScope] ?? 1) - 1;
+              if (nextCount <= 0) {
+                const rest = { ...prev };
+                delete rest[actionScope];
+                return rest;
+              }
+              return { ...prev, [actionScope]: nextCount };
+            });
+          } else {
+            setBusy(false);
+          }
         }
       }
     },
-    [applyServerState],
+    [
+      applyServerStateForSession,
+      reconcileExternalSession,
+      reconcileSessionMismatch,
+    ],
   );
 
   const isScopeBusy = useCallback(
@@ -319,20 +514,35 @@ export function useGameSession(isAdminRoute: boolean) {
   );
 
   const handleLogout = useCallback(async () => {
+    sessionEpochRef.current += 1;
+    const logoutEpoch = sessionEpochRef.current;
     setBusy(true);
+    localAuthInFlightRef.current += 1;
     try {
       await api.logoutAccount();
     } finally {
-      setState(null);
-      setShowSettingsModal(false);
-      setNoticeBanner(null);
-      setErrorBanner(null);
-      setBusy(false);
+      localAuthInFlightRef.current = Math.max(
+        0,
+        localAuthInFlightRef.current - 1,
+      );
+      if (sessionEpochRef.current === logoutEpoch) {
+        activeTokenRef.current = null;
+        boundTokenRef.current = null;
+        setSnapshot(null);
+        setPendingScopes({});
+        setShowSettingsModal(false);
+        setShowAnnouncementModal(false);
+        setShowWorldMapModal(false);
+        setNoticeBanner(null);
+        setErrorBanner(null);
+        setBusy(false);
+      }
     }
   }, []);
 
   return {
     state,
+    boundSessionToken,
     loading,
     busy,
     isScopeBusy,
@@ -353,8 +563,10 @@ export function useGameSession(isAdminRoute: boolean) {
     showWorldMapModal,
     setShowWorldMapModal,
     applyServerState,
+    reconcileSessionMismatch,
     runAction,
     handleLogout,
     lastSyncAtMs,
+    raidSyncedAtMs,
   };
 }
