@@ -12,9 +12,15 @@ CLEAN_START_DATABASE=${CLEAN_START_DATABASE:-}
 EXPECTED_PREVIOUS_SHA=${EXPECTED_PREVIOUS_SHA:-}
 COMMIT_SHA=$(git -C "$ROOT_DIR" rev-parse HEAD)
 SHORT_SHA=$(git -C "$ROOT_DIR" rev-parse --short=12 HEAD)
-if [[ -n "$CLEAN_START_DATABASE" && ! "$CLEAN_START_DATABASE" =~ ^d2e_restart_[a-z0-9_]+$ ]]; then
-  echo "CLEAN_START_DATABASE must be a new d2e_restart_* database name" >&2
-  exit 1
+if [[ -n "$CLEAN_START_DATABASE" ]]; then
+  if [[ ! "$CLEAN_START_DATABASE" =~ ^d2e_restart_[a-z0-9_]+$ ]]; then
+    echo "CLEAN_START_DATABASE must be a new d2e_restart_* database name" >&2
+    exit 1
+  fi
+  if [[ -z "$EXPECTED_PREVIOUS_SHA" ]]; then
+    echo "EXPECTED_PREVIOUS_SHA is required when CLEAN_START_DATABASE is set" >&2
+    exit 1
+  fi
 fi
 if [[ -n "$(git -C "$ROOT_DIR" status --porcelain)" ]]; then
   echo "Release requires a clean, committed checkout" >&2
@@ -54,7 +60,8 @@ cp "$ROOT_DIR/deploy/production.env.example" "$STAGE_DIR/bundle/deploy/productio
 COPYFILE_DISABLE=1 tar -C "$STAGE_DIR/bundle" -czf "$STAGE_DIR/release.tar.gz" .
 
 echo "==> [2/6] Pre-flight conflict check on $SSH_HOST..."
-ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s" -- "$PUBLIC_PORT" <<'EOF'
+REMOTE_PREFLIGHT_ARGS=$(printf '%q ' "$PUBLIC_PORT")
+ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s -- ${REMOTE_PREFLIGHT_ARGS}" <<'EOF'
 set -euo pipefail
 PORT="$1"
 # Ensure port is not used by any non-drop2empire process
@@ -72,15 +79,16 @@ ssh -o ConnectTimeout=10 "$SSH_HOST" "mkdir -p /srv/drop2empire/config /srv/drop
 scp -q "$STAGE_DIR/release.tar.gz" "$SSH_HOST:/srv/drop2empire/releases/$SHORT_SHA/release.tar.gz"
 
 echo "==> [4/6] Building runtime images & rolling out compose project 'drop2empire' on $SSH_HOST..."
-ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s" -- "$VERSION" "$COMMIT_SHA" "$SHORT_SHA" "$PUBLIC_PORT" "$SSH_HOST" "$CLEAN_START_DATABASE" "$EXPECTED_PREVIOUS_SHA" <<'EOF'
+REMOTE_ROLLOUT_ARGS=$(printf '%q ' "$VERSION" "$COMMIT_SHA" "$SHORT_SHA" "$PUBLIC_PORT" "$SSH_HOST" "$CLEAN_START_DATABASE" "$EXPECTED_PREVIOUS_SHA")
+ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s -- ${REMOTE_ROLLOUT_ARGS}" <<'EOF'
 set -Eeuo pipefail
 VERSION="$1"
 COMMIT_SHA="$2"
 SHORT_SHA="$3"
 PUBLIC_PORT="$4"
 HOST_IP="$5"
-NEW_DB="$6"
-EXPECTED_PREVIOUS_SHA="$7"
+NEW_DB="${6:-}"
+EXPECTED_PREVIOUS_SHA="${7:-}"
 RELEASE_DIR="/srv/drop2empire/releases/$SHORT_SHA"
 ENV_FILE="/srv/drop2empire/config/production.env"
 TLS_DIR="/srv/drop2empire/tls"
@@ -178,11 +186,14 @@ rollback() {
 }
 trap rollback ERR
 
+if [[ -n "$EXPECTED_PREVIOUS_SHA" ]]; then
+  [[ -f "$PREVIOUS_DIR/images.env" ]]
+  OLD_SHA=$(docker exec drop2empire-game-1 wget -qO- http://127.0.0.1:8080/version | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])')
+  [[ "$OLD_SHA" == "$EXPECTED_PREVIOUS_SHA" ]]
+fi
 if [[ -n "$NEW_DB" ]]; then
   [[ "$NEW_DB" =~ ^d2e_restart_[a-z0-9_]+$ ]]
   [[ -n "$EXPECTED_PREVIOUS_SHA" && -f "$PREVIOUS_DIR/images.env" ]]
-  OLD_SHA=$(docker exec drop2empire-game-1 wget -qO- http://127.0.0.1:8080/version | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])')
-  [[ "$OLD_SHA" == "$EXPECTED_PREVIOUS_SHA" ]]
   EXISTS=$(docker exec drop2empire-postgres-1 sh -c 'psql -U "$POSTGRES_USER" -d postgres -Atc "$1"' sh "SELECT 1 FROM pg_database WHERE datname='$NEW_DB'")
   [[ -z "$EXISTS" ]] # Never erase or reuse a previous attempt's database.
   OLD_DB=$(sed -n 's/^POSTGRES_DB=//p' "$ENV_FILE" | tail -1)
@@ -231,7 +242,8 @@ echo "Rollback records: $BACKUP_DIR"
 EOF
 
 echo "==> [5/6] Verifying Drop to Empire HTTPS health & API readiness on $SSH_HOST:$PUBLIC_PORT..."
-ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s" -- "$SSH_HOST" "$PUBLIC_PORT" <<'EOF'
+REMOTE_VERIFY_ARGS=$(printf '%q ' "$SSH_HOST" "$PUBLIC_PORT")
+ssh -o ConnectTimeout=10 "$SSH_HOST" "bash -s -- ${REMOTE_VERIFY_ARGS}" <<'EOF'
 set -euo pipefail
 HOST_IP="$1"
 PORT="$2"
