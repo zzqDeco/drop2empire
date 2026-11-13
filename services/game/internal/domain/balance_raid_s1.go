@@ -228,7 +228,7 @@ var RaidZoneTemplates = []RaidZoneTemplateSpec{
 var RaidLootCatalogMeta = map[string]RaidLootItem{
 	ResFlint:            {Key: ResFlint, Name: "燧石结晶", Rarity: "COMMON", Category: "material"},
 	ResAncientShard:     {Key: ResAncientShard, Name: "古文明残片", Rarity: "RARE", Category: "material"},
-	ResMeteorOre:        {Key: ResMeteorOre, Name: "天外陨铁", Rarity: "EPIC", Category: "material"},
+	ResMeteorOre:        {Key: ResMeteorOre, Name: "星陨秘银", Rarity: "EPIC", Category: "material"},
 	ResBPCrossbow:       {Key: ResBPCrossbow, Name: "★图纸：墨械连发手弩", Rarity: "RARE", Category: "blueprint"},
 	ResBPCarapaceArmor:  {Key: ResBPCarapaceArmor, Name: "★图纸：荒原沙虫甲", Rarity: "RARE", Category: "blueprint"},
 	ResBPSpringBoots:    {Key: ResBPSpringBoots, Name: "★图纸：墨械弹簧战靴", Rarity: "RARE", Category: "blueprint"},

@@ -1,15 +1,49 @@
 import { useState } from "react";
 import { api } from "@drop2empire/api-client";
-import { Award, Compass, Plus, Shield, Swords } from "lucide-react";
+import { Award, Compass, Package, Plus, Shield, Swords } from "lucide-react";
+import { economyCommand } from "../../economy";
 import { ICON } from "../../icons";
 import { formatGold, formatResource } from "../../format";
 import { WarGraphMapSVG } from "../../WarGraphMapSVG";
 import type { SceneProps } from "./types";
 
+const NODE_SUPPORT_CATALOG = [
+  {
+    key: "heavy_workpack",
+    name: "重载作业包",
+    effect: "企业支援 · 攻防战力 +12% (+35贡献/+12积分)",
+    friendlyOnly: false,
+  },
+  {
+    key: "precision_workpack",
+    name: "精密作业包",
+    effect: "企业支援 · 克制 +5% / 战损 -5% (+35贡献/+12积分)",
+    friendlyOnly: false,
+  },
+  {
+    key: "fire_control_pack",
+    name: "火控校准包",
+    effect: "职业耗材 · 不利克制惩罚减半",
+    friendlyOnly: false,
+  },
+  {
+    key: "field_medkit",
+    name: "战地救护包",
+    effect: "职业耗材 · 战损率 -5%",
+    friendlyOnly: false,
+  },
+  {
+    key: "defense_ward",
+    name: "守城结界",
+    effect: "职业耗材 · 己方城防 +8%",
+    friendlyOnly: true,
+  },
+] as const;
+
 /**
  * Scene IV: Guild System (公会大厅) & 8-Node Chamber Territory War (城池争夺战区)
  */
-export function WarGuildSceneView({ state, runAction }: SceneProps) {
+export function WarGuildSceneView({ state, busy, runAction }: SceneProps) {
   const [selectedNodeId, setSelectedNodeId] = useState("node_north_fort");
   const [deployInf, setDeployInf] = useState(2);
   const [deployArc, setDeployArc] = useState(2);
@@ -40,6 +74,10 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
     resources.find((r) => r.key === "archer_kit")?.amountMilli ?? 0;
   const cavKitMilli =
     resources.find((r) => r.key === "cavalry_kit")?.amountMilli ?? 0;
+  const heavyPackMilli =
+    resources.find((r) => r.key === "heavy_workpack")?.amountMilli ?? 0;
+  const precisionPackMilli =
+    resources.find((r) => r.key === "precision_workpack")?.amountMilli ?? 0;
 
   const canDonateSupplies =
     Boolean(joinedGuild) &&
@@ -47,8 +85,16 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
     woodMilli >= 50000 &&
     stoneMilli >= 25000;
   const canDonateGold = Boolean(joinedGuild) && player.goldBasis >= 500000;
+  const canDonateHeavyPack = Boolean(joinedGuild) && heavyPackMilli >= 1000;
+  const canDonatePrecisionPack =
+    Boolean(joinedGuild) && precisionPackMilli >= 1000;
   const canCreateGuild =
     waterMilli >= 100000 && woodMilli >= 60000 && stoneMilli >= 30000;
+
+  const myDeployedTotal =
+    selectedWarNode.myInfantry +
+    selectedWarNode.myArcher +
+    selectedWarNode.myCavalry;
 
   const totalTroopBoxes = deployInf + deployArc + deployCav;
   const hasEnoughKits =
@@ -126,7 +172,7 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
                   type="button"
                   className="btn-outline"
                   data-pop="+180 贡献 / +25 积分"
-                  disabled={!canDonateGold}
+                  disabled={busy || !canDonateGold}
                   onClick={() =>
                     void runAction(() =>
                       api.guildAction({ action: "donate_gold" }),
@@ -134,7 +180,51 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
                   }
                 >
                   <Award size={ICON.xs} />
-                  <span>军费捐献 (50 G)</span>
+                  <span>
+                    军费捐献 (<span className="mono-num">50 G</span>)
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-outline"
+                  data-pop="+240 贡献 / +35 积分"
+                  disabled={busy || !canDonateHeavyPack}
+                  onClick={() =>
+                    void runAction(() =>
+                      api.guildAction({ action: "donate_heavy_pack" }),
+                    )
+                  }
+                >
+                  <Package size={ICON.xs} />
+                  <span>
+                    重载包捐献 (余{" "}
+                    <span className="mono-num">
+                      {formatResource(heavyPackMilli, 0)}
+                    </span>
+                    )
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-outline"
+                  data-pop="+240 贡献 / +35 积分"
+                  disabled={busy || !canDonatePrecisionPack}
+                  onClick={() =>
+                    void runAction(() =>
+                      api.guildAction({ action: "donate_precision_pack" }),
+                    )
+                  }
+                >
+                  <Package size={ICON.xs} />
+                  <span>
+                    精密包捐献 (余{" "}
+                    <span className="mono-num">
+                      {formatResource(precisionPackMilli, 0)}
+                    </span>
+                    )
+                  </span>
                 </button>
 
                 <button
@@ -545,6 +635,63 @@ export function WarGuildSceneView({ state, runAction }: SceneProps) {
                         : `代表 [${joinedGuild.tag}] 出兵部署`}
             </button>
           </form>
+
+          <div className="node-intel-card" aria-label="据点战术与企业作业包支援">
+            <div className="intel-row">
+              <strong>据点战术与企业作业包支援</strong>
+              <span className="mono-num">
+                我的驻军 {myDeployedTotal} 团
+              </span>
+            </div>
+            {myDeployedTotal <= 0 && (
+              <p className="muted-note">
+                需先向本据点派驻至少 <span className="mono-num">1</span>{" "}
+                团兵力，方可投送本轮耗材或企业作业包支援。
+              </p>
+            )}
+            {NODE_SUPPORT_CATALOG.map((item) => {
+              const ownedMilli =
+                resources.find((r) => r.key === item.key)?.amountMilli ?? 0;
+              const friendlyBlocked =
+                item.friendlyOnly &&
+                selectedWarNode.ownerGuild !== war.playerGuild;
+              const canUseSupport =
+                !busy &&
+                Boolean(joinedGuild) &&
+                myDeployedTotal > 0 &&
+                ownedMilli >= 1000 &&
+                !friendlyBlocked;
+              return (
+                <div key={item.key} className="intel-row">
+                  <div>
+                    <strong>{item.name}</strong>{" "}
+                    <span className="mono-num">
+                      ×{formatResource(ownedMilli, 0)}
+                    </span>
+                    <div className="muted-note">{item.effect}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    data-pop={`⚡ ${item.name}`}
+                    disabled={!canUseSupport}
+                    onClick={() =>
+                      void runAction(
+                        () =>
+                          economyCommand(state, "use", {
+                            target: item.key,
+                            option: selectedWarNode.nodeId,
+                          }),
+                        `已向【${selectedWarNode.name}】投送${item.name}`,
+                      )
+                    }
+                  >
+                    {friendlyBlocked ? "仅限己方城池" : "支援据点"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
 
           <div className="war-tactics-legend">
             <strong>兵种克制与会战损耗法则</strong>

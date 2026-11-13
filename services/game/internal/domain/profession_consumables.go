@@ -211,6 +211,9 @@ func advanceProfessional(p *PlayerState) {
 }
 
 func UseConsumable(w *WorldState, p *PlayerState, key, target string, now time.Time) error {
+	if key == ResHeavyPack || key == ResPrecisionPack {
+		return useCorporateWarWorkpack(w, p, key, target, now)
+	}
 	s, ok := FindConsumable(key)
 	if !ok {
 		return ErrNotFound("未知的耗材")
@@ -242,8 +245,12 @@ func UseConsumable(w *WorldState, p *PlayerState, key, target string, now time.T
 		}
 		ps.SigilSeconds = 600
 	case "war":
+		EnsureGuildState(w)
 		if p.JoinedGuildID == "" {
 			return ErrPrecondition("guild_required", "需要加入公会")
+		}
+		if g := FindGuild(w, p.JoinedGuildID); g != nil {
+			p.GuildCode = g.Faction
 		}
 		var node *WarNodeState
 		for i := range w.WarNodes {
@@ -271,5 +278,49 @@ func UseConsumable(w *WorldState, p *PlayerState, key, target string, now time.T
 	}
 	p.ResourcesMilli[key] -= 1000
 	AppendLog(p, now, "CONSUMABLE", "已使用"+s.Name)
+	return nil
+}
+
+func useCorporateWarWorkpack(w *WorldState, p *PlayerState, key, target string, now time.Time) error {
+	if p.ResourcesMilli[key] < ResourceScale {
+		return ErrPrecondition("insufficient_resource", "库存中没有该企业作业包")
+	}
+	EnsureGuildState(w)
+	if p.JoinedGuildID == "" {
+		return ErrPrecondition("guild_required", "请先加入公会后再向战区据点投送企业作业包")
+	}
+	g := FindGuild(w, p.JoinedGuildID)
+	if g == nil {
+		return ErrPrecondition("guild_required", "当前所属公会不存在")
+	}
+	p.GuildCode = g.Faction
+
+	var node *WarNodeState
+	for i := range w.WarNodes {
+		if w.WarNodes[i].NodeID == target {
+			node = &w.WarNodes[i]
+			break
+		}
+	}
+	if node == nil || node.PlayerDeployed[p.Handle].Total() == 0 {
+		return ErrPrecondition("deployment_required", "只能支援自己已出兵的战略据点")
+	}
+	if node.Consumables == nil {
+		node.Consumables = map[string]bool{}
+	}
+	flag := p.GuildCode + ":" + key
+	if node.Consumables[flag] {
+		return ErrPrecondition("effect_active", "本节点本方已部署相同企业作业包支援")
+	}
+	node.Consumables[flag] = true
+	p.ResourcesMilli[key] -= ResourceScale
+
+	addGuildXP(g, MacroBalance.WarWorkpackSupportXP)
+	addOrUpdateGuildMember(g, p.Handle, "成员", MacroBalance.WarWorkpackSupportContrib, 0)
+	p.GuildContribution += MacroBalance.WarWorkpackSupportContrib
+	p.ActivityPoints += MacroBalance.WarWorkpackSupportPts
+
+	AppendLog(p, now, "WAR", fmt.Sprintf("向据点【%s】投送企业工程支援【%s】×1：公会经验 +%d，个人贡献 +%d，活动积分 +%d。",
+		node.Name, ResourceName(key), MacroBalance.WarWorkpackSupportXP, MacroBalance.WarWorkpackSupportContrib, MacroBalance.WarWorkpackSupportPts))
 	return nil
 }

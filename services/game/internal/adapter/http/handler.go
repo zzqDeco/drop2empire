@@ -467,6 +467,9 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		defenseBonus := domain.EffectiveNodeDefenseBonus(n)
 		gPower := domain.ComputeWeightedPower(garrison, domain.Troops{}, defenseBonus)
 		intelNote := n.IntelNote
+		if rally := domain.WarRallySummary(w, n); rally != "" {
+			intelNote += "；集结：" + rally
+		}
 		if effects := domain.WarConsumableSummary(n); effects != "" {
 			intelNote += "；本轮支援：" + effects
 		}

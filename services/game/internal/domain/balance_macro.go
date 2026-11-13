@@ -32,20 +32,30 @@ var MacroBalance = struct {
 	GuildDonateGoldXP          int64
 	GuildDonateGoldContrib     int64
 	GuildDonateGoldPts         int32
+	GuildDonateWorkpackXP      int64
+	GuildDonateWorkpackContrib int64
+	GuildDonateWorkpackPts     int32
 
 	// Chamber War deployment, counter matrix, attrition & daily settlement rewards:
-	WarDeployContribPerUnit int64
-	WarDeployGuildXPPerUnit int64
-	WarDeployRallyBonusPts  int32
-	WarCounterMatrixBps     [3][3]int64
-	WarWinAttritionPct      int32
-	WarLoseAttritionPct     int32
-	WarLoserBasePts         int32
-	WarWinnerBasePts        int32
-	WarPtsPerUnitDeployed   int32
-	WarBaseStipendGold      int64
-	WarStipendGoldPerUnit   int64
-	MaxWarHistoryEntries    int
+	WarDeployContribPerUnit          int64
+	WarDeployGuildXPPerUnit          int64
+	WarDeployRallyBonusPts           int32
+	WarWorkpackSupportXP             int64
+	WarWorkpackSupportContrib        int64
+	WarWorkpackSupportPts            int32
+	WarHeavyPackPowerBonusPct        int32
+	WarPrecisionPackLossReductionPct int32
+	WarPrecisionPackCounterBonusBps  int64
+	WarCounterMatrixBps              [3][3]int64
+	WarWinAttritionPct               int32
+	WarLoseAttritionPct              int32
+	WarLoserBasePts                  int32
+	WarTieBasePts                    int32
+	WarWinnerBasePts                 int32
+	WarPtsPerUnitDeployed            int32
+	WarBaseStipendGold               int64
+	WarStipendGoldPerUnit            int64
+	MaxWarHistoryEntries             int
 }{
 	MaxCraftBatchesPerReq: 20,
 
@@ -74,10 +84,19 @@ var MacroBalance = struct {
 	GuildDonateGoldXP:          200,
 	GuildDonateGoldContrib:     180,
 	GuildDonateGoldPts:         25,
+	GuildDonateWorkpackXP:      260,
+	GuildDonateWorkpackContrib: 240,
+	GuildDonateWorkpackPts:     35,
 
-	WarDeployContribPerUnit: 15,
-	WarDeployGuildXPPerUnit: 10,
-	WarDeployRallyBonusPts:  5,
+	WarDeployContribPerUnit:          15,
+	WarDeployGuildXPPerUnit:          10,
+	WarDeployRallyBonusPts:           5,
+	WarWorkpackSupportXP:             40,
+	WarWorkpackSupportContrib:        35,
+	WarWorkpackSupportPts:            12,
+	WarHeavyPackPowerBonusPct:        12,
+	WarPrecisionPackLossReductionPct: 5,
+	WarPrecisionPackCounterBonusBps:  500,
 	WarCounterMatrixBps: [3][3]int64{
 		{10000, 11500, 9000},
 		{9000, 10000, 11500},
@@ -86,6 +105,7 @@ var MacroBalance = struct {
 	WarWinAttritionPct:    20,
 	WarLoseAttritionPct:   40,
 	WarLoserBasePts:       45,
+	WarTieBasePts:         60,
 	WarWinnerBasePts:      75,
 	WarPtsPerUnitDeployed: 3,
 	WarBaseStipendGold:    80,
@@ -102,13 +122,13 @@ var ResourceCatalog = []ResourceMeta{
 	{Key: ResStone, Name: "石材", Tier: "basic", Description: "工程与冶炼矿石", Tradable: true, InitPriceBasis: 9500},
 	{Key: ResFlint, Name: "燧石结晶", Tier: "relic", Description: "采集伴生晶矿 · 用于机关与游商易物", Tradable: true, InitPriceBasis: 28000},
 	{Key: ResAncientShard, Name: "古文明残片", Tier: "relic", Description: "远征与深层采掘所得 · 远古遗物核心", Tradable: true, InitPriceBasis: 65000},
-	{Key: ResMeteorOre, Name: "星陨秘银", Tier: "relic", Description: "荒原秘境搜出 · 高阶军械与黑市硬通货", Tradable: true, InitPriceBasis: 145000},
+	{Key: ResMeteorOre, Name: "星陨秘银", Tier: "relic", Description: "荒原机关石棺/深渊秘宝库搜出 · 传世装备与高阶硬通货", Tradable: true, InitPriceBasis: 145000},
 	{Key: ResIronIngot, Name: "铁锭", Tier: "intermediate", Description: "高炉吞吐石材与木炭精炼", Tradable: true, InitPriceBasis: 32000},
 	{Key: ResRation, Name: "军粮", Tier: "intermediate", Description: "消耗净水与木材封装", Tradable: true, InitPriceBasis: 24000},
-	{Key: ResAutoPump, Name: "自动抽水机", Tier: "profession", Description: "科学家制品 · 打水/伐木 +15%", Tradable: true, InitPriceBasis: 185000},
-	{Key: ResAlchCatalyst, Name: "赫尔墨斯催化剂", Tier: "profession", Description: "炼金制品 · 全岗位 +12%", Tradable: true, InitPriceBasis: 195000},
-	{Key: ResEnchantScroll, Name: "星界附魔卷轴", Tier: "profession", Description: "魔法师制品 · 采石/军粮 +15%", Tradable: true, InitPriceBasis: 200000},
-	{Key: ResHeavyToolset, Name: "泰坦精锻工具组", Tier: "profession", Description: "工匠制品 · 伐木/炼铁 +15%", Tradable: true, InitPriceBasis: 190000},
+	{Key: ResAutoPump, Name: "自动抽水机", Tier: "profession", Description: "科学家装置 · 打水/伐木 +8%（上限 3 台）", Tradable: true, InitPriceBasis: 185000},
+	{Key: ResAlchCatalyst, Name: "赫尔墨斯催化剂", Tier: "profession", Description: "炼金装置 · 全岗位 +6%（上限 3 瓶）", Tradable: true, InitPriceBasis: 195000},
+	{Key: ResEnchantScroll, Name: "星界附魔卷轴", Tier: "profession", Description: "魔法师装置 · 采石/军粮 +8%（上限 3 卷）", Tradable: true, InitPriceBasis: 200000},
+	{Key: ResHeavyToolset, Name: "泰坦精锻工具组", Tier: "profession", Description: "工匠装置 · 伐木/烧炭/炼铁 +8%（上限 3 套）", Tradable: true, InitPriceBasis: 190000},
 	{Key: ResInfantryKit, Name: "重步兵军备", Tier: "war", Description: "步兵编制 · 克弓兵", Tradable: true, InitPriceBasis: 98000},
 	{Key: ResArcherKit, Name: "长弓兵军备", Tier: "war", Description: "弓兵编制 · 克骑兵", Tradable: true, InitPriceBasis: 102000},
 	{Key: ResCavalryKit, Name: "铁骑兵军备", Tier: "war", Description: "骑兵编制 · 克步兵", Tradable: true, InitPriceBasis: 112000},
@@ -249,9 +269,9 @@ var CraftRecipeCatalog = []CraftRecipeSpec{
 		OutputKey:         ResAutoPump,
 		OutputName:        "自动抽水机",
 		OutputAmountMilli: 1 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWater: 600 * ResourceScale, ResWood: 300 * ResourceScale, ResIronIngot: 4 * ResourceScale},
+		CostsMilli:        map[string]int64{ResWater: 600 * ResourceScale, ResWood: 300 * ResourceScale, ResIronIngot: 8 * ResourceScale},
 		GoldCostBasis:     5 * GoldScale,
-		EffectSummary:     "装槽：打水/伐木 +15%",
+		EffectSummary:     "装槽：打水/伐木 +8%（最多 3 台）",
 	},
 	{
 		RecipeCode:        "craft_alch_catalyst",
@@ -262,9 +282,9 @@ var CraftRecipeCatalog = []CraftRecipeSpec{
 		OutputKey:         ResAlchCatalyst,
 		OutputName:        "赫尔墨斯催化剂",
 		OutputAmountMilli: 1 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWater: 800 * ResourceScale, ResStone: 220 * ResourceScale, ResRation: 4 * ResourceScale},
+		CostsMilli:        map[string]int64{ResWater: 700 * ResourceScale, ResStone: 220 * ResourceScale, ResCharcoal: 12 * ResourceScale, ResIronIngot: 8 * ResourceScale, ResRation: 4 * ResourceScale},
 		GoldCostBasis:     5 * GoldScale,
-		EffectSummary:     "装槽：全岗位 +12%",
+		EffectSummary:     "装槽：全岗位 +6%（最多 3 瓶）",
 	},
 	{
 		RecipeCode:        "craft_enchant_scroll",
@@ -275,9 +295,9 @@ var CraftRecipeCatalog = []CraftRecipeSpec{
 		OutputKey:         ResEnchantScroll,
 		OutputName:        "星界附魔卷轴",
 		OutputAmountMilli: 1 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWater: 500 * ResourceScale, ResWood: 380 * ResourceScale, ResStone: 200 * ResourceScale},
+		CostsMilli:        map[string]int64{ResWater: 500 * ResourceScale, ResWood: 360 * ResourceScale, ResStone: 200 * ResourceScale, ResIronIngot: 8 * ResourceScale, ResFlint: 4 * ResourceScale},
 		GoldCostBasis:     5 * GoldScale,
-		EffectSummary:     "装槽：采石/军粮 +15%",
+		EffectSummary:     "装槽：采石/军粮 +8%（最多 3 卷）",
 	},
 	{
 		RecipeCode:        "craft_heavy_toolset",
@@ -288,9 +308,9 @@ var CraftRecipeCatalog = []CraftRecipeSpec{
 		OutputKey:         ResHeavyToolset,
 		OutputName:        "泰坦精锻工具组",
 		OutputAmountMilli: 1 * ResourceScale,
-		CostsMilli:        map[string]int64{ResWood: 280 * ResourceScale, ResStone: 240 * ResourceScale, ResIronIngot: 4 * ResourceScale},
+		CostsMilli:        map[string]int64{ResWood: 280 * ResourceScale, ResStone: 240 * ResourceScale, ResCharcoal: 12 * ResourceScale, ResIronIngot: 8 * ResourceScale},
 		GoldCostBasis:     5 * GoldScale,
-		EffectSummary:     "装槽：伐木/炼铁 +15%",
+		EffectSummary:     "装槽：伐木/烧炭/炼铁 +8%（最多 3 套）",
 	},
 	{
 		RecipeCode:        "craft_infantry_kit",
@@ -302,7 +322,7 @@ var CraftRecipeCatalog = []CraftRecipeSpec{
 		OutputName:        "重步兵军备",
 		OutputAmountMilli: 2 * ResourceScale,
 		CostsMilli:        map[string]int64{ResWood: 220 * ResourceScale, ResIronIngot: 3 * ResourceScale, ResRation: 4 * ResourceScale},
-		GoldCostBasis:     2 * GoldScale,
+		GoldCostBasis:     0,
 		EffectSummary:     "克弓兵 1.15x",
 	},
 	{
@@ -315,7 +335,7 @@ var CraftRecipeCatalog = []CraftRecipeSpec{
 		OutputName:        "长弓兵军备",
 		OutputAmountMilli: 2 * ResourceScale,
 		CostsMilli:        map[string]int64{ResWood: 360 * ResourceScale, ResStone: 140 * ResourceScale, ResRation: 4 * ResourceScale},
-		GoldCostBasis:     2 * GoldScale,
+		GoldCostBasis:     0,
 		EffectSummary:     "克骑兵 1.15x",
 	},
 	{
@@ -328,7 +348,7 @@ var CraftRecipeCatalog = []CraftRecipeSpec{
 		OutputName:        "铁骑兵军备",
 		OutputAmountMilli: 2 * ResourceScale,
 		CostsMilli:        map[string]int64{ResWater: 300 * ResourceScale, ResIronIngot: 4 * ResourceScale, ResRation: 6 * ResourceScale},
-		GoldCostBasis:     3 * GoldScale,
+		GoldCostBasis:     0,
 		EffectSummary:     "克步兵 1.15x",
 	},
 }
@@ -338,51 +358,51 @@ var EquipmentCatalog = []EquipmentSpec{
 	{
 		ItemKey:      ResAutoPump,
 		Name:         "自动抽水机",
-		MaxStack:     5,
-		BonusSummary: "打水/伐木 +15%/台",
+		MaxStack:     3,
+		BonusSummary: "打水/伐木 +8%/台",
 		JobEfficiencyPerStack: map[string]int64{
-			JobWater: 15,
-			JobWood:  15,
+			JobWater: 8,
+			JobWood:  8,
 		},
 	},
 	{
 		ItemKey:      ResAlchCatalyst,
 		Name:         "赫尔墨斯催化剂",
-		MaxStack:     5,
-		BonusSummary: "全岗位 +12%/瓶",
+		MaxStack:     3,
+		BonusSummary: "全岗位 +6%/瓶",
 		JobEfficiencyPerStack: map[string]int64{
-			JobWater:      12,
-			JobWood:       12,
-			JobCharcoal:   12,
-			JobStone:      12,
-			JobSmeltIron:  12,
-			JobPrepRation: 12,
+			JobWater:      6,
+			JobWood:       6,
+			JobCharcoal:   6,
+			JobStone:      6,
+			JobSmeltIron:  6,
+			JobPrepRation: 6,
 		},
 	},
 	{
 		ItemKey:      ResEnchantScroll,
 		Name:         "星界附魔卷轴",
-		MaxStack:     5,
-		BonusSummary: "采石/军粮 +15%/卷",
+		MaxStack:     3,
+		BonusSummary: "采石/军粮 +8%/卷",
 		JobEfficiencyPerStack: map[string]int64{
-			JobStone:      15,
-			JobPrepRation: 15,
+			JobStone:      8,
+			JobPrepRation: 8,
 		},
 	},
 	{
 		ItemKey:      ResHeavyToolset,
 		Name:         "泰坦精锻工具组",
-		MaxStack:     5,
-		BonusSummary: "伐木/炼铁 +15%/套",
+		MaxStack:     3,
+		BonusSummary: "伐木/烧炭/炼铁 +8%/套",
 		JobEfficiencyPerStack: map[string]int64{
-			JobWood:      15,
-			JobCharcoal:  15,
-			JobSmeltIron: 15,
+			JobWood:      8,
+			JobCharcoal:  8,
+			JobSmeltIron: 8,
 		},
 	},
 }
 
-// DefaultGuilds returns the initial NPC/Demo guild roster for the Chamber War.
+// DefaultGuilds returns the 4 canonical starter chambers for the Chamber War with zero fictional players.
 func DefaultGuilds() []GuildState {
 	return []GuildState{
 		{
@@ -390,70 +410,57 @@ func DefaultGuilds() []GuildState {
 			Name:              "墨械先驱团",
 			Tag:               "INK",
 			Faction:           GuildObsidian,
-			LeaderHandle:      "archon_demo",
-			Level:             3,
-			XP:                420,
+			LeaderHandle:      "商会执政厅",
+			Level:             1,
+			XP:                0,
 			TreasuryGoldBasis: 0,
 			RallyNodeID:       "node_north_fort",
 			Announcement:      "以水力与黑曜齿轮构筑西线铁壁，优先集结北侧据点！",
-			Members: []GuildMember{
-				{Handle: "archon_demo", Role: "会长", Contribution: 680, WarDeployed: 28},
-				{Handle: "墨匠·玄枢", Role: "副会长", Contribution: 420, WarDeployed: 18},
-				{Handle: "铁砧·墨衡", Role: "精锐", Contribution: 260, WarDeployed: 12},
-			},
+			Members:           []GuildMember{},
 		},
 		{
 			GuildID:           "guild_obsidian_iron",
 			Name:              "黑曜铁卫公会",
 			Tag:               "IRON",
 			Faction:           GuildObsidian,
-			LeaderHandle:      "重甲督军·岩罡",
-			Level:             2,
-			XP:                260,
+			LeaderHandle:      "商会执政厅",
+			Level:             1,
+			XP:                0,
 			TreasuryGoldBasis: 0,
 			RallyNodeID:       "node_south_ferry",
-			Announcement:      "专司南线渡口重步兵攻坚，欢迎巨匠与炼金师加盟。",
-			Members: []GuildMember{
-				{Handle: "重甲督军·岩罡", Role: "会长", Contribution: 450, WarDeployed: 22},
-				{Handle: "燧火·赤锤", Role: "精锐", Contribution: 190, WarDeployed: 10},
-			},
+			Announcement:      "专司南线渡口重步兵攻坚，欢迎工匠与炼金师加盟。",
+			Members:           []GuildMember{},
 		},
 		{
 			GuildID:           "guild_argent_astral",
 			Name:              "白银星界议会",
 			Tag:               "ASTR",
 			Faction:           GuildArgent,
-			LeaderHandle:      "星轨大导师·凛月",
-			Level:             3,
-			XP:                410,
+			LeaderHandle:      "商会执政厅",
+			Level:             1,
+			XP:                0,
 			TreasuryGoldBasis: 0,
 			RallyNodeID:       "node_east_fort",
 			Announcement:      "星盘所指即为白银疆域，协同夺取东侧据点与中央宝藏城。",
-			Members: []GuildMember{
-				{Handle: "星轨大导师·凛月", Role: "会长", Contribution: 640, WarDeployed: 26},
-				{Handle: "银羽·星河", Role: "精锐", Contribution: 290, WarDeployed: 14},
-			},
+			Members:           []GuildMember{},
 		},
 		{
 			GuildID:           "guild_argent_hermes",
 			Name:              "赫尔墨斯炼金会",
 			Tag:               "ALCH",
 			Faction:           GuildArgent,
-			LeaderHandle:      "翠玉炼金师·维克",
-			Level:             2,
-			XP:                240,
+			LeaderHandle:      "商会执政厅",
+			Level:             1,
+			XP:                0,
 			TreasuryGoldBasis: 0,
-			RallyNodeID:       "node_center_vault",
-			Announcement:      "海量催化剂与附魔卷轴后勤支援，直插中央宝藏城。",
-			Members: []GuildMember{
-				{Handle: "翠玉炼金师·维克", Role: "会长", Contribution: 410, WarDeployed: 18},
-				{Handle: "白银之翼", Role: "成员", Contribution: 150, WarDeployed: 8},
-			},
+			RallyNodeID:       "node_south_ferry",
+			Announcement:      "协同补给南线渡口与东境防线，向中央宝藏城推进。",
+			Members:           []GuildMember{},
 		},
 	}
 }
 
-// DefaultWarNodes returns the 8-node graph topology and initial garrisons for the Chamber War.
+// DefaultWarNodes returns the mirror-symmetric 8-node graph topology and initial garrisons for the Chamber War.
 func DefaultWarNodes() []WarNodeState {
 	return []WarNodeState{
 		{
@@ -474,7 +481,7 @@ func DefaultWarNodes() []WarNodeState {
 			NodeID:          "node_west_outpost",
 			Name:            "西境前哨",
 			Region:          "west",
-			X:               260,
+			X:               250,
 			Y:               210,
 			OwnerGuild:      GuildObsidian,
 			DefenseBonusPct: 25,
@@ -488,13 +495,13 @@ func DefaultWarNodes() []WarNodeState {
 			NodeID:          "node_north_fort",
 			Name:            "北侧据点",
 			Region:          "north",
-			X:               430,
+			X:               400,
 			Y:               95,
 			OwnerGuild:      GuildNeutral,
 			DefenseBonusPct: 25,
 			DailyScore:      30,
 			IsTreasureVault: false,
-			NeutralGarrison: Troops{Infantry: 8, Archer: 6, Cavalry: 4},
+			NeutralGarrison: Troops{Infantry: 6, Archer: 6, Cavalry: 6},
 			PlayerDeployed:  map[string]Troops{},
 			IntelNote:       "北线高地",
 		},
@@ -508,7 +515,7 @@ func DefaultWarNodes() []WarNodeState {
 			DefenseBonusPct: 25,
 			DailyScore:      30,
 			IsTreasureVault: false,
-			NeutralGarrison: Troops{Infantry: 5, Archer: 10, Cavalry: 4},
+			NeutralGarrison: Troops{Infantry: 6, Archer: 8, Cavalry: 6},
 			PlayerDeployed:  map[string]Troops{},
 			IntelNote:       "南线水路",
 		},
@@ -516,7 +523,7 @@ func DefaultWarNodes() []WarNodeState {
 			NodeID:          "node_center_vault",
 			Name:            "中央宝藏城 ★",
 			Region:          "center",
-			X:               530,
+			X:               500,
 			Y:               200,
 			OwnerGuild:      GuildNeutral,
 			DefenseBonusPct: 25,
@@ -530,13 +537,13 @@ func DefaultWarNodes() []WarNodeState {
 			NodeID:          "node_east_fort",
 			Name:            "东侧据点",
 			Region:          "east",
-			X:               660,
+			X:               600,
 			Y:               95,
 			OwnerGuild:      GuildNeutral,
 			DefenseBonusPct: 25,
 			DailyScore:      30,
 			IsTreasureVault: false,
-			NeutralGarrison: Troops{Infantry: 6, Archer: 6, Cavalry: 9},
+			NeutralGarrison: Troops{Infantry: 6, Archer: 6, Cavalry: 6},
 			PlayerDeployed:  map[string]Troops{},
 			IntelNote:       "东境要塞",
 		},
@@ -544,7 +551,7 @@ func DefaultWarNodes() []WarNodeState {
 			NodeID:          "node_east_outpost",
 			Name:            "东境前哨",
 			Region:          "east",
-			X:               760,
+			X:               750,
 			Y:               210,
 			OwnerGuild:      GuildArgent,
 			DefenseBonusPct: 25,
@@ -571,7 +578,7 @@ func DefaultWarNodes() []WarNodeState {
 	}
 }
 
-// DefaultWarEdges returns the supply-line edges connecting the 8 Chamber War nodes.
+// DefaultWarEdges returns the 11 mirror-symmetric supply-line edges connecting the 8 Chamber War nodes.
 func DefaultWarEdges() []WarEdge {
 	return []WarEdge{
 		{FromNode: "node_west_base", ToNode: "node_west_outpost"},
@@ -580,6 +587,7 @@ func DefaultWarEdges() []WarEdge {
 		{FromNode: "node_north_fort", ToNode: "node_south_ferry"},
 		{FromNode: "node_north_fort", ToNode: "node_center_vault"},
 		{FromNode: "node_south_ferry", ToNode: "node_center_vault"},
+		{FromNode: "node_south_ferry", ToNode: "node_east_fort"},
 		{FromNode: "node_center_vault", ToNode: "node_east_fort"},
 		{FromNode: "node_south_ferry", ToNode: "node_east_outpost"},
 		{FromNode: "node_east_fort", ToNode: "node_east_outpost"},
@@ -587,24 +595,23 @@ func DefaultWarEdges() []WarEdge {
 	}
 }
 
-// WarDailyNPCReinforcements defines daily NPC vanguard reinforcements per node before 20:00 settlement.
+// WarDailyNPCReinforcements defines mirror-symmetric daily NPC vanguard reinforcements per node before 20:00 settlement.
 var WarDailyNPCReinforcements = map[string]struct {
 	Obsidian Troops
 	Argent   Troops
 }{
 	"node_north_fort": {
-		Obsidian: Troops{Cavalry: 4},
-		Argent:   Troops{Archer: 3},
+		Obsidian: Troops{Infantry: 2, Cavalry: 2},
 	},
 	"node_south_ferry": {
-		Obsidian: Troops{Infantry: 4},
-		Argent:   Troops{Cavalry: 4},
+		Obsidian: Troops{Infantry: 2, Archer: 2},
+		Argent:   Troops{Infantry: 2, Archer: 2},
 	},
 	"node_center_vault": {
-		Obsidian: Troops{Infantry: 5, Archer: 4},
-		Argent:   Troops{Infantry: 4, Cavalry: 5},
+		Obsidian: Troops{Infantry: 3, Archer: 3, Cavalry: 3},
+		Argent:   Troops{Infantry: 3, Archer: 3, Cavalry: 3},
 	},
 	"node_east_fort": {
-		Argent: Troops{Archer: 5},
+		Argent: Troops{Infantry: 2, Cavalry: 2},
 	},
 }

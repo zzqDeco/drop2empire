@@ -19,8 +19,12 @@ func (s *Service) BootstrapAdmin(ctx context.Context, password string) error {
 		if err != nil {
 			return err
 		}
+		upgraded := domain.UpgradePersistedWorldState(w)
 		for _, p := range w.Players {
 			if p.IsAdmin {
+				if upgraded {
+					return s.repo.SaveWorld(tx, w)
+				}
 				return nil
 			}
 		}

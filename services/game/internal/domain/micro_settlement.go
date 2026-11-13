@@ -131,7 +131,7 @@ func ComputeJobs(p *PlayerState) []ComputedJob {
 
 	// 4. Installed Workshop Equipment stack modifiers
 	for _, eq := range EquipmentCatalog {
-		stacks := int64(p.InstalledEquipments[eq.ItemKey])
+		stacks := int64(min(p.InstalledEquipments[eq.ItemKey], eq.MaxStack))
 		if stacks <= 0 {
 			continue
 		}
