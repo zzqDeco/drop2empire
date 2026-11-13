@@ -54,14 +54,14 @@ All player endpoints authenticate via the `Authorization: Bearer <session_token>
 
 | Method & Path | IDL Operation | Description |
 | :--- | :--- | :--- |
-| `POST /api/v1/empire/crafting/craft` | `CraftItem` | Crafts profession-exclusive devices or war armaments (`infantry_gear`, `archer_gear`, `cavalry_gear`) and pays the `2.0 Gold` crafting fee (entirely transferred to treasury). |
-| `POST /api/v1/empire/crafting/install` | `InstallEquipment` | Installs or removes a cross-profession device (`auto_pump`, `hermes_catalyst`, `astral_scroll`, `titan_tools`) in the player's 4-slot workshop rack. |
+| `POST /api/v1/empire/crafting/craft` | `CraftItem` | Crafts intermediate batches (`craft_iron_batch`, `craft_ration_batch`, `0 Gold`), war armaments (`craft_infantry_kit`, `craft_archer_kit`, `craft_cavalry_kit`, `0 Gold`), or permanent cross-profession workshop devices (`craft_auto_pump`, `craft_alch_catalyst`, `craft_enchant_scroll`, `craft_heavy_toolset`, `5.0 Gold` transferred to treasury). |
+| `POST /api/v1/empire/crafting/install` | `InstallEquipment` | Installs or removes a cross-profession device (`auto_pump`, `alch_catalyst`, `enchant_scroll`, `heavy_toolset`, max `3` stacks per type) in the player's 4-slot workshop rack. |
 | `POST /api/v1/empire/market/orders` | `PlaceMarketOrder` | Places a `BID` or `ASK` limit order on the CLOB spot market (supports resources, crafted devices, war gear, **unlearned raid blueprints `bp_*`**, and **S1 animated cosmetics `cos_*`**). |
 | `POST /api/v1/empire/market/orders/:id/cancel` | `CancelMarketOrder` | Cancels an open limit order and unfreezes escrowed gold or items. |
 | `POST /api/v1/empire/war/guild` | `SwitchGuild` | Switches allegiance between Obsidian (`OBSIDIAN`) and Argent (`ARGENT`) chambers. |
-| `POST /api/v1/empire/war/guild-action` | `GuildAction` | Executes a guild operation (`join`, `create`, `donate_supplies`, `donate_gold`, `set_rally`). |
+| `POST /api/v1/empire/war/guild-action` | `GuildAction` | Executes a guild operation (`join`, `create`, `donate_supplies`, `donate_gold`, `donate_heavy_pack`, `donate_precision_pack`, `set_rally`). |
 | `POST /api/v1/empire/war/deploy` | `DeployWarTroops` | Deploys infantry, archer, and cavalry regiments under the player's joined Guild to a connected war node (up to 100 daily budget points; grants `+5` bonus activity points when deploying to the Guild's `rallyNodeId`). |
-| `POST /api/v1/empire/season/redeem-chest` | `RedeemSeasonChest` | Spends `80` war activity points to mint a procedural UV-etched collectible relic (`S1·墨械典藏宝箱`). |
+| `POST /api/v1/empire/season/redeem-chest` | `RedeemSeasonChest` | Spends `100` war activity points (`ChestRedeemCostPoints`) to redeem `1 × S1·墨械宝箱` (`season_chest`), which can then be opened (`POST /api/v1/empire/season/open-chest`) to mint a procedural UV-etched collectible relic. |
 
 ---
 
@@ -114,7 +114,7 @@ A requested edict or mechanism with flat per-second resource drain (`night_shift
 
 - `build_facility`: `option` empty for ordinary construction, or a workpack key for level-two alternative costs.
 - `craft`: `target` consumable key, `quantity` 1–20 batches; exclusive profession and paid facility required. The old crafting route rejects these recipes.
-- `use`: `target` consumable key, `option` war node ID when applicable. Raid-use items must instead use the sequenced RaidAction `use_consumable` with `itemKey` (blink additionally `dx/dy` exactly ±2 on one axis).
+- `use`: `target` consumable key (or corporate workpack key `heavy_workpack` / `precision_workpack` for war-node engineering support), `option` war node ID when applicable. Raid-use items must instead use the sequenced RaidAction `use_consumable` with `itemKey` (blink additionally `dx/dy` exactly ±2 on one axis).
 - `subscribe`: `target` company ID, `quantity` integer shares; real cash moves into IPO escrow.
 - `propose`: `target` company ID and complete `CompanyPlanDTO` (`route`, `activeLines`, `askPriceBasis`, `inputBudgetBasis`, `pack`, `expandWith`, `dividendBasis`, `capitalBudgetBasis`). `expandWith=""` preserves any pending expansion; a workpack key creates/replaces the pending project; `"cancel"` requires a pending project and zero capital budget.
 - `vote`: company ID, exact `voteId`, `approve`; only snapshot weights count.

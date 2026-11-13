@@ -3,7 +3,7 @@
 > **层级定位**：`03-micro`（微观设计层 · 单局 2D 搜打撤肉鸽核心规则与行前增益卡库）  
 > **职责边界**：定义 2D 多区块传送门互联地图、实时沙暴倒计时、移动最大频率冷却、五档宝箱读条交互、安全保险箱死亡保底机制、一次性可交易蓝图研习/销毁规则，以及 54 种行前增益卡轮抽机制。  
 > **注**：当季专属的高阶装备目录 (`16 Raid Gear Specs`)、10 种一次性蓝图 (`bp_*`) 与 12 款限定动态外观 (`cos_*`) 掉率归属 [`04-seasons/s1-obsidian-awakening.md`](../04-seasons/s1-obsidian-awakening.md)。  
-> **代码映射**：[`services/game/internal/domain/balance_raid_s1.go`](../../../services/game/internal/domain/balance_raid_s1.go)、[`services/game/internal/domain/micro_raid.go`](../../../services/game/internal/domain/micro_raid.go)、[`apps/web/src/WastelandRaidPanel.tsx`](../../../apps/web/src/WastelandRaidPanel.tsx)
+> **代码映射**：[`services/game/internal/domain/balance_raid_s1.go`](../../../services/game/internal/domain/balance_raid_s1.go)、[`services/game/internal/domain/micro_raid.go`](../../../services/game/internal/domain/micro_raid.go)、[`apps/web/src/WastelandRaidPanel.tsx`](../../../apps/web/src/WastelandRaidPanel.tsx)、[`apps/web/src/features/raid/RaidBattlefieldViewport.tsx`](../../../apps/web/src/features/raid/RaidBattlefieldViewport.tsx)
 
 ---
 
@@ -11,29 +11,29 @@
 
 为杜绝客户端伪造战利品或透视战争迷雾，单局荒原 2D 搜打撤采用**纯服务端权威状态机 (`ActiveRaidSession`)**：
 - **服务端地图生成与迷雾裁剪 (`Fog-of-War Server Clipping`)**：`StartRaid` 时由服务端生成 4 区块异构尺寸（`11×7 / 9×9 / 10×8 / 8×8`）地图网格 (`RaidZoneState`)；在序列化响应 DTO (`RaidZoneViewDTO`) 时，所有 `Explored == false` 的格子统一被服务端脱敏裁剪为 `kind: "fog"`，客户端无法通过抓包获知未探明区域的宝箱或游商坐标。
-- **步进式意图校验 (`POST /api/v1/empire/colony/raid/action`)**：前端仅发送玩家动作意图（`MOVE` / `LOOT_TILE` / `TAKE_CHEST_ITEM` / `MOVE_TO_SAFEBOX` / `USE_POTION` / `BUY_MERCHANT`），由服务端逐格校验曼哈顿距离 (`|Δx| + |Δy| == 1`)、墙体阻挡、实时沙暴倒计时 (`ExpiresAtUnixMs`)、CSPRNG 宝箱掉落以及安全保险箱/随身背囊容量。
-- **权威撤离判定 (`POST /api/v1/empire/colony/raid/finish`)**：`FinishRaidReq` 不接受任何客户端战利品数组；当 `status == "EXTRACTED"` 时，服务端强制校验玩家当前坐标是否处于撤离信标 (`extract`) 格或相邻 1 格内，并仅结算服务端 `ActiveRaidSession` 中真实获取的背囊与安全箱战利品。
+- **步进式意图校验 (`POST /api/v1/empire/colony/raid/action`)**：前端仅发送玩家动作意图（`move` / `open_chest` / `use_portal` / `transfer_loot` / `loot_all` / `drink_potion` / `use_consumable` / `merchant_buy`），由服务端逐格校验曼哈顿距离 (`|Δx| + |Δy| == 1`)、墙体阻挡、实时沙暴倒计时 (`ExpiresAtUnixMs`)、CSPRNG 宝箱掉落以及安全保险箱/随身背囊容量。
+- **权威撤离判定 (`POST /api/v1/empire/colony/raid/finish`)**：`FinishRaidReq` 不接受任何客户端战利品数组；当 `outcome == "extract"` 时，服务端强制校验玩家当前坐标是否精确站立在开放撤离信标格（`extract_early` 或 `extract_deep`）并已完成 `2.80 秒` 读条，仅结算服务端 `ActiveRaidSession` 中真实获取的背囊与安全箱战利品。外围早期信标 (`extract_early`) 在剩余时间 `< 60 秒` (`EarlyExtractCutoffSec = 60`) 时关闭，迫使深潜搜刮者前往南境迷林或核心圣殿的深层信标 (`extract_deep`) 撤离。
 
 ---
 
 ## 1. 多区块传送门连接 2D 地图架构 (`Multi-Zone Portal Topology`)
 
-摒弃固定尺寸单图，每次点击【启程潜入荒原】(`StartRaid`) 时，系统基于权威随机种子 (`ActiveRaidSeed`) 生成 **4 个尺寸各异、由双向裂隙传送门 (`Portal 🌀`) 互联的 2D 生态区块**：
+摒弃固定尺寸单图，每次点击【启程潜入荒原】(`StartRaid`) 时，系统基于权威随机种子生成 **4 个尺寸各异、由双向裂隙传送门 (`Portal 🌀`) 互联的 2D 生态区块**：
 
 ```mermaid
 flowchart LR
-  Z0["Zone 0 · 外围：沙暴荒原 (11×7)\n🚁 出生撤离信标 · 📦 木箱/军需箱"] <-->|🌀 北裂隙传送门| Z1["Zone 1 · 北境：断崖古矿坑 (9×9)\n🧰 军需箱/机关石棺 · ⚔️ 矿道重甲守卫"]
-  Z0 <-->|🌀 南裂隙传送门| Z2["Zone 2 · 南境：枯木迷林 (10×8)\n🧙 黑市游商 · 💧 绿洲甘泉 · ⚱️ 机关石棺"]
-  Z1 <-->|🌀 深渊传送门 A| Z3["Zone 3 · 核心：沉没黑曜圣殿 (8×8)\n💎 深渊黑曜秘宝库 · 👹 黑曜圣殿巨像 · 🚁 紧急信标"]
+  Z0["Zone 0 · 外围：沙暴荒原 (11×7)\n🚁 早期信标 (>60s) · 🧙 游商 · 📦 木箱/军需箱"] <-->|🌀 北裂隙传送门| Z1["Zone 1 · 北境：断崖古矿坑 (9×9)\n🧙 黑市游商 · 🧰 军需箱/机关石棺 · ⚔️ 岩甲沙虫"]
+  Z0 <-->|🌀 南裂隙传送门| Z2["Zone 2 · 南境：枯木迷林 (10×8)\n💧 绿洲甘泉 · 🚁 深层信标 · ⚱️ 机关石棺"]
+  Z1 <-->|🌀 深渊传送门 A| Z3["Zone 3 · 核心：沉没黑曜圣殿 (8×8)\n💎 深渊黑曜秘宝库 · 👹 墨械圣殿重装巨像 · 🚁 深层信标"]
   Z2 <-->|🌀 深渊传送门 B| Z3
 ```
 
 | 区块编号 | 区块名称 (`zoneName`) | 网格尺寸 (`W × H`) | 战争迷雾视野 | 核心探索交互物与生态定位 |
 | :---: | :--- | :---: | :---: | :--- |
-| `Zone 0` | **外围 · 沙暴荒原** | `11 × 7` | 基础半径 `2` | 初始出生点与常驻撤离信标 (`🚁`)；分布破旧木箱 (`📦`)、铁皮军需箱 (`🧰`) 与低阶沙匪 (`ATK 14`) |
-| `Zone 1` | **北境 · 断崖古矿坑** | `9 × 9` | 基础半径 `2` | 岩壁掩体密集；盛产铁皮军需箱 (`🧰`)、远古机关石棺 (`⚱️`) 与矿道重甲守卫 (`ATK 24`) |
-| `Zone 2` | **南境 · 枯木迷林** | `10 × 8` | 基础半径 `2` | 必刷**荒原黑市神秘游商 (`🧙`)**（可用局内古钱直接购买高阶蓝图或圣物匣）与恢复生命/时间的绿洲甘泉 (`💧`) |
-| `Zone 3` | **核心 · 沉没黑曜圣殿** | `8 × 8` | 基础半径 `2` | 高危终局圣殿；盘踞黑曜圣殿巨像 (`ATK 38`)，集中分布**深渊黑曜秘宝库 (`💎`)** 与一座高危紧急撤离信标 (`🚁`) |
+| `Zone 0` | **外围 · 沙暴荒原** | `11 × 7` | 基础半径 `2` | 初始出生点、常驻游商营帐 (`🧙`) 与外围早期撤离信标 (`extract_early`，剩余 `<60s` 关闭)；分布破旧木箱 (`📦`)、铁皮军需箱 (`🧰`) 与荒原劫掠者 (`HP 38 / ATK 9`) |
+| `Zone 1` | **北境 · 断崖古矿坑** | `9 × 9` | 基础半径 `2` | 岩壁掩体密集，驻有矿脉黑市游商 (`🧙`)；盛产铁皮军需箱 (`🧰`)、远古机关石棺 (`⚱️`) 与岩甲沙虫 (`HP 65 / ATK 14`) |
+| `Zone 2` | **南境 · 枯木迷林** | `10 × 8` | 基础半径 `2` | 设有恢复生命与探索时间的绿洲甘泉 (`💧 +45 HP / +25s`) 及全程开放的深层撤离信标 (`extract_deep`)；盘踞迷林猎手 (`HP 52 / ATK 12`) |
+| `Zone 3` | **核心 · 沉没黑曜圣殿** | `8 × 8` | 基础半径 `2` | 高危终局禁区；盘踞黑曜巡逻傀儡 (`HP 78 / ATK 16`) 与首领**墨械圣殿重装巨像 (`HP 135 / ATK 22`)**，固定生成 2 座**深渊黑曜秘宝库 (`💎`)**、1 座机关石棺与 1 座深层撤离信标 (`extract_deep`) |
 
 ### 1.1 全屏 2D 搜打撤战场与裂隙战术小地图 (`Full-Screen Battlefield & Tactical Radar Minimap`)
 - **全屏沉浸视口 (`.raid-fullscreen-viewport`)**：踏入裂隙后切换为全屏战场，左侧主区为动态适配当前区块 `W×H`（`--zone-cols` × `--zone-rows`，每格 `56px×56px`）的手绘矢量生态战棋盘（`.raid-map-grid`，含领主当前格高亮、相邻可交互格脉冲边框、确定性战损与致死告警微章、战争迷雾斜纹遮罩），底部设有一键饮用药剂快捷腰带与药效倒计时。
@@ -52,12 +52,13 @@ flowchart LR
 
 ### 2.2 移动最大频率限制 (`MoveCooldownMs`)
 - 玩家通过键盘 `W A S D` / 方向键或点击相邻格在 2D 网格上移动，每步移动受**最小冷却间隔 (`MoveCooldownMs`)** 限制：
-  $$\text{MoveCooldown}_{\text{effective}} = \max\left(95\text{ ms},\; \text{Base}_{360\text{ms}} - \Delta_{\text{boots}} - \Delta_{\text{buffs}} - \Delta_{\text{potion}}\right)$$
+  $$\text{MoveCooldown}_{\text{effective}} = \max\left(110\text{ ms},\; \text{Base}_{\text{boots}} \times (1 - \Delta_{\text{buffs}})\right)$$
+  （饮用【轻身疾行散】生效期间，有效移动冷却进一步压至 `GalePotionCooldownMs = 105 ms`。）
 - **移速手感阶梯**：
   - 赤足无靴基准：**`360 ms / 格`**（每秒最多移动 `2.78 格`）；
-  - 穿戴 T1【麻布疾行靴】：**`285 ms / 格`**；
-  - 穿戴 T2【墨械弹簧战靴】：**`215 ms / 格`**；
-  - 穿戴 T3【赫尔墨斯风行羽靴】+ 疾风药水/行军卡：最快可达 **`95 ~ 155 ms / 格`**（丝滑高速穿梭，抢在沙暴闭合前横跨四个区块）。
+  - 穿戴 T1【草编轻便履 / 厚底鹿皮行军靴】：**`310 ms / 265 ms / 格`**；
+  - 穿戴 T2【墨械弹簧战靴】：**`210 ms / 格`**；
+  - 穿戴 T3【赫尔墨斯风行羽靴】(`155 ms`) + 行军卡/疾行散：最快可达 **`105 ~ 110 ms / 格`**（丝滑高速穿梭，抢在沙暴闭合前横跨四个区块）。
 
 ### 2.3 五档交互目标搜索读条时间表 (`ChannelDurationMs`)
 当玩家移动到宝箱或撤离信标格时，自动开启**原地读条进度条**（读条期间若主动移动，读条立即中断重置）：

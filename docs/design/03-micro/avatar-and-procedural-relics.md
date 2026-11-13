@@ -2,7 +2,7 @@
 
 > **层级定位**：`03-micro`（微观设计层 · 纸墨工程制图角色动态渲染架构与程序化藏品生成算法）  
 > **职责边界**：定义领主个人纸墨蚀刻动态形象 (`LordAvatarSVG`) 的八层工程制图 SVG 动画系统、三场景投射（顶栏迷你徽章、领主衣橱工程图版、2D 搜打撤肉鸽地图实机棋子），以及战争活动点数铸造的 CS 式唯一编号 UV 蚀刻藏品 (`ProceduralRelicSVG`)。  
-> **代码映射**：[`apps/web/src/LordAvatarSVG.tsx`](../../../apps/web/src/LordAvatarSVG.tsx)、[`apps/web/src/WastelandRaidPanel.tsx`](../../../apps/web/src/WastelandRaidPanel.tsx)、[`apps/web/src/ProceduralRelicSVG.tsx`](../../../apps/web/src/ProceduralRelicSVG.tsx)
+> **代码映射**：[`apps/web/src/LordAvatarSVG.tsx`](../../../apps/web/src/LordAvatarSVG.tsx)、[`apps/web/src/features/raid/LordProfileWardrobeBar.tsx`](../../../apps/web/src/features/raid/LordProfileWardrobeBar.tsx)、[`apps/web/src/ProceduralRelicSVG.tsx`](../../../apps/web/src/ProceduralRelicSVG.tsx)
 
 ---
 
@@ -35,7 +35,7 @@
 
 ## 2. CS 式唯一序列号与随机 UV 采样藏品 (`ProceduralRelicSVG`)
 
-除荒原掉落的可交易穿戴式角色外观 (`cos_*`) 外，玩家参与每晚 20:00 商会领土战争获得 `80 战争活动积分` 后，可铸造具有**全球唯一递增 `item_id` 与确定性随机 UV 纹理参数**的【墨械典藏圣物】：
+除荒原掉落的可交易穿戴式角色外观 (`cos_*`) 外，玩家参与每晚 20:00 商会领土战争积累 `100 战争活动积分` (`ChestRedeemCostPoints = 100`) 后，可兑换并开启【S1·墨械宝箱】以铸造具有**全球唯一递增 `item_id` 与确定性随机 UV 纹理参数**的【墨械典藏圣物】：
 
 | 字段名 (`CollectibleItemDTO`) | 类型 | 生成规则与视觉映射 |
 | :--- | :--- | :--- |

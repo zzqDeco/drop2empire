@@ -77,11 +77,19 @@ func RunEconomyScenario(cfg EconomyScenario) (EconomySimulationReport, error) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	w := NewDefaultWorld(start)
 	w.Players = map[string]*PlayerState{}
+	w.Guilds = DefaultGuilds()
 	for i := 0; i < cfg.Players; i++ {
 		h := fmt.Sprintf("sim%03d", i)
 		p := NewBlankPlayer(h, start)
 		p.Profession = []string{ProfScientist, ProfAlchemist, ProfMage, ProfArtisan}[i%4]
 		w.Players[h] = p
+		targetGuild := "guild_obsidian_vanguard"
+		if i%2 == 1 {
+			targetGuild = "guild_argent_astral"
+		}
+		if err := PerformGuildAction(w, p, "join", targetGuild, "", "", "", "", start); err != nil {
+			return report, err
+		}
 	}
 	apply := func(p MonetaryPolicy) error { return ApplyMonetaryPolicy(w, p, start) }
 	if err := apply(MonetaryPolicy{ID: "sim-issue", Action: "issue", Amount: cfg.InitialPublicGold * GoldScale}); err != nil {
@@ -222,18 +230,32 @@ func RunEconomyScenario(cfg EconomyScenario) (EconomySimulationReport, error) {
 					if err := PlaceMarketOrder(w, p, k, "BID", price, n*1000, now.Add(time.Hour)); err != nil {
 						return report, err
 					}
-					consumed := p.ResourcesMilli[k] / 1000
-					p.ResourcesMilli[k] -= consumed * 1000
-					report.TerminalUnitsConsumed += consumed
-
+					donateAction := "donate_heavy_pack"
+					if k == ResPrecisionPack {
+						donateAction = "donate_precision_pack"
+					}
+					for p.ResourcesMilli[k] >= ResourceScale {
+						if err := PerformGuildAction(w, p, donateAction, "", "", "", "", "", now.Add(time.Hour)); err != nil {
+							return report, err
+						}
+						report.TerminalUnitsConsumed++
+					}
 				}
 			}
 		}
-		for _, p := range w.Players {
+		for _, h := range sortedKeys(w.Players) {
+			p := w.Players[h]
 			for _, k := range []string{ResHeavyPack, ResPrecisionPack} {
-				n := p.ResourcesMilli[k] / 1000
-				p.ResourcesMilli[k] -= n * 1000
-				report.TerminalUnitsConsumed += n
+				donateAction := "donate_heavy_pack"
+				if k == ResPrecisionPack {
+					donateAction = "donate_precision_pack"
+				}
+				for p.ResourcesMilli[k] >= ResourceScale {
+					if err := PerformGuildAction(w, p, donateAction, "", "", "", "", "", now.Add(time.Hour)); err != nil {
+						return report, err
+					}
+					report.TerminalUnitsConsumed++
+				}
 			}
 		}
 		if err := CheckEconomy(w); err != nil {

@@ -2,15 +2,124 @@ package domain
 
 import (
 	"fmt"
+	"math/big"
 	"sort"
 	"strings"
 	"time"
 )
 
+var legacyFictionalGuildHandles = map[string]bool{
+	"archon_demo":  true,
+	"墨匠·玄枢":     true,
+	"铁砧·墨衡":     true,
+	"重甲督军·岩罡":   true,
+	"燧火·赤锤":     true,
+	"星轨大导师·凛月":  true,
+	"银羽·星河":     true,
+	"翠玉炼金师·维克":  true,
+	"白银之翼":      true,
+}
+
+func hasWarEdge(edges []WarEdge, a, b string) bool {
+	for _, e := range edges {
+		if (e.FromNode == a && e.ToNode == b) || (e.FromNode == b && e.ToNode == a) {
+			return true
+		}
+	}
+	return false
+}
+
+// UpgradePersistedWorldState idempotently upgrades v1.2.0 persisted world snapshots
+// (10-edge war topology, asymmetric pre-war neutral garrisons, and fictional NPC guild members)
+// without disturbing live player accounts, balances, or active war history.
+func UpgradePersistedWorldState(w *WorldState) bool {
+	if w == nil {
+		return false
+	}
+	changed := false
+
+	if len(w.WarEdges) > 0 && !hasWarEdge(w.WarEdges, "node_south_ferry", "node_east_fort") {
+		w.WarEdges = DefaultWarEdges()
+		changed = true
+	}
+
+	if len(w.WarNodes) > 0 {
+		canonicalNodes := make(map[string]WarNodeState, 8)
+		for _, dn := range DefaultWarNodes() {
+			canonicalNodes[dn.NodeID] = dn
+		}
+		for i := range w.WarNodes {
+			n := &w.WarNodes[i]
+			def, ok := canonicalNodes[n.NodeID]
+			if !ok {
+				continue
+			}
+			if n.X != def.X || n.Y != def.Y {
+				n.X = def.X
+				n.Y = def.Y
+				changed = true
+			}
+			if len(w.WarHistory) == 0 &&
+				n.OwnerGuild == GuildNeutral &&
+				len(n.PlayerDeployed) == 0 &&
+				n.ObsidianTroops.Total() == 0 &&
+				n.ArgentTroops.Total() == 0 &&
+				n.NeutralGarrison != def.NeutralGarrison {
+				n.NeutralGarrison = def.NeutralGarrison
+				changed = true
+			}
+		}
+	}
+
+	if len(w.Guilds) > 0 {
+		canonicalGuilds := make(map[string]GuildState, 4)
+		for _, dg := range DefaultGuilds() {
+			canonicalGuilds[dg.GuildID] = dg
+		}
+		for i := range w.Guilds {
+			g := &w.Guilds[i]
+			filtered := make([]GuildMember, 0, len(g.Members))
+			pruned := false
+			for _, m := range g.Members {
+				if legacyFictionalGuildHandles[m.Handle] && (w.Players == nil || w.Players[m.Handle] == nil) {
+					pruned = true
+					continue
+				}
+				filtered = append(filtered, m)
+			}
+			if pruned {
+				g.Members = filtered
+				changed = true
+				if def, isStarter := canonicalGuilds[g.GuildID]; isStarter {
+					g.Announcement = def.Announcement
+					if len(g.Members) == 0 && g.TreasuryGoldBasis == 0 {
+						g.LeaderHandle = def.LeaderHandle
+						g.Level = 1
+						g.XP = 0
+						g.RallyNodeID = def.RallyNodeID
+					} else if len(g.Members) > 0 && legacyFictionalGuildHandles[g.LeaderHandle] && (w.Players == nil || w.Players[g.LeaderHandle] == nil) {
+						g.Members[0].Role = "会长"
+						g.LeaderHandle = g.Members[0].Handle
+					}
+				}
+			}
+		}
+	}
+
+	for _, p := range w.Players {
+		if MigrateInstalledEquipments(p) {
+			changed = true
+		}
+	}
+
+	return changed
+}
+
 func EnsureGuildState(w *WorldState) {
 	if len(w.Guilds) == 0 {
 		w.Guilds = DefaultGuilds()
 	}
+	UpgradePersistedWorldState(w)
 	if w.NextGuildSeq < 10 {
 		w.NextGuildSeq = 10
 	}
@@ -19,6 +128,12 @@ func EnsureGuildState(w *WorldState) {
 		vet.GuildCode = GuildObsidian
 		if vet.GuildContribution == 0 {
 			vet.GuildContribution = 680
+		}
+		if g := FindGuild(w, "guild_obsidian_vanguard"); g != nil {
+			if len(g.Members) == 0 {
+				g.LeaderHandle = "archon_demo"
+			}
+			addOrUpdateGuildMember(g, "archon_demo", "会长", vet.GuildContribution, 0)
 		}
 	}
 }
@@ -104,7 +219,12 @@ func PerformGuildAction(w *WorldState, p *PlayerState, action, guildID, name, ta
 			return ErrNotFound("未找到目标公会")
 		}
 		removeMemberFromAllGuilds(w, p.Handle)
-		addOrUpdateGuildMember(g, p.Handle, "成员", 0, 0)
+		role := "成员"
+		if len(g.Members) == 0 {
+			role = "会长"
+			g.LeaderHandle = p.Handle
+		}
+		addOrUpdateGuildMember(g, p.Handle, role, 0, 0)
 		p.JoinedGuildID = g.GuildID
 		p.GuildCode = g.Faction
 		AppendLog(p, now, "WAR", fmt.Sprintf("已加入公会【[%s] %s】（所属商会：%s），现在可协同公会战友出兵争夺城池！",
@@ -227,6 +347,30 @@ func PerformGuildAction(w *WorldState, p *PlayerState, action, guildID, name, ta
 		p.ActivityPoints += MacroBalance.GuildDonateGoldPts
 		AppendLog(p, now, "WAR", fmt.Sprintf("向公会【%s】金库捐献 50 金币：公会经验 +%d，个人贡献 +%d，活动积分 +%d。",
 			g.Name, MacroBalance.GuildDonateGoldXP, MacroBalance.GuildDonateGoldContrib, MacroBalance.GuildDonateGoldPts))
+		return nil
+
+	case "donate_heavy_pack", "donate_precision_pack":
+		if p.JoinedGuildID == "" {
+			return ErrPrecondition("guild_required", "请先加入或创建一个公会")
+		}
+		g := FindGuild(w, p.JoinedGuildID)
+		if g == nil {
+			return ErrNotFound("当前所属公会不存在")
+		}
+		packKey := ResHeavyPack
+		if action == "donate_precision_pack" {
+			packKey = ResPrecisionPack
+		}
+		if p.ResourcesMilli[packKey] < ResourceScale {
+			return ErrPrecondition("insufficient_resources", fmt.Sprintf("公会高阶后勤捐献需：%s ×1", ResourceName(packKey)))
+		}
+		p.ResourcesMilli[packKey] -= ResourceScale
+		addGuildXP(g, MacroBalance.GuildDonateWorkpackXP)
+		addOrUpdateGuildMember(g, p.Handle, "成员", MacroBalance.GuildDonateWorkpackContrib, 0)
+		p.GuildContribution += MacroBalance.GuildDonateWorkpackContrib
+		p.ActivityPoints += MacroBalance.GuildDonateWorkpackPts
+		AppendLog(p, now, "WAR", fmt.Sprintf("向公会【%s】捐献企业产物【%s】×1：公会经验 +%d，个人贡献 +%d，活动积分 +%d。",
+			g.Name, ResourceName(packKey), MacroBalance.GuildDonateWorkpackXP, MacroBalance.GuildDonateWorkpackContrib, MacroBalance.GuildDonateWorkpackPts))
 		return nil
 
 	case "set_rally":
@@ -411,7 +555,50 @@ func DeployWarTroops(w *WorldState, p *PlayerState, nodeID string, infDelta, arc
 }
 
 func ComputeWeightedPower(side Troops, opp Troops, defenseBonusPct int32) int64 {
-	return computeCalibratedPower(side, opp, defenseBonusPct, false)
+	return computeWarPower(side, opp, defenseBonusPct, false, false)
+}
+
+func computeCalibratedPower(side Troops, opp Troops, defenseBonusPct int32, calibrated bool) int64 {
+	return computeWarPower(side, opp, defenseBonusPct, calibrated, false)
+}
+
+func ActiveFactionRallyBonusPct(w *WorldState, n WarNodeState, faction string) int32 {
+	if w == nil || len(n.PlayerDeployed) == 0 {
+		return 0
+	}
+	var best int32
+	for _, g := range w.Guilds {
+		if g.Faction != faction || g.RallyNodeID != n.NodeID {
+			continue
+		}
+		hasMember := false
+		for _, m := range g.Members {
+			if n.PlayerDeployed[m.Handle].Total() > 0 {
+				hasMember = true
+				break
+			}
+		}
+		if !hasMember {
+			continue
+		}
+		lvl := max(int32(1), g.Level)
+		bonus := MacroBalance.GuildRallyBaseBonusPct + lvl*MacroBalance.GuildRallyBonusPerLvlPct
+		if bonus > best {
+			best = bonus
+		}
+	}
+	return best
+}
+
+func WarRallySummary(w *WorldState, n WarNodeState) string {
+	var banners []string
+	if obs := ActiveFactionRallyBonusPct(w, n, GuildObsidian); obs > 0 {
+		banners = append(banners, fmt.Sprintf("黑曜战旗 +%d%%", obs))
+	}
+	if arg := ActiveFactionRallyBonusPct(w, n, GuildArgent); arg > 0 {
+		banners = append(banners, fmt.Sprintf("白银战旗 +%d%%", arg))
+	}
+	return strings.Join(banners, "，")
 }
 
 func EffectiveNodeDefenseBonus(n WarNodeState) int32 {
@@ -425,7 +612,7 @@ func EffectiveNodeDefenseBonus(n WarNodeState) int32 {
 func WarConsumableSummary(n WarNodeState) string {
 	var effects []string
 	for _, side := range []struct{ code, name string }{{GuildObsidian, "黑曜"}, {GuildArgent, "白银"}} {
-		for _, item := range []string{ResCalibration, ResMedic, ResWard} {
+		for _, item := range []string{ResCalibration, ResMedic, ResWard, ResHeavyPack, ResPrecisionPack} {
 			if n.Consumables[side.code+":"+item] {
 				effects = append(effects, side.name+"·"+ResourceName(item))
 			}
@@ -434,7 +621,7 @@ func WarConsumableSummary(n WarNodeState) string {
 	return strings.Join(effects, "，")
 }
 
-func computeCalibratedPower(side Troops, opp Troops, defenseBonusPct int32, calibrated bool) int64 {
+func computeWarPower(side Troops, opp Troops, defenseBonusPct int32, calibrated bool, precisionBoost bool) int64 {
 	totalSide := side.Total()
 	if totalSide <= 0 {
 		return 0
@@ -450,12 +637,22 @@ func computeCalibratedPower(side Troops, opp Troops, defenseBonusPct int32, cali
 			}
 		}
 	}
+	if precisionBoost {
+		for i := range kBps {
+			for j := range kBps[i] {
+				kBps[i][j] += MacroBalance.WarPrecisionPackCounterBonusBps
+			}
+		}
+	}
 	sArr := [3]int64{int64(side.Infantry), int64(side.Archer), int64(side.Cavalry)}
 	oArr := [3]int64{int64(opp.Infantry), int64(opp.Archer), int64(opp.Cavalry)}
 
 	var weightedMilli int64
 	if totalOpp <= 0 {
 		weightedMilli = int64(totalSide) * ResourceScale
+		if precisionBoost {
+			weightedMilli = (weightedMilli * (10000 + MacroBalance.WarPrecisionPackCounterBonusBps)) / 10000
+		}
 	} else {
 		var numer int64
 		for i := 0; i < 3; i++ {
@@ -502,6 +699,7 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 	if period <= w.LastWarPeriod {
 		return
 	}
+	EnsureGuildState(w)
 	w.LastWarPeriod = period
 	for i := range w.WarNodes {
 		n := &w.WarNodes[i]
@@ -529,11 +727,27 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 		neu := n.NeutralGarrison
 		defenseBonus := EffectiveNodeDefenseBonus(*n)
 		power := func(side, opp Troops, def int32, faction string) int64 {
-			return computeCalibratedPower(side, opp, def, n.Consumables[faction+":"+ResCalibration])
+			pMilli := computeWarPower(
+				side,
+				opp,
+				def,
+				n.Consumables[faction+":"+ResCalibration],
+				n.Consumables[faction+":"+ResPrecisionPack],
+			)
+			if rallyPct := ActiveFactionRallyBonusPct(w, *n, faction); rallyPct > 0 {
+				pMilli = (pMilli * int64(100+rallyPct)) / 100
+			}
+			if n.Consumables[faction+":"+ResHeavyPack] {
+				pMilli = (pMilli * int64(100+MacroBalance.WarHeavyPackPowerBonusPct)) / 100
+			}
+			return pMilli
 		}
 		lossRate := func(loss int32, faction string) int32 {
 			if n.Consumables[faction+":"+ResMedic] {
 				loss = max(int32(0), loss-5)
+			}
+			if n.Consumables[faction+":"+ResPrecisionPack] {
+				loss = max(int32(0), loss-MacroBalance.WarPrecisionPackLossReductionPct)
 			}
 			return loss
 		}
@@ -593,32 +807,26 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 				Cavalry:  obs.Cavalry + arg.Cavalry,
 			}, defenseBonus)
 			defMilli = neuDef
-			if obsAtk >= argAtk {
-				atkMilli = obsAtk
-				if obsAtk > neuDef && obs.Total() > 0 {
-					winner = GuildObsidian
-					n.ObsidianTroops = attrition(obs, winLoss, GuildObsidian)
-					n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
-					n.NeutralGarrison = Troops{}
-					casualtyText = "黑曜商会击败中立守军与竞争者，夺取城池控制权"
-				} else if obs.Total() > 0 || arg.Total() > 0 {
-					n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
-					n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
-					n.NeutralGarrison = ApplyAttrition(neu, winLoss)
-					casualtyText = fmt.Sprintf("进攻火力未突破中立城防（+%d%%），双方部队受创撤退", defenseBonus)
-				}
-			} else {
-				atkMilli = argAtk
-				if argAtk > neuDef && arg.Total() > 0 {
-					winner = GuildArgent
-					n.ArgentTroops = attrition(arg, winLoss, GuildArgent)
-					n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
-					n.NeutralGarrison = Troops{}
-					casualtyText = "白银同盟击败中立守军与竞争者，夺取城池控制权"
+			atkMilli = max(obsAtk, argAtk)
+			if obsAtk > argAtk && obsAtk > neuDef && obs.Total() > 0 {
+				winner = GuildObsidian
+				n.ObsidianTroops = attrition(obs, winLoss, GuildObsidian)
+				n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
+				n.NeutralGarrison = Troops{}
+				casualtyText = "黑曜商会击败中立守军与竞争者，夺取城池控制权"
+			} else if argAtk > obsAtk && argAtk > neuDef && arg.Total() > 0 {
+				winner = GuildArgent
+				n.ArgentTroops = attrition(arg, winLoss, GuildArgent)
+				n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
+				n.NeutralGarrison = Troops{}
+				casualtyText = "白银同盟击败中立守军与竞争者，夺取城池控制权"
+			} else if obs.Total() > 0 || arg.Total() > 0 {
+				n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
+				n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
+				n.NeutralGarrison = ApplyAttrition(neu, winLoss)
+				if obsAtk == argAtk && obsAtk > neuDef {
+					casualtyText = "黑曜与白银进攻火力完全持平，双方激战拉锯未能夺取城池"
 				} else {
-					n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
-					n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
-					n.NeutralGarrison = ApplyAttrition(neu, winLoss)
 					casualtyText = fmt.Sprintf("进攻火力未突破中立城防（+%d%%），双方部队受创撤退", defenseBonus)
 				}
 			}
@@ -654,36 +862,81 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 	w.ArgentScore += argDelta
 
 	var activeEarned int32
+	var activePaidBasis int64
 	activeSubmitted := activePlayer.DailyWarBudgetUsed
-	// Stable handle order makes a limited treasury deterministic.
+	// Stable handle order + pro-rata integer Basis payout eliminates alphabetical starvation.
 	handles := make([]string, 0, len(w.Players))
 	for handle := range w.Players {
 		handles = append(handles, handle)
 	}
 	sort.Strings(handles)
+
+	type participantClaim struct {
+		handle    string
+		wantBasis int64
+	}
+	claims := make([]participantClaim, 0, len(handles))
+	var totalWantBasis int64
+
 	for _, handle := range handles {
 		p := w.Players[handle]
-		if p.DailyWarBudgetUsed <= 0 || p.Profession == ProfNone || FindGuild(w, p.JoinedGuildID) == nil {
+		g := FindGuild(w, p.JoinedGuildID)
+		if p.DailyWarBudgetUsed <= 0 || p.Profession == ProfNone || g == nil {
 			p.DailyWarBudgetUsed = 0
 			continue
 		}
-		basePts := MacroBalance.WarLoserBasePts
-		if (p.GuildCode == GuildObsidian && obsDelta >= argDelta) || (p.GuildCode == GuildArgent && argDelta > obsDelta) {
-			basePts = MacroBalance.WarWinnerBasePts
+		var basePts int32
+		switch {
+		case obsDelta > argDelta:
+			if p.GuildCode == GuildObsidian {
+				basePts = MacroBalance.WarWinnerBasePts
+			} else {
+				basePts = MacroBalance.WarLoserBasePts
+			}
+		case argDelta > obsDelta:
+			if p.GuildCode == GuildArgent {
+				basePts = MacroBalance.WarWinnerBasePts
+			} else {
+				basePts = MacroBalance.WarLoserBasePts
+			}
+		default:
+			basePts = MacroBalance.WarTieBasePts
 		}
 		contribPts := p.DailyWarBudgetUsed * MacroBalance.WarPtsPerUnitDeployed
-		earned := basePts + contribPts
+		guildBonusPts := max(int32(1), g.Level) * MacroBalance.GuildWarPtsPerLvl
+		earned := basePts + contribPts + guildBonusPts
 		p.ActivityPoints += earned
 
-		stipend := (MacroBalance.WarBaseStipendGold + int64(p.DailyWarBudgetUsed)*MacroBalance.WarStipendGoldPerUnit) * GoldScale
-		if w.TreasuryHeldBasis >= stipend {
-			w.TreasuryHeldBasis -= stipend
-			p.GoldBasis += stipend
-		}
+		want := (MacroBalance.WarBaseStipendGold + int64(p.DailyWarBudgetUsed)*MacroBalance.WarStipendGoldPerUnit) * GoldScale
+		claims = append(claims, participantClaim{handle: handle, wantBasis: want})
+		totalWantBasis += want
+
 		if p.Handle == activePlayer.Handle {
 			activeEarned = earned
 		}
 		p.DailyWarBudgetUsed = 0
+	}
+
+	availableTreasury := w.TreasuryHeldBasis
+	if totalWantBasis > 0 && availableTreasury > 0 {
+		availBig := big.NewInt(availableTreasury)
+		totalBig := big.NewInt(totalWantBasis)
+		for _, c := range claims {
+			var paid int64
+			if availableTreasury >= totalWantBasis {
+				paid = c.wantBasis
+			} else {
+				num := new(big.Int).Mul(availBig, big.NewInt(c.wantBasis))
+				paid = num.Quo(num, totalBig).Int64()
+			}
+			if paid > 0 {
+				w.TreasuryHeldBasis -= paid
+				w.Players[c.handle].GoldBasis += paid
+				if c.handle == activePlayer.Handle {
+					activePaidBasis = paid
+				}
+			}
+		}
 	}
 
 	settlement := WarDaySettlement{
@@ -700,8 +953,13 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 		w.WarHistory = w.WarHistory[:MacroBalance.MaxWarHistoryEntries]
 	}
 
-	AppendLog(activePlayer, now, "WAR", fmt.Sprintf("★ 第 D%d 晚 20:00 商会战争结算完成！黑曜 +%d 分 / 白银 +%d 分，你获得 +%d 活动点数与财政军饷补贴。",
-		w.WarDay, obsDelta, argDelta, activeEarned))
+	if activeSubmitted > 0 && activeEarned > 0 {
+		AppendLog(activePlayer, now, "WAR", fmt.Sprintf("★ 第 D%d 晚 20:00 商会战争结算完成！黑曜 +%d 分 / 白银 +%d 分，你获得 +%d 活动点数，财政军饷实发 %.4f 金币。",
+			w.WarDay, obsDelta, argDelta, activeEarned, float64(activePaidBasis)/float64(GoldScale)))
+	} else {
+		AppendLog(activePlayer, now, "WAR", fmt.Sprintf("★ 第 D%d 晚 20:00 商会战争结算完成！黑曜 +%d 分 / 白银 +%d 分（本期未参战出兵）。",
+			w.WarDay, obsDelta, argDelta))
+	}
 
 	for i := range w.WarNodes {
 		w.WarNodes[i].PlayerDeployed = map[string]Troops{}

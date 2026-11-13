@@ -232,6 +232,28 @@ func ResetSettlementProgress(p *PlayerState) {
 	p.LastSettlementCommand = ""
 }
 
+// MigrateInstalledEquipments refunds any legacy installed workshop devices above MaxStack
+// back into the player's inventory so lowering MaxStack preserves item ownership and caps output.
+func MigrateInstalledEquipments(p *PlayerState) bool {
+	if p == nil || len(p.InstalledEquipments) == 0 {
+		return false
+	}
+	if p.ResourcesMilli == nil {
+		p.ResourcesMilli = map[string]int64{}
+	}
+	changed := false
+	for _, eq := range EquipmentCatalog {
+		cur := p.InstalledEquipments[eq.ItemKey]
+		if cur > eq.MaxStack {
+			excess := cur - eq.MaxStack
+			p.InstalledEquipments[eq.ItemKey] = eq.MaxStack
+			p.ResourcesMilli[eq.ItemKey] += int64(excess) * ResourceScale
+			changed = true
+		}
+	}
+	return changed
+}
+
 func EnsureSettlementState(p *PlayerState) {
 	if p.ResearchedTechnologies == nil {
 		p.ResearchedTechnologies = map[string]bool{}
@@ -244,6 +266,7 @@ func EnsureSettlementState(p *PlayerState) {
 			p.UnlockedBlueprints[b.EffectCode] = true
 		}
 	}
+	MigrateInstalledEquipments(p)
 	RefreshSettlementDiscovery(p)
 }
 
