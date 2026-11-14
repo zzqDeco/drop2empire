@@ -1,35 +1,38 @@
 # 微观设计 III：领主纸墨蚀刻动态立绘与程序化藏品 (Blueprint & Ink Animated Lord Avatar & Procedural Relics)
 
 > **层级定位**：`03-micro`（微观设计层 · 纸墨工程制图角色动态渲染架构与程序化藏品生成算法）  
-> **职责边界**：定义领主个人纸墨蚀刻动态形象 (`LordAvatarSVG`) 的八层工程制图 SVG 动画系统、三场景投射（顶栏迷你徽章、领主衣橱工程图版、2D 搜打撤肉鸽地图实机棋子），以及战争活动点数铸造的 CS 式唯一编号 UV 蚀刻藏品 (`ProceduralRelicSVG`)。  
-> **代码映射**：[`apps/web/src/LordAvatarSVG.tsx`](../../../apps/web/src/LordAvatarSVG.tsx)、[`apps/web/src/features/raid/LordProfileWardrobeBar.tsx`](../../../apps/web/src/features/raid/LordProfileWardrobeBar.tsx)、[`apps/web/src/ProceduralRelicSVG.tsx`](../../../apps/web/src/ProceduralRelicSVG.tsx)
+> **职责边界**：定义领主个人纸墨蚀刻动态形象 (`LordAvatarSVG`) 的八层工程制图 SVG 动画系统、荒原怪物手绘敌方图元 (`RaidTileSpriteSVG`)、三场景投射（顶栏迷你徽章、领主衣橱工程图版、2D 搜打撤肉鸽地图实机棋子），以及战争活动点数铸造的 CS 式唯一编号 UV 蚀刻藏品 (`ProceduralRelicSVG`)。  
+> **代码映射**：[`apps/web/src/LordAvatarSVG.tsx`](../../../apps/web/src/LordAvatarSVG.tsx)、[`apps/web/src/RaidSpritesSVG.tsx`](../../../apps/web/src/RaidSpritesSVG.tsx)、[`apps/web/src/features/raid/LordProfileWardrobeBar.tsx`](../../../apps/web/src/features/raid/LordProfileWardrobeBar.tsx)、[`apps/web/src/ProceduralRelicSVG.tsx`](../../../apps/web/src/ProceduralRelicSVG.tsx)
 
 ---
 
-## 1. 领主纸墨工程蚀刻动态立绘架构 (`LordAvatarSVG`)
+## 1. 领主纸墨手绘 2.5 头身动态探险家立绘架构 (`LordAvatarSVG`)
 
-为确保角色形象与全站 **Blueprint & Ink（纸墨工程制图 / 钢笔排线蚀刻风）** 视觉体系（[`apps/web/src/tokens.css`](../../../apps/web/src/tokens.css) 与 [`apps/web/src/ProceduralRelicSVG.tsx`](../../../apps/web/src/ProceduralRelicSVG.tsx)）严丝合缝，系统摒弃传统高饱和扁平卡通色块，采用**达芬奇手稿 / 墨械自动机（Clockwork Automaton）钢笔蚀刻立绘风格**：
+为确保角色形象兼具灵动生命力与全站 **Blueprint & Ink（纸墨工程制图风）** 视觉体系（[`apps/web/src/tokens.css`](../../../apps/web/src/tokens.css)、[`apps/web/src/theme/svgPalettes.ts`](../../../apps/web/src/theme/svgPalettes.ts) 与 [`apps/web/src/ProceduralRelicSVG.tsx`](../../../apps/web/src/ProceduralRelicSVG.tsx)）的统一质感，`LordAvatarSVG` 采用 **2.5 头身纸墨手绘灵动探险家（Hand-Inked Chibi Explorer）** 美术架构：
 
-- **自适应主题色板（CSS Tokens 驱动）**：直接绑定 `var(--text-strong)`（焦墨主线）、`var(--surface)` / `var(--surface-sunken)`（宣纸与沉降底纸）、`var(--seal-accent)`（朱砂印泥点缀）、`var(--warning-text)`（鎏金黄铜齿轮）与 `var(--success-text)`（氧化铜绿液冷管路），在「纸墨日间」与「曜石夜间」双主题下自动无损切换。
-- **三档钢笔排线纹理 (`<pattern>`)**：内置 `42°` 单向钢笔排线 (`#lordInkHatch`)、双角度正交建筑阴影排线 (`#lordCrossHatch`) 与 `-35°` 朱砂印泥排线 (`#lordSealHatch`)，赋予披风褶皱、肩甲切面与面甲阴影纯粹的版画质感。
-- **八层工程骨骼与动态机关叠加**（支持 `"profile" 124px`、`"token" 44px`、`"mini" 34px`）：
+- **非反相独立墨线色板 + 双主题背光适配**：角色本体的松烟墨勾线、暖肤色、靛青猎装、朱砂围巾、黄铜配件与紫曜微光描边统一定义于 [`apps/web/src/theme/svgPalettes.ts`](../../../apps/web/src/theme/svgPalettes.ts)（`LORD_ILLUSTRATION_PALETTE` 与 `RAID_CREATURE_PALETTE`），切至暗色主题时绝不出现“皮肤白描边 / 白靴反相”；外围工程制图画框绑定 CSS 语义 Token，并在角色身后叠加暖宣纸径向背光晕（`radialGradient`）保障暗色底板轮廓清晰度。
+- **真四向侧身与背影转体（`down` / `right` / `left` / `up`）**：
+  - `down`（正面立姿）：灵动高光瞳孔、错落碎发呆毛、飘逸朱砂围巾与 A 字探险猎装；
+  - `right` / `left`（真 3/4 侧身行军）：独立绘制侧转脸廓、单侧耳廓、向后扬起的风吹碎发与围巾飘带、前后错步战靴及前探持武姿态；
+  - `up`（真背面立姿）：完整层次后发发梢、背部围巾结带与大氅剪裁。
+- **八层穿戴与动态机关叠加**（支持 `"stage" 168px`、`"profile" 128px`、`"token" 48px`、`"mini" 36px`）：
 
 ```text
-[Layer 8: 机关随从层 Companion]  ──► 折纸发条蛙 / 达芬奇齿轮鸮 / 星轨朱砂机巧龙 (发条旋钮与悬浮游弋)
-[Layer 7: 右持圣物层 Held Relic] ──► 星盘罗经仪 / 八角铜绿炼金灯 / 陀螺仪雷霆杖 (指针摆动与双环自转)
-[Layer 6: 左持武器层 Weapon]     ──► 刻度燧石戟 / 机械滑轮弩 / 泰坦液压攻城锤 (钢笔排线刃面)
-[Layer 5: 头部冠冕层 Headgear]   ──► 测绘三角羽帽 / 十字准星双镜 / 擒纵轮蒸汽冠 / 黑曜浮空方尖冠
-[Layer 4: 棱面瓷墨面甲 Visage]   ──► 六棱测绘面甲 + 机械快门眨眼目镜 + 高领排线阴影
-[Layer 3: 胸甲与肩甲层 Cuirass]  ──► 铆钉板甲 / 黑曜六角虫壳甲 / 铜绿双表水压甲 + 胸口计时核心
-[Layer 2: 机械胫甲与战靴 Greaves]──► 膝部圆规铆钉关节 + 小腿黄铜扭簧 (弹簧靴) / 朱砂翼片 (赫尔墨斯靴)
-[Layer 1: 背部装置与星盘 Halo]   ──► 沙暴排线大氅 / 达芬奇液冷翼 / 六羽星盘翼 + 360° 自转星盘刻度环
-[Layer 0: 工程制图图框 Plate]    ──► (仅 Profile 模式) 双线制图外框、正交准星、游标角标、「FIG.01·LORD」钢印与朱砂方印
+[Layer 8: 机关随从层 Companion]  ──► 汲水发条木蛙 / 炼金机械猫头鹰 / 星界以太幼龙 (独立安全悬浮轨道，零遮挡武器)
+[Layer 7: 头部冠冕层 Headgear]   ──► 额前圆框黄铜防风护目镜 / 墨械蒸汽齿轮冠 / 曜石星辉浮空王冠
+[Layer 6: 面部与碎发层 Visage]   ──► 2.5 头身手绘圆润颌线、双层高光眼瞳与错落斜刘海/呆毛
+[Layer 5: 右手副持圣物 HeldRelic]──► 寻脉青铜罗盘 / 赫尔墨斯荧光提灯 / 双环陀螺仪泰坦雷鸣权杖
+[Layer 4: 左手主战武器 Weapon]   ──► 削尖硬木矛 / 燧石短猎弓 / 墨械连发手弩 / 银刃泰坦裂地重锤
+[Layer 3: 猎装与胸甲层 Cuirass]  ──► 靛青领主猎装 / 粗麻防沙衣 / 硬化木片甲 / 沙虫壳胸甲 / 水压动力重甲 + 朱砂围巾
+[Layer 2: 战靴层 Boots]          ──► 猎人皮靴 / 草编轻便履 / 厚底鹿皮靴 / 黄铜弹簧战靴 / 赫尔墨斯风行羽靴
+[Layer 1: 背部大氅与羽翼 Mantle] ──► 探险短披肩 / 沙行旅人斗篷 / 达芬奇水翼背甲 / 星界流光羽翼
+[Layer 0: 工程制图图框 Plate]    ──► 双线制图外框、游标角标、暖宣纸径向背光与透视石台底座
 ```
 
-### 三大显形场景
-1. **顶栏迷你徽章 (`size="mini"`)**：在页面顶部 `topbar` 品牌区实时展示玩家当前穿戴的纸墨蚀刻小人。
-2. **领主衣橱工程图版 (`size="profile"`)**：展示完整的 `124×124` 工程制图图版（含 `FIG.01·LORD` 编号与朱砂方印）及 12 款赛季限定外观 (`cos_*`) 换装台。
-3. **2D 荒原搜打撤地图实机棋子 (`size="token"`, `isMoving`)**：在 2D 多区块传送门荒原网格上直接渲染领主蚀刻棋子，移动时触发高频步伐起伏与阴影缩放。
+### 三大显形场景与荒原敌方生物图元
+1. **顶栏迷你徽章 (`size="mini"`)**：在页面顶部 `topbar` 品牌区实时展示玩家当前穿戴的纸墨手绘探险家小人。
+2. **领主衣橱工程图版 (`size="profile"` / `"stage"`)**：展示完整的双线工程制图图版及 12 款赛季限定外观 (`cos_*`) 换装台。
+3. **2D 荒原搜打撤地图实机棋子与手绘敌方三怪 (`size="token"`, `RaidTileSpriteSVG`)**：在 2D 多区块传送门荒原网格上渲染领主四向行军棋子，并与同色系手绘敌方图元——**荒原蒙面劫掠者**（弯刀与尖刺护肩）、**S 型盘踞岩甲沙虫**（四颚口器与腹甲节片）、**黑曜机巧巨像 Boss**（浮空碎岩拳套、自转黄铜星盘环与熔炉核心）形成高辨识度剪影对比。
 
 ---
 

@@ -61,7 +61,7 @@ export function RaidSettlementModal({
           <div className="subpanel-head">
             <h3>
               <Compass size={ICON.sm} />
-              <span>领主体素立绘与远征统计</span>
+              <span>领主纸墨立绘与远征统计</span>
             </h3>
           </div>
           <div className="raid-settlement-hero">

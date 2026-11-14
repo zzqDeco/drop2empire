@@ -214,7 +214,7 @@ export function LordProfileWardrobeBar({
   );
 
   return (
-    <section className="panel" aria-label="领主个人档案与体素衣橱">
+    <section className="panel" aria-label="领主个人档案与纸墨衣橱">
       <div className="panel-header">
         <div className="panel-title">
           <Award size={ICON.sm} />

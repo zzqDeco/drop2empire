@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { RaidBuffCardDTO } from "@drop2empire/api-client";
+import { RAID_CREATURE_PALETTE as C } from "./theme/svgPalettes";
 
 export type RaidTileSpriteKind =
   | "empty"
@@ -334,22 +335,20 @@ export function RaidTileSpriteSVG({
   // Monsters: enemy_raider, enemy_worm, enemy_boss
   if (defeated) {
     return (
-      <svg width="38" height="38" viewBox="0 0 40 40" aria-hidden="true">
-        <g opacity="0.45">
-          <rect
-            x="12"
-            y="14"
-            width="16"
-            height="14"
-            fill={sunken}
-            stroke={ink}
-            strokeWidth="1.4"
-          />
+      <svg width="38" height="38" viewBox="0 0 44 44" aria-hidden="true">
+        <g opacity="0.52">
+          <ellipse cx="22" cy="33" rx="13" ry="4" fill={sunken} stroke={ink} strokeWidth="1.2" />
+          {/* Cracked Skull / Shattered Automaton Mask Remnant */}
           <path
-            d="M15 19 L18 22 M18 19 L15 22 M22 19 L25 22 M25 19 L22 22"
-            stroke={ink}
-            strokeWidth="1.4"
+            d="M14 29 C13 21 17 16 23 16 C29 16 32 21 31 29 L27 31 L24 28 L20 31 Z"
+            fill={C.bone}
+            stroke={C.ink}
+            strokeWidth="1.6"
+            strokeLinejoin="round"
           />
+          <circle cx="19.5" cy="23.5" r="2" fill={C.ink} />
+          <circle cx="25.5" cy="23.5" r="2" fill={C.ink} />
+          <path d="M22 16 L20 21 L23 23" fill="none" stroke={C.ink} strokeWidth="1.2" />
         </g>
       </svg>
     );
@@ -357,96 +356,160 @@ export function RaidTileSpriteSVG({
 
   if (kind === "enemy_boss") {
     return (
-      <svg width="42" height="42" viewBox="0 0 40 40" aria-hidden="true">
-        {/* 2.5D Voxel Clockwork Obsidian Colossus Boss */}
-        <polygon
-          points="8,10 14,5 32,5 26,10"
-          fill={ink}
-          stroke={seal}
-          strokeWidth="1.4"
-        />
-        <rect
-          x="8"
-          y="10"
-          width="20"
-          height="22"
-          fill={paper}
-          stroke={ink}
-          strokeWidth="2"
-        />
-        <polygon
-          points="28,10 34,5 34,27 28,32"
-          fill={sunken}
-          stroke={ink}
+      <svg width="42" height="42" viewBox="0 0 48 48" aria-hidden="true">
+        {/* Hand-Inked Clockwork Obsidian Colossus Boss */}
+        <ellipse cx="24" cy="43" rx="16" ry="3.8" fill={C.shadowWash} />
+        {/* Spinning Brass Astrolabe Halo Behind Shoulders */}
+        <circle
+          cx="24"
+          cy="20"
+          r="15.5"
+          fill="none"
+          stroke={C.bossBrass}
           strokeWidth="1.6"
+          strokeDasharray="4 3"
+        >
+          <animateTransform
+            attributeName="transform"
+            type="rotate"
+            from="0 24 20"
+            to="360 24 20"
+            dur="9s"
+            repeatCount="indefinite"
+          />
+        </circle>
+        {/* Heavy Armored Pauldrons & Obsidian Torso */}
+        <path
+          d="M10 21 L16 15 L32 15 L38 21 L35 40 L28 42 L24 37.5 L20 42 L13 40 Z"
+          fill={C.bossArmor}
+          stroke={C.bossRim}
+          strokeWidth="1.5"
+          strokeLinejoin="round"
         />
-        {/* Horns */}
-        <polygon points="8,12 2,5 8,8" fill={seal} />
-        <polygon points="28,12 34,5 28,8" fill={seal} />
-        {/* Glowing Voxel Visor */}
-        <rect x="11" y="15" width="14" height="5" fill={ink} />
-        <rect x="13" y="16" width="4" height="3" fill={seal} />
-        <rect x="19" y="16" width="4" height="3" fill={seal} />
-        {/* Core */}
-        <polygon points="18,23 22,27 18,31 14,27" fill={seal} />
+        <path d="M7.5 21.5 L16 16.5 L15 26.5 L9 27.5 Z" fill={C.bossObsidian} stroke={C.bossRim} strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M40.5 21.5 L32 16.5 L33 26.5 L39 27.5 Z" fill={C.bossObsidian} stroke={C.bossRim} strokeWidth="1.3" strokeLinejoin="round" />
+        {/* Floating Crusher Gauntlets Flanking Left & Right */}
+        <path
+          d="M2.5 29 L8.5 27 L10.5 34 L7 38.5 L2.5 35.5 Z"
+          fill={C.bossObsidian}
+          stroke={C.bossRim}
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+        <line x1="4.5" y1="32" x2="8.5" y2="31.5" stroke={C.bossCore} strokeWidth="1.3" />
+        <path
+          d="M45.5 29 L39.5 27 L37.5 34 L41 38.5 L45.5 35.5 Z"
+          fill={C.bossObsidian}
+          stroke={C.bossRim}
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+        <line x1="43.5" y1="32" x2="39.5" y2="31.5" stroke={C.bossCore} strokeWidth="1.3" />
+        {/* Blazing Furnace Core */}
+        <polygon points="24,22.5 30,29.5 24,36.5 18,29.5" fill={C.bossCore} stroke={C.ink} strokeWidth="1.5" />
+        <polygon points="24,25.8 27,29.5 24,33.2 21,29.5" fill={C.bossCoreInner} />
+        {/* Horned Crowned Helm & Visor */}
+        <path
+          d="M15.5 18 L13.5 8.5 L19 12.5 L24 6 L29 12.5 L34.5 8.5 L32.5 18 Z"
+          fill={C.bossObsidian}
+          stroke={C.bossRim}
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+        <path d="M14 9 L8.5 4.5 L13 13 Z" fill={C.bossBrass} stroke={C.ink} strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M34 9 L39.5 4.5 L35 13 Z" fill={C.bossBrass} stroke={C.ink} strokeWidth="1.4" strokeLinejoin="round" />
+        <rect x="18" y="13.5" width="12" height="3.2" rx="1.2" fill={C.bossCore} />
       </svg>
     );
   }
 
   if (kind === "enemy_worm") {
     return (
-      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
-        {/* 2.5D Voxel Armored Carapace Sandworm */}
-        <rect
-          x="10"
-          y="18"
-          width="20"
-          height="14"
-          fill={sunken}
-          stroke={ink}
+      <svg width="40" height="40" viewBox="0 0 46 46" aria-hidden="true">
+        {/* Hand-Inked S-Coiled Armored Dune Sandworm */}
+        <ellipse cx="23" cy="39" rx="16.5" ry="4.5" fill={C.raiderHoodDark} stroke={C.ink} strokeWidth="1.6" />
+        {/* Cracked Sand Burrow Rubble Chunks */}
+        <polygon points="7,38 11,33 14,39" fill={C.wormShell} stroke={C.ink} strokeWidth="1.3" strokeLinejoin="round" />
+        <polygon points="39,38 35,33 32,39" fill={C.wormShell} stroke={C.ink} strokeWidth="1.3" strokeLinejoin="round" />
+        {/* S-Curved Chitinous Coiled Body */}
+        <path
+          d="M11 38 C9 31 15 28 24 27 C31 26 32 21 26 17 L19 13 C28 9 38 15 37 26 C36 33 31 37 27 38 Z"
+          fill={C.wormShell}
+          stroke={C.ink}
           strokeWidth="1.8"
+          strokeLinejoin="round"
         />
-        <rect
-          x="12"
-          y="10"
-          width="16"
-          height="10"
-          fill={paper}
-          stroke={ink}
-          strokeWidth="1.8"
+        {/* Segmented Underbelly & Dorsal Ridges */}
+        <path
+          d="M14 38 C14 31 21 29 27 27 C32 25 32 20 25 16 L20 16 C25 20 24 24 19 27 C13 30 11 34 14 38 Z"
+          fill={C.wormBelly}
+          stroke={C.ink}
+          strokeWidth="1.3"
+          strokeLinejoin="round"
         />
-        {/* Mandibles & Eyes */}
-        <polygon points="12,10 8,5 15,10" fill={brass} stroke={ink} strokeWidth="1.2" />
-        <polygon points="28,10 32,5 25,10" fill={brass} stroke={ink} strokeWidth="1.2" />
-        <rect x="15" y="13" width="3" height="3" fill={seal} />
-        <rect x="22" y="13" width="3" height="3" fill={seal} />
-        <line x1="10" y1="24" x2="30" y2="24" stroke={ink} strokeWidth="1.4" />
+        <path d="M29 16 L34 14 M31 21 L37 20 M30 27 L36 28" stroke={C.wormShellDark} strokeWidth="1.5" strokeLinecap="round" />
+        {/* Predatory Rearing Maw & 4 Bone Mandibles */}
+        <circle cx="19.5" cy="14.5" r="6.8" fill={C.wormMaw} stroke={C.ink} strokeWidth="1.8" />
+        <circle cx="19.5" cy="14.5" r="3.2" fill={C.crimsonEye} opacity="0.55" />
+        <path d="M14 11 L8 6.5 L15.5 8.5 Z" fill={C.bone} stroke={C.ink} strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M24.5 10.5 L29.5 5.5 L22.5 8 Z" fill={C.bone} stroke={C.ink} strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M13.5 17.5 L8 20.5 L15.5 19.5 Z" fill={C.bone} stroke={C.ink} strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M19.5 7.8 L19 2.8 L21.8 8 Z" fill={C.bone} stroke={C.ink} strokeWidth="1.3" strokeLinejoin="round" />
+        {/* Amber Cluster Eyes */}
+        <circle cx="16.5" cy="12.5" r="1.6" fill={C.amberEye} />
+        <circle cx="22.8" cy="12.5" r="1.6" fill={C.amberEye} />
       </svg>
     );
   }
 
-  // Default: enemy_raider (Voxel Wasteland Scavenger)
+  // Default: enemy_raider (Hunched Wasteland Masked Brigand with Spiked Pauldron & Notched Scimitar)
   return (
-    <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
-      <polygon
-        points="11,13 16,8 30,8 25,13"
-        fill={paper}
-        stroke={ink}
-        strokeWidth="1.5"
+    <svg width="40" height="40" viewBox="0 0 46 46" aria-hidden="true">
+      <ellipse cx="24" cy="40" rx="13" ry="3.5" fill={C.shadowWash} />
+      {/* Trailing Tattered Crimson Desert Scarf */}
+      <path
+        d="M29 22 L41 25 L38 29 L30 26 Z"
+        fill={C.raiderScarf}
+        stroke={C.ink}
+        strokeWidth="1.4"
+        strokeLinejoin="round"
       />
-      <rect
-        x="11"
-        y="13"
-        width="16"
-        height="18"
-        fill={paper}
-        stroke={ink}
+      {/* Curved Notched Scimitar Cleaver Held Forward */}
+      <path
+        d="M11 29 C5 24 4 15 9 9 L12.5 13 L10.5 16 L13 18.5 C11 22 12 26 14 28 Z"
+        fill={C.raiderSteel}
+        stroke={C.ink}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M8.5 13 C7 18 8 23 11.5 27" fill="none" stroke={C.raiderSteelDark} strokeWidth="1.3" />
+      <line x1="11.5" y1="27.5" x2="14.5" y2="34.5" stroke={C.raiderHoodDark} strokeWidth="2.4" strokeLinecap="round" />
+      {/* Hunched Brigand Cloak & Boots */}
+      <path d="M18 35 H22 V40 H17 Z M27 35 H31 V40 H27 Z" fill={C.raiderHoodDark} stroke={C.ink} strokeWidth="1.4" />
+      <path
+        d="M15 23 L32 23 L35 36 L27 35 L24 37.5 L20 35 L13 36 Z"
+        fill={C.raiderCloth}
+        stroke={C.ink}
         strokeWidth="1.8"
+        strokeLinejoin="round"
       />
-      <rect x="11" y="13" width="16" height="5" fill={ink} />
-      <rect x="14" y="20" width="4" height="3" fill={seal} />
-      <rect x="21" y="20" width="4" height="3" fill={seal} />
-      <line x1="6" y1="28" x2="14" y2="16" stroke={ink} strokeWidth="2" />
+      {/* Spiked Scrap-Iron Pauldron & Crimson Neck Wrap */}
+      <path d="M28 22 L36 20 L34 16 L38 18 L36 25 L29 25 Z" fill={C.raiderSteelDark} stroke={C.ink} strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M15 22.5 Q23.5 27 31.5 22.5 L30.5 26 Q23.5 29.5 16 26 Z" fill={C.raiderScarf} stroke={C.ink} strokeWidth="1.4" />
+      {/* Gloved Hand Gripping Hilt */}
+      <circle cx="13" cy="29.5" r="2.6" fill={C.raiderHoodDark} stroke={C.ink} strokeWidth="1.4" />
+      {/* Pointed Desert Bandit Hood & Respirator Mask */}
+      <path
+        d="M14 21 C14 11.5 19 6.5 26 5.5 L28.5 9.5 C31.5 11.5 33 16.5 32 21.5 C27 24.5 19 24.5 14 21 Z"
+        fill={C.raiderHood}
+        stroke={C.ink}
+        strokeWidth="1.9"
+        strokeLinejoin="round"
+      />
+      <ellipse cx="23" cy="18" rx="7.2" ry="4.8" fill={C.raiderMask} stroke={C.ink} strokeWidth="1.4" />
+      {/* Glowing Slanted Crimson Bandit Eyes */}
+      <polygon points="17.8,17.2 22,18 21.2,19.6 18.2,19.1" fill={C.crimsonEye} />
+      <polygon points="28.2,17.2 24,18 24.8,19.6 27.8,19.1" fill={C.crimsonEye} />
     </svg>
   );
 }
