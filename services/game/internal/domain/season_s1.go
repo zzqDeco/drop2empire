@@ -47,7 +47,8 @@ func OpenSeasonChest(w *WorldState, p *PlayerState, _ int64, now time.Time) erro
 	rawSeed ^= rawSeed >> 27
 	rawSeed *= 0x94d049bb133111eb
 	rawSeed ^= rawSeed >> 31
-	patternSeed := int64(rawSeed & 0x7fffffffffffff)
+	// Keep within IEEE-754 JS safe integer range (<= 2^53 - 1 = 0x1fffffffffffff) so JSON numbers never lose precision.
+	patternSeed := int64(rawSeed & 0x1fffffffffffff)
 	if patternSeed < 100000 {
 		patternSeed += 100000
 	}

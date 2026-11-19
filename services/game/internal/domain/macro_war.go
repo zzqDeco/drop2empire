@@ -768,12 +768,12 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 					winner = GuildArgent
 					n.ArgentTroops = attrition(arg, winLoss, GuildArgent)
 					n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
-					casualtyText = fmt.Sprintf("白银同盟攻破城防（胜方战损 %d%%，守军战损 %d%%）", lossRate(winLoss, GuildArgent), lossRate(loseLoss, GuildObsidian))
+					casualtyText = fmt.Sprintf("白银同盟攻破城防（胜方战损 %d%%、败方战损 %d%%；双方残部均继续留驻本据点归入各自阵营驻军）", lossRate(winLoss, GuildArgent), lossRate(loseLoss, GuildObsidian))
 				} else {
 					winner = GuildObsidian
 					n.ObsidianTroops = attrition(obs, winLoss, GuildObsidian)
 					n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
-					casualtyText = fmt.Sprintf("黑曜商会依托 +%d%% 城防成功守住节点（守军战损 %d%%，攻方战损 %d%%）", defenseBonus, lossRate(winLoss, GuildObsidian), lossRate(loseLoss, GuildArgent))
+					casualtyText = fmt.Sprintf("黑曜商会依托 +%d%% 城防成功守住节点（守军战损 %d%%、攻方战损 %d%%；双方残部均继续留驻本据点归入各自阵营驻军）", defenseBonus, lossRate(winLoss, GuildObsidian), lossRate(loseLoss, GuildArgent))
 				}
 			} else {
 				defMilli = power(obs, Troops{}, defenseBonus, GuildObsidian)
@@ -787,12 +787,12 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 					winner = GuildObsidian
 					n.ObsidianTroops = attrition(obs, winLoss, GuildObsidian)
 					n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
-					casualtyText = fmt.Sprintf("黑曜商会攻克城池（胜方战损 %d%%，守军战损 %d%%）", lossRate(winLoss, GuildObsidian), lossRate(loseLoss, GuildArgent))
+					casualtyText = fmt.Sprintf("黑曜商会攻克城池（胜方战损 %d%%、败方战损 %d%%；双方残部均继续留驻本据点归入各自阵营驻军）", lossRate(winLoss, GuildObsidian), lossRate(loseLoss, GuildArgent))
 				} else {
 					winner = GuildArgent
 					n.ArgentTroops = attrition(arg, winLoss, GuildArgent)
 					n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
-					casualtyText = fmt.Sprintf("白银同盟依托 +%d%% 城防击退进攻（守军战损 %d%%，攻方战损 %d%%）", defenseBonus, lossRate(winLoss, GuildArgent), lossRate(loseLoss, GuildObsidian))
+					casualtyText = fmt.Sprintf("白银同盟依托 +%d%% 城防击退进攻（守军战损 %d%%、攻方战损 %d%%；双方残部均继续留驻本据点归入各自阵营驻军）", defenseBonus, lossRate(winLoss, GuildArgent), lossRate(loseLoss, GuildObsidian))
 				}
 			} else {
 				defMilli = power(arg, Troops{}, defenseBonus, GuildArgent)
@@ -813,21 +813,21 @@ func SettleWarDay(w *WorldState, activePlayer *PlayerState, now time.Time) {
 				n.ObsidianTroops = attrition(obs, winLoss, GuildObsidian)
 				n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
 				n.NeutralGarrison = Troops{}
-				casualtyText = "黑曜商会击败中立守军与竞争者，夺取城池控制权"
+				casualtyText = "黑曜商会击败中立守军与竞争者，夺取城池控制权（双方残部继续留驻本据点归入各自阵营驻军）"
 			} else if argAtk > obsAtk && argAtk > neuDef && arg.Total() > 0 {
 				winner = GuildArgent
 				n.ArgentTroops = attrition(arg, winLoss, GuildArgent)
 				n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
 				n.NeutralGarrison = Troops{}
-				casualtyText = "白银同盟击败中立守军与竞争者，夺取城池控制权"
+				casualtyText = "白银同盟击败中立守军与竞争者，夺取城池控制权（双方残部继续留驻本据点归入各自阵营驻军）"
 			} else if obs.Total() > 0 || arg.Total() > 0 {
 				n.ObsidianTroops = attrition(obs, loseLoss, GuildObsidian)
 				n.ArgentTroops = attrition(arg, loseLoss, GuildArgent)
 				n.NeutralGarrison = ApplyAttrition(neu, winLoss)
 				if obsAtk == argAtk && obsAtk > neuDef {
-					casualtyText = "黑曜与白银进攻火力完全持平，双方激战拉锯未能夺取城池"
+					casualtyText = "黑曜与白银进攻火力完全持平，双方激战拉锯未能夺取城池（双方残部继续留驻本据点）"
 				} else {
-					casualtyText = fmt.Sprintf("进攻火力未突破中立城防（+%d%%），双方部队受创撤退", defenseBonus)
+					casualtyText = fmt.Sprintf("进攻火力未突破中立城防（+%d%%），攻方受创且残部继续留驻本据点等待次日增援", defenseBonus)
 				}
 			}
 		}

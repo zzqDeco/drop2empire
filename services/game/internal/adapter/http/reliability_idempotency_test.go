@@ -220,3 +220,57 @@ func TestCreateInviteIdempotencyReplayPreservesPlaintextCodeAndEnforcesAdmin(t *
 		t.Fatalf("expected 403 Forbidden for non-admin invite replay, got %d: %s", recForbidden.Code, recForbidden.Body.String())
 	}
 }
+
+func TestDashboardExposesExactArtisanOutputAndLegacyPatternSeedText(t *testing.T) {
+	now := time.Now().UTC()
+	w := domain.NewDefaultWorld(now)
+	p := w.Players["archon_demo"]
+	p.Profession = domain.ProfArtisan
+	const legacy55BitSeed int64 = 29723401198431597 // > Number.MAX_SAFE_INTEGER (2^53 - 1)
+	w.Collectibles = append([]domain.CollectibleItem{{
+		ItemID:       "d2e-s1-0001-legacy",
+		SerialNumber: 1,
+		SeasonID:     w.SeasonCode,
+		Name:         "黑曜星盘 | 墨金蚀刻 #001",
+		PatternSeed:  legacy55BitSeed,
+		RarityTier:   "EPIC",
+		OwnerHandle:  p.Handle,
+	}}, w.Collectibles...)
+	w.Sessions["tok_demo"] = "archon_demo"
+
+	mem := &fakeMemStore{w: w}
+	h := NewHTTPHandler(app.NewService(mem, mem), nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/empire/state", nil)
+	req.Header.Set("X-Session-Token", "tok_demo")
+	req.Header.Set("X-Admin-Tunnel", "0")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /state failed: %s", rec.Body.String())
+	}
+	var dash empire.DashboardStateResp
+	if err := json.Unmarshal(rec.Body.Bytes(), &dash); err != nil {
+		t.Fatal(err)
+	}
+
+	foundArtisanInf := false
+	for _, rc := range dash.Recipes {
+		if rc.RecipeCode == "craft_infantry_kit" {
+			foundArtisanInf = true
+			if rc.OutputAmountMilli != 2500 {
+				t.Fatalf("expected Artisan craft_infantry_kit outputAmountMilli=2500, got %d", rc.OutputAmountMilli)
+			}
+		}
+	}
+	if !foundArtisanInf {
+		t.Fatal("expected craft_infantry_kit in dashboard recipes")
+	}
+
+	if len(dash.Collectibles) == 0 || dash.Collectibles[0].PatternSeedText == nil {
+		t.Fatalf("expected patternSeedText on CollectibleItemDTO, got %+v", dash.Collectibles)
+	}
+	if *dash.Collectibles[0].PatternSeedText != "29723401198431597" {
+		t.Fatalf("expected exact legacy 55-bit decimal seed text, got %q", *dash.Collectibles[0].PatternSeedText)
+	}
+}
