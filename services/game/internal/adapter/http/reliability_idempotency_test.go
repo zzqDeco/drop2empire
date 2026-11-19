@@ -142,3 +142,81 @@ func TestSinglePlayerPathIsolatesBystanderAndPopulatesServerTimestamps(t *testin
 		t.Fatalf("expected bystander revision to remain untouched at 42 after archon raid start, got %d", bystander.Revision)
 	}
 }
+
+func TestCreateInviteIdempotencyReplayPreservesPlaintextCodeAndEnforcesAdmin(t *testing.T) {
+	now := time.Now().UTC()
+	w := domain.NewDefaultWorld(now)
+	domain.EnsureDefaultAccounts(w, now)
+	w.Sessions["tok_admin"] = "admin"
+	w.Sessions["tok_player"] = "archon_demo"
+	initialInvites := len(w.Invites)
+
+	mem := &fakeMemStore{w: w}
+	svc := app.NewService(mem, mem)
+	h := NewHTTPHandler(svc, nil)
+
+	postInvite := func(handler http.Handler, token, idemKey string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/empire/admin/invites", strings.NewReader(`{}`))
+		req.Header.Set("X-Session-Token", token)
+		req.Header.Set("X-Admin-Tunnel", "1")
+		if idemKey != "" {
+			req.Header.Set("X-Idempotency-Key", idemKey)
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// 1. Admin creates an invite with X-Idempotency-Key and replays the exact same request
+	rec1 := postInvite(h, "tok_admin", "invite-click-1")
+	if rec1.Code != http.StatusOK {
+		t.Fatalf("first invite creation failed (%d): %s", rec1.Code, rec1.Body.String())
+	}
+	var resp1 empire.DashboardStateResp
+	if err := json.Unmarshal(rec1.Body.Bytes(), &resp1); err != nil {
+		t.Fatal(err)
+	}
+	if resp1.CreatedInviteCode == nil || !strings.HasPrefix(*resp1.CreatedInviteCode, "d2e-inv-") {
+		got := "<nil>"
+		if resp1.CreatedInviteCode != nil {
+			got = *resp1.CreatedInviteCode
+		}
+		t.Fatalf("expected valid d2e-inv-* invite code on first attempt, got %q", got)
+	}
+
+	rec2 := postInvite(h, "tok_admin", "invite-click-1")
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("replayed invite creation failed (%d): %s", rec2.Code, rec2.Body.String())
+	}
+	var resp2 empire.DashboardStateResp
+	if err := json.Unmarshal(rec2.Body.Bytes(), &resp2); err != nil {
+		t.Fatal(err)
+	}
+	if resp2.CreatedInviteCode == nil || *resp2.CreatedInviteCode != *resp1.CreatedInviteCode {
+		t.Fatalf("expected replayed invite creation to preserve exact plaintext code %q, got %v", *resp1.CreatedInviteCode, resp2.CreatedInviteCode)
+	}
+	if len(w.Invites) != initialInvites+1 {
+		t.Fatalf("expected exactly 1 new invite created across idempotent replay, got delta=%d", len(w.Invites)-initialInvites)
+	}
+
+	// 2. Simulating process restart (new Service sharing same DB state): replay must not return 200 OK with empty code
+	restartedHandler := NewHTTPHandler(app.NewService(mem, mem), nil)
+	recRestart := postInvite(restartedHandler, "tok_admin", "invite-click-1")
+	if recRestart.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 invite_replay_unavailable after restart, got %d: %s", recRestart.Code, recRestart.Body.String())
+	}
+	if !strings.Contains(recRestart.Body.String(), "invite_replay_unavailable") {
+		t.Fatalf("expected invite_replay_unavailable error code, got %s", recRestart.Body.String())
+	}
+	if len(w.Invites) != initialInvites+1 {
+		t.Fatalf("expected no duplicate invite after restart replay, got delta=%d", len(w.Invites)-initialInvites)
+	}
+
+	// 3. Non-admin replaying an already-recorded idempotency key must still receive 403 Forbidden
+	w.Players["archon_demo"].RecordIdempotencyKey("POST:/api/v1/empire/admin/invites:stolen-key")
+	recForbidden := postInvite(h, "tok_player", "stolen-key")
+	if recForbidden.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for non-admin invite replay, got %d: %s", recForbidden.Code, recForbidden.Body.String())
+	}
+}

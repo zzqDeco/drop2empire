@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"drop2empire/services/game/internal/domain"
@@ -48,12 +49,68 @@ func IdempotencyKeyFromContext(ctx context.Context) string {
 	return v
 }
 
+const maxInviteReplayCache = domain.MaxStoredIdempotencyKeys * 4
+
+type inviteReplayEntry struct {
+	key  string
+	code string
+}
+
 type Service struct {
 	tx                  domain.TxManager
 	repo                domain.WorldRepository
 	players             domain.PlayerRepository
 	now                 func() time.Time
 	bootstrapInviteCode string
+
+	inviteReplayMu    sync.Mutex
+	inviteReplays     map[string]string
+	inviteReplayOrder []inviteReplayEntry
+}
+
+func inviteReplayCacheKey(handle, idemKey string) string {
+	return handle + "\x00" + idemKey
+}
+
+func (s *Service) rememberInviteReplay(cacheKey, plainCode string) {
+	if cacheKey == "" || plainCode == "" {
+		return
+	}
+	s.inviteReplayMu.Lock()
+	defer s.inviteReplayMu.Unlock()
+	if s.inviteReplays == nil {
+		s.inviteReplays = make(map[string]string)
+	}
+	s.inviteReplays[cacheKey] = plainCode
+	s.inviteReplayOrder = append(s.inviteReplayOrder, inviteReplayEntry{key: cacheKey, code: plainCode})
+	for len(s.inviteReplayOrder) > maxInviteReplayCache {
+		oldest := s.inviteReplayOrder[0]
+		s.inviteReplayOrder = s.inviteReplayOrder[1:]
+		if cur, ok := s.inviteReplays[oldest.key]; ok && cur == oldest.code {
+			delete(s.inviteReplays, oldest.key)
+		}
+	}
+}
+
+func (s *Service) lookupInviteReplay(cacheKey string) (string, bool) {
+	if cacheKey == "" {
+		return "", false
+	}
+	s.inviteReplayMu.Lock()
+	defer s.inviteReplayMu.Unlock()
+	code, ok := s.inviteReplays[cacheKey]
+	return code, ok
+}
+
+func (s *Service) forgetInviteReplay(cacheKey, plainCode string) {
+	if cacheKey == "" || plainCode == "" {
+		return
+	}
+	s.inviteReplayMu.Lock()
+	defer s.inviteReplayMu.Unlock()
+	if cur, ok := s.inviteReplays[cacheKey]; ok && cur == plainCode {
+		delete(s.inviteReplays, cacheKey)
+	}
 }
 
 func NewService(tx domain.TxManager, repo domain.GameRepository) *Service {
@@ -315,15 +372,40 @@ func (s *Service) CreateInvite(ctx context.Context) (*domain.WorldState, string,
 	if IsPublicSurface(ctx) {
 		return nil, "", domain.ErrForbidden("管理后台未在公网开放，请通过 SSH 本地隧道访问")
 	}
+	idemKey := IdempotencyKeyFromContext(ctx)
 	var plainCode string
-	w, err := s.mutate(ctx, func(w *domain.WorldState, _ *domain.PlayerState, now time.Time) error {
+	var replayKey string
+	ranCallback := false
+	w, err := s.mutate(ctx, func(w *domain.WorldState, p *domain.PlayerState, now time.Time) error {
 		if !w.AdminMode {
 			return domain.ErrForbidden("仅平台管理员可生成注册邀请码")
 		}
 		_, plainCode = domain.CreateInvite(w, now)
+		ranCallback = true
+		if idemKey != "" {
+			replayKey = inviteReplayCacheKey(p.Handle, idemKey)
+			s.rememberInviteReplay(replayKey, plainCode)
+		}
 		return nil
 	})
-	return w, plainCode, err
+	if err != nil {
+		if ranCallback && replayKey != "" {
+			s.forgetInviteReplay(replayKey, plainCode)
+		}
+		return nil, "", err
+	}
+	if !w.AdminMode {
+		return nil, "", domain.ErrForbidden("仅平台管理员可生成注册邀请码")
+	}
+	if !ranCallback {
+		if idemKey != "" {
+			if cached, ok := s.lookupInviteReplay(inviteReplayCacheKey(w.ActiveHandle, idemKey)); ok && cached != "" {
+				return w, cached, nil
+			}
+		}
+		return nil, "", domain.ErrPrecondition("invite_replay_unavailable", "该邀请码创建请求已提交，但明文邀请码无法跨进程重启恢复，请查看邀请码列表或发起新请求重新签发")
+	}
+	return w, plainCode, nil
 }
 
 func (s *Service) RevokeInvite(ctx context.Context, inviteID string) (*domain.WorldState, error) {

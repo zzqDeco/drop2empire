@@ -335,26 +335,28 @@ func (s *Store) LoadSessionPlayer(ctx context.Context, token string) (*domain.Pl
 	return &p, admin || p.IsAdmin, nil
 }
 
-// LoadSessionWorldView reads realm metadata via non-locking MVCC SELECT and locks ONLY
-// the authenticated player row (FOR UPDATE), eliminating global lock contention for polling
-// and single-player commands while preserving deadlock-free lock ordering.
+// LoadSessionWorldView locks ONLY the authenticated player row (FOR UPDATE) before reading
+// realm metadata and aggregate player gold totals in a single atomic MVCC SQL statement.
+// Because every global transaction (LoadWorld) locks d2e_world_state and then all d2e_players
+// rows in handle order, acquiring the single-player row lock first guarantees:
+//  1. Zero deadlocks (player transactions never lock d2e_world_state or a second player row).
+//  2. Snapshot consistency under READ COMMITTED: any in-flight global transaction commits before
+//     the player lock succeeds, and no new global transaction can commit while the player lock
+//     is held, so the player row, realm metadata, and aggregate gold balances always come from
+//     one consistent monetary snapshot.
 func (s *Store) LoadSessionWorldView(ctx context.Context, token string) (*domain.WorldState, *domain.PlayerState, bool, error) {
-	var rawWorld []byte
-	err := s.db.QueryRow(ctx, `SELECT state_json FROM d2e_world_state WHERE realm_id = 'realm-main'`).Scan(&rawWorld)
+	var rawTarget string
+	var economyVersion int
+	err := s.db.QueryRow(ctx, `SELECT COALESCE(state_json->'sessions'->>$1, ''), COALESCE((state_json->'economy'->>'version')::int, 0) FROM d2e_world_state WHERE realm_id = 'realm-main'`, token).Scan(&rawTarget, &economyVersion)
 	if err != nil {
 		if postgres.IsNoRows(err) {
 			return nil, nil, false, domain.ErrUnauthorized("请先登录或注册领主账号")
 		}
 		return nil, nil, false, err
 	}
-	var w domain.WorldState
-	if err := json.Unmarshal(rawWorld, &w); err != nil {
-		return nil, nil, false, err
-	}
-	if w.Economy == nil || w.Economy.Version != 1 {
+	if economyVersion != 1 {
 		return nil, nil, false, domain.ErrPrecondition("economy_restart_required", "新经济规则要求清档重开，请按上线手册重新初始化经济数据库")
 	}
-	rawTarget := w.Sessions[token]
 	if rawTarget == "" {
 		return nil, nil, false, domain.ErrUnauthorized("登录会话已过期，请重新登录")
 	}
@@ -368,7 +370,7 @@ func (s *Store) LoadSessionWorldView(ctx context.Context, token string) (*domain
 	}
 	var data []byte
 	var revision int64
-	err = s.db.QueryRow(ctx, `SELECT state_json,revision FROM d2e_players WHERE handle=$1 FOR UPDATE`, handle).Scan(&data, &revision)
+	err = s.db.QueryRow(ctx, `SELECT state_json, revision FROM d2e_players WHERE handle = $1 FOR UPDATE`, handle).Scan(&data, &revision)
 	if postgres.IsNoRows(err) {
 		return nil, nil, false, domain.ErrUnauthorized("登录账号不存在")
 	}
@@ -381,9 +383,45 @@ func (s *Store) LoadSessionWorldView(ctx context.Context, token string) (*domain
 	}
 	p.Revision = revision
 
+	var rawWorld []byte
 	var totalGold, totalEscrow int64
-	if aggErr := s.db.QueryRow(ctx, `SELECT COALESCE(SUM((state_json->>'goldBasis')::bigint),0), COALESCE(SUM((state_json->>'goldFrozenBasis')::bigint),0) FROM d2e_players`).Scan(&totalGold, &totalEscrow); aggErr != nil {
-		return nil, nil, false, aggErr
+	err = s.db.QueryRow(ctx, `
+SELECT
+	w.state_json,
+	agg.total_gold,
+	agg.total_escrow
+FROM d2e_world_state w
+CROSS JOIN (
+	SELECT
+		COALESCE(SUM((state_json->>'goldBasis')::bigint), 0) AS total_gold,
+		COALESCE(SUM((state_json->>'goldFrozenBasis')::bigint), 0) AS total_escrow
+	FROM d2e_players
+) agg
+WHERE w.realm_id = 'realm-main'
+`).Scan(&rawWorld, &totalGold, &totalEscrow)
+	if err != nil {
+		if postgres.IsNoRows(err) {
+			return nil, nil, false, domain.ErrUnauthorized("请先登录或注册领主账号")
+		}
+		return nil, nil, false, err
+	}
+	var w domain.WorldState
+	if err := json.Unmarshal(rawWorld, &w); err != nil {
+		return nil, nil, false, err
+	}
+	if w.Economy == nil || w.Economy.Version != 1 {
+		return nil, nil, false, domain.ErrPrecondition("economy_restart_required", "新经济规则要求清档重开，请按上线手册重新初始化经济数据库")
+	}
+	currentTarget := w.Sessions[token]
+	if currentTarget == "" {
+		return nil, nil, false, domain.ErrUnauthorized("登录会话已过期，请重新登录")
+	}
+	if currentTarget != rawTarget {
+		_, curAdmin := sessionTarget(currentTarget)
+		if !curAdmin {
+			return nil, nil, false, domain.ErrUnauthorized("登录会话已过期，请重新登录")
+		}
+		admin = true
 	}
 	w.MacroLedgerCached = true
 	w.CachedPlayerHeldBasis = totalGold
