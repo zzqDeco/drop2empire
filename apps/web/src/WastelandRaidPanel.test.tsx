@@ -137,8 +137,8 @@ describe("raid consumables reconcile the visible search timer", () => {
       />,
     );
   const click = async (label: string) => {
-    const button = Array.from(container.querySelectorAll("button")).find((b) =>
-      b.textContent?.startsWith(label),
+    const button = Array.from(document.body.querySelectorAll("button")).find(
+      (b) => b.textContent?.startsWith(label),
     );
     expect(button, label).toBeDefined();
     await act(async () => button!.click());

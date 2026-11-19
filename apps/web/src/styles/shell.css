@@ -20,7 +20,8 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  padding-bottom: 88px;
+  padding-bottom: 32px;
+  overflow-x: clip;
 }
 
 .imperial-header-stack {
@@ -288,7 +289,7 @@
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -299,7 +300,7 @@
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -310,7 +311,7 @@
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -400,6 +401,8 @@
 /* Lower Multi-System Workspace Shell */
 .lower-workspace {
   margin: 0 18px var(--space-6);
+  min-width: 0;
+  max-width: 100%;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   box-shadow: var(--shadow-sm);
@@ -470,17 +473,18 @@
 
 .split-2col {
   display: grid;
-  grid-template-columns: 1fr 1.35fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
   gap: var(--space-3);
 }
 
 .split-3col {
   display: grid;
-  grid-template-columns: 1fr 1.15fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
   gap: var(--space-3);
 }
 
 .subpanel {
+  min-width: 0;
   border: 1px solid var(--border-strong);
   background: var(--bg);
 }
@@ -639,51 +643,6 @@
   background: var(--bg);
   border: 1px solid var(--border-strong);
   border-radius: var(--r-xs);
-}
-
-/* Bottom-Right Floating World Map Compass Button */
-.world-map-fab {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 42;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 18px;
-  background: var(--brand);
-  color: var(--on-brand);
-  border: 2px solid var(--border-strong);
-  box-shadow: var(--shadow-pop);
-  cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.world-map-fab:hover {
-  transform: translateY(-3px);
-}
-
-.world-map-fab-ring {
-  position: absolute;
-  inset: -4px;
-  border: 1px dashed var(--border-strong);
-  pointer-events: none;
-}
-
-.world-map-fab-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.2;
-}
-
-.world-map-fab-text strong {
-  font-size: var(--font-base);
-}
-
-.world-map-fab-text span {
-  font-size: 11px;
-  opacity: 0.88;
 }
 
 /* World Map Compass Modal */

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { Compass, Droplets } from "lucide-react";
+import { Droplets } from "lucide-react";
 import { EconomyWorkspace, CompanyPortfolio } from "./EconomyWorkspace";
 import { EconomyEvents } from "./EconomyEvents";
 import "./economy.css";
@@ -308,27 +308,6 @@ export function App() {
             runAction={runAction}
           />
         </div>
-      )}
-
-      {flags.canNavigateWorld && (
-        <button
-          type="button"
-          className="world-map-fab"
-          aria-label="打开世界舆图 (快捷键 M)"
-          data-pop="展开世界舆图"
-          onClick={() => setShowWorldMapModal(true)}
-        >
-          <span className="world-map-fab-ring" aria-hidden="true" />
-          <Compass size={ICON.lg} />
-          <div className="world-map-fab-text">
-            <strong>世界舆图</strong>
-            <span className="mono-num">
-              {effectiveScene === "settlement"
-                ? "前往疆域 [M]"
-                : "切换疆域 [M]"}
-            </span>
-          </div>
-        </button>
       )}
 
       {showCivChapterPopup && (

@@ -206,8 +206,8 @@
 .raid-fullscreen-stage {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: safe center;
+  justify-content: safe center;
   padding: var(--space-3);
   overflow: auto;
   background: radial-gradient(circle at center, var(--surface) 0%, var(--bg) 78%);
@@ -215,9 +215,10 @@
 
 .raid-battlefield-layout {
   display: grid;
-  grid-template-columns: auto 296px;
+  grid-template-columns: minmax(0, auto) minmax(0, 296px);
   align-items: start;
   gap: var(--space-4);
+  width: min(100%, 1080px);
   max-width: 100%;
 }
 
@@ -226,20 +227,23 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .raid-map-grid {
   display: grid;
   grid-template-columns: repeat(
     var(--zone-cols, 9),
-    clamp(30px, calc((100vw - 48px) / var(--zone-cols, 9)), 64px)
+    clamp(24px, calc((100vw - 56px - (var(--zone-cols, 9) - 1) * 3px) / var(--zone-cols, 9)), 64px)
   );
   grid-template-rows: repeat(
     var(--zone-rows, 9),
-    clamp(30px, calc((100vw - 48px) / var(--zone-cols, 9)), 64px)
+    clamp(24px, calc((100vw - 56px - (var(--zone-cols, 9) - 1) * 3px) / var(--zone-cols, 9)), 64px)
   );
   gap: 3px;
   padding: 8px;
+  max-width: 100%;
   background: var(--surface-sunken);
   border: 2px solid var(--border-strong);
   box-shadow: var(--shadow-lg);
@@ -356,6 +360,8 @@
 
 /* Tactical Radar & 4-Zone Portal Topology Minimap */
 .raid-minimap-dock {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);

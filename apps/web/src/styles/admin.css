@@ -109,9 +109,41 @@
   .form-row-3 {
     grid-template-columns: 1fr;
   }
-  .world-map-fab {
-    right: 14px;
-    bottom: 14px;
-    padding: 9px 13px;
+  .lower-workspace {
+    margin-left: 8px;
+    margin-right: 8px;
+  }
+  .dashboard-grid,
+  .dashboard-grid-2col {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .economy-toast {
+    margin-left: 8px;
+    margin-right: 8px;
+    max-width: calc(100% - 16px);
+  }
+  .job-row,
+  .bp-footer,
+  .equip-card,
+  .chest-console {
+    flex-wrap: wrap;
+  }
+  .stepper-group {
+    gap: 5px;
+  }
+  .btn-step {
+    min-width: 36px;
+    min-height: 36px;
+    font-size: var(--font-sm);
+  }
+  .modal-backdrop {
+    padding: var(--space-2);
+  }
+  .raid-fullscreen-hud {
+    padding: 8px 10px;
+  }
+  .raid-fullscreen-stage {
+    padding: var(--space-2);
   }
 }

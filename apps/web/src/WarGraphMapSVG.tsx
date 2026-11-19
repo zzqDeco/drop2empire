@@ -28,8 +28,8 @@ export function WarGraphMapSVG({
       <svg
         className="war-map-svg"
         viewBox="0 0 1000 410"
-        role="img"
-        aria-label="商会战争战略拓扑图"
+        role="region"
+        aria-label="商会战争战略拓扑图（可使用 Tab 与回车选择据点）"
       >
         {/* Background drafting grid lines */}
         {[100, 200, 300, 400, 500, 600, 700, 800, 900].map((x) => (
@@ -90,8 +90,18 @@ export function WarGraphMapSVG({
             <g
               key={node.nodeId}
               className="war-node-group"
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
+              aria-label={`${node.name}，当前归属${ownerLabel(node.ownerGuild)}，日分 +${node.dailyScore}，驻军 步${node.infantryCount}/弓${node.archerCount}/骑${node.cavalryCount}${node.canDeploy ? "，补给线已连通可派兵" : "，补给线未连通"}${isRally ? "，公会集结目标" : ""}`}
               transform={`translate(${node.x}, ${node.y})`}
               onClick={() => onSelectNode(node.nodeId)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectNode(node.nodeId);
+                }
+              }}
             >
               {node.canDeploy && (
                 <circle

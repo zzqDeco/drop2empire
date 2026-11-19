@@ -3,7 +3,7 @@ import { api } from "@drop2empire/api-client";
 import { Cpu, FlaskConical, Layers, Scale, TrendingUp } from "lucide-react";
 import { ICON } from "../../icons";
 import { fixedInput } from "../../economy";
-import { formatGold, formatResource } from "../../format";
+import { formatExactResource, formatGold, formatResource } from "../../format";
 import {
   classifyMarketCategory,
   resolveSellableStockMilli,
@@ -92,6 +92,23 @@ export function MarketSceneView({
     [state.marketSummaries],
   );
 
+  const marketSearchAliases = useMemo(() => {
+    const aliases = new Map<string, string[]>();
+    for (const gear of state.raidGears ?? []) {
+      if (gear.blueprintKey) {
+        const list = aliases.get(gear.blueprintKey) ?? [];
+        list.push(gear.name, gear.blueprintName, gear.itemKey);
+        aliases.set(gear.blueprintKey, list);
+      }
+    }
+    for (const rc of state.recipes ?? []) {
+      const list = aliases.get(rc.outputKey) ?? [];
+      list.push(rc.name, rc.outputName, rc.recipeCode);
+      aliases.set(rc.outputKey, list);
+    }
+    return aliases;
+  }, [state.raidGears, state.recipes]);
+
   const filteredMarketItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return state.marketSummaries.filter((m) => {
@@ -101,16 +118,20 @@ export function MarketSceneView({
       ) {
         return false;
       }
-      if (
-        q &&
-        !m.itemName.toLowerCase().includes(q) &&
-        !m.itemKey.toLowerCase().includes(q)
-      ) {
-        return false;
+      if (q) {
+        const directMatch =
+          m.itemName.toLowerCase().includes(q) ||
+          m.itemKey.toLowerCase().includes(q);
+        const aliasMatch = (marketSearchAliases.get(m.itemKey) ?? []).some(
+          (alias) => alias.toLowerCase().includes(q),
+        );
+        if (!directMatch && !aliasMatch) {
+          return false;
+        }
       }
       return true;
     });
-  }, [state.marketSummaries, categoryFilter, searchQuery]);
+  }, [state.marketSummaries, categoryFilter, searchQuery, marketSearchAliases]);
 
   const selectedMarketMeta =
     state.marketSummaries.find((m) => m.itemKey === selectedMarketItem) ??
@@ -309,7 +330,7 @@ export function MarketSceneView({
                       </span>
                     </div>
                     <span className="mono-num">
-                      +{formatResource(totalOutMilli, 0)}
+                      +{formatExactResource(totalOutMilli)}
                     </span>
                   </div>
                   <p className="recipe-desc">{rc.effectSummary}</p>
@@ -357,7 +378,7 @@ export function MarketSceneView({
                     <button
                       type="button"
                       className="btn-primary"
-                      data-pop={`+${formatResource(totalOutMilli, 0)} ${rc.outputName}`}
+                      data-pop={`+${formatExactResource(totalOutMilli)} ${rc.outputName}`}
                       disabled={busy || !canCraftBatch}
                       onClick={() =>
                         void runAction(() =>

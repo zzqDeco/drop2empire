@@ -17,10 +17,16 @@ export function SeasonRelicVaultPanel({
   const [revealedRelic, setRevealedRelic] = useState<CollectibleItemDTO | null>(
     null,
   );
+  const [vaultScope, setVaultScope] = useState<"mine" | "all">("mine");
   const { player, resources } = state;
   const chestCount = Math.floor(
     (resources.find((r) => r.key === "season_chest")?.amountMilli ?? 0) / 1000,
   );
+  const myCollectibles = state.collectibles.filter(
+    (c) => c.ownerName === player.handle,
+  );
+  const visibleCollectibles =
+    vaultScope === "mine" ? myCollectibles : state.collectibles;
 
   return (
     <section className="lower-workspace" aria-label="墨械典藏宝箱与程序化藏品">
@@ -35,7 +41,7 @@ export function SeasonRelicVaultPanel({
               </span>
             </h3>
             <p>
-              消耗 100 战争活动积分可兑换 1 个赛季宝箱。开启后铸造具有全服唯一递增序列号与传世墨金蚀刻纹样的秘宝藏品（跨赛季永久保留）。
+              消耗 100 战争活动积分可兑换 1 个赛季宝箱。开启后铸造具有全服唯一递增序列号与传世墨金蚀刻纹样的秘宝藏品（跨赛季永久保留，支持区分本人拥有与全服馆藏）。
             </p>
           </div>
           <div className="chest-console-actions">
@@ -56,18 +62,24 @@ export function SeasonRelicVaultPanel({
               data-pop="✦ 开启秘宝"
               disabled={busy || chestCount < 1}
               onClick={() => {
-                const existingIds = new Set(
-                  state.collectibles.map((c) => c.itemId),
+                const existingOwnIds = new Set(
+                  myCollectibles.map((c) => c.itemId),
                 );
                 void runAction(async () => {
                   const resp = await api.openSeasonChest({
                     clientSeedHint: Date.now(),
                   });
+                  const ownCollectibles = resp.collectibles.filter(
+                    (c) => c.ownerName === resp.player.handle,
+                  );
                   const minted =
-                    resp.collectibles.find((c) => !existingIds.has(c.itemId)) ??
-                    resp.collectibles[0] ??
+                    ownCollectibles.find(
+                      (c) => !existingOwnIds.has(c.itemId),
+                    ) ??
+                    ownCollectibles[0] ??
                     null;
                   if (minted) {
+                    setVaultScope("mine");
                     setRevealedRelic(minted);
                   }
                   return resp;
@@ -80,51 +92,81 @@ export function SeasonRelicVaultPanel({
           </div>
         </div>
 
-        {state.collectibles.length === 0 ? (
+        <div className="quick-alloc-bar">
+          <button
+            type="button"
+            className={`btn-chip mono-num ${vaultScope === "mine" ? "active" : ""}`}
+            onClick={() => setVaultScope("mine")}
+          >
+            我的秘宝 ({myCollectibles.length})
+          </button>
+          <button
+            type="button"
+            className={`btn-chip mono-num ${vaultScope === "all" ? "active" : ""}`}
+            onClick={() => setVaultScope("all")}
+          >
+            全服馆藏 ({state.collectibles.length})
+          </button>
+        </div>
+
+        {visibleCollectibles.length === 0 ? (
           <div className="empty-stage-hint">
-            尚未铸造赛季蚀刻藏品。参与公会捐献或每晚 20:00 战区会战获取活动积分即可兑换开箱！
+            {vaultScope === "mine" && state.collectibles.length > 0
+              ? `你尚未铸造个人赛季秘宝（当前全服已公开陈列 ${state.collectibles.length} 件，可切换“全服馆藏”鉴赏）。参与公会捐献或每晚 20:00 战区会战获取活动积分即可兑换开箱！`
+              : "尚未铸造赛季蚀刻藏品。参与公会捐献或每晚 20:00 战区会战获取活动积分即可兑换开箱！"}
           </div>
         ) : (
           <div className="collectibles-grid">
-            {state.collectibles.map((item) => (
-              <article key={item.itemId} className="collectible-card">
-                <ProceduralRelicSVG item={item} />
-                <div className="collectible-meta">
-                  <div className="collectible-title-row">
-                    <strong>{item.name}</strong>
-                    <span
-                      className={`rarity-badge rarity-${item.rarityTier.toLowerCase()}`}
+            {visibleCollectibles.map((item) => {
+              const isMine = item.ownerName === player.handle;
+              const exactSeed = item.patternSeedText ?? String(item.patternSeed);
+              return (
+                <article key={item.itemId} className="collectible-card">
+                  <ProceduralRelicSVG item={item} />
+                  <div className="collectible-meta">
+                    <div className="collectible-title-row">
+                      <strong>{item.name}</strong>
+                      <span
+                        className={`rarity-badge rarity-${item.rarityTier.toLowerCase()}`}
+                      >
+                        {item.rarityTier}
+                      </span>
+                    </div>
+                    <div className="special-tag-row">{item.specialTag}</div>
+                    <dl className="collectible-kv mono-num">
+                      <div>
+                        <dt>编号</dt>
+                        <dd>#{item.serialNumber}</dd>
+                      </div>
+                      <div>
+                        <dt>持有人</dt>
+                        <dd>
+                          {item.ownerName}
+                          {isMine ? "（我的）" : ""}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>纹理</dt>
+                        <dd>
+                          {item.textureName} · {item.paletteName}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>种子</dt>
+                        <dd>{exactSeed}</dd>
+                      </div>
+                    </dl>
+                    <button
+                      type="button"
+                      className="btn-link"
+                      onClick={() => setRevealedRelic(item)}
                     >
-                      {item.rarityTier}
-                    </span>
+                      检视蚀刻铭文
+                    </button>
                   </div>
-                  <div className="special-tag-row">{item.specialTag}</div>
-                  <dl className="collectible-kv mono-num">
-                    <div>
-                      <dt>编号</dt>
-                      <dd>#{item.serialNumber}</dd>
-                    </div>
-                    <div>
-                      <dt>纹理</dt>
-                      <dd>
-                        {item.textureName} · {item.paletteName}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>种子</dt>
-                      <dd>{item.patternSeed}</dd>
-                    </div>
-                  </dl>
-                  <button
-                    type="button"
-                    className="btn-link"
-                    onClick={() => setRevealedRelic(item)}
-                  >
-                    检视蚀刻铭文
-                  </button>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
@@ -143,8 +185,8 @@ export function SeasonRelicVaultPanel({
               </span>
               <h2>传世秘宝铸造揭晓 · {revealedRelic.name}</h2>
               <p>
-                {revealedRelic.seasonId} 永久跨季契约认证 · 铸造时刻{" "}
-                {revealedRelic.mintedAt}
+                {revealedRelic.seasonId} 永久跨季契约认证 · 持有人{" "}
+                {revealedRelic.ownerName} · 铸造时刻 {revealedRelic.mintedAt}
               </p>
             </div>
             <span
@@ -160,6 +202,13 @@ export function SeasonRelicVaultPanel({
             </div>
             <div className="ledger-audit-box mono-num">
               <div className="ledger-row">
+                <span>归属持有人</span>
+                <strong>
+                  {revealedRelic.ownerName}
+                  {revealedRelic.ownerName === player.handle ? "（本人拥有）" : ""}
+                </strong>
+              </div>
+              <div className="ledger-row">
                 <span>蚀刻词条</span>
                 <strong className="special-tag-row">
                   {revealedRelic.specialTag}
@@ -173,14 +222,19 @@ export function SeasonRelicVaultPanel({
               </div>
               <div className="ledger-row">
                 <span>几何纹样种子</span>
-                <strong>{revealedRelic.patternSeed}</strong>
+                <strong>
+                  {revealedRelic.patternSeedText ??
+                    String(revealedRelic.patternSeed)}
+                </strong>
               </div>
               <button
                 type="button"
                 className="btn-primary btn-block"
                 onClick={() => setRevealedRelic(null)}
               >
-                收入秘宝陈列馆
+                {revealedRelic.ownerName === player.handle
+                  ? "收入我的秘宝陈列馆"
+                  : "关闭全服馆藏检视"}
               </button>
             </div>
           </div>

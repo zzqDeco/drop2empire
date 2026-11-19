@@ -115,10 +115,14 @@ export function computeLiveWaterMetrics(
     waterRes.amountMilli +
     inFlightClicks * perClickWaterMilli +
     Math.floor(waterRes.netRatePerSecMilli * interpSeconds);
+  const waterCeilingMilli =
+    waterRes.capacityMilli > 0
+      ? Math.max(waterRes.capacityMilli, waterRes.amountMilli)
+      : Number.POSITIVE_INFINITY;
   const liveWaterMilli = Math.max(
     0,
     waterRes.capacityMilli > 0
-      ? Math.min(waterRes.capacityMilli, rawLiveWaterMilli)
+      ? Math.min(waterCeilingMilli, rawLiveWaterMilli)
       : rawLiveWaterMilli,
   );
   const totalClicks = state.player.totalManualClicks + inFlightClicks;

@@ -117,8 +117,42 @@ export function useRaidController(
   >("all");
   const [replaceSlotIdx, setReplaceSlotIdx] = useState<number>(0);
 
-  const [dismissedSettlementRaidId, setDismissedSettlementRaidId] =
-    useState<string>("");
+  const dismissStorageKey = `d2e_dismissed_raid_report:${state.player?.handle ?? "default"}`;
+  const [dismissedByStorageKey, setDismissedByStorageKey] = useState<
+    Record<string, string>
+  >({});
+  const readPersistedDismissed = (key: string): string => {
+    if (key in dismissedByStorageKey) {
+      return dismissedByStorageKey[key];
+    }
+    if (typeof window === "undefined") return "";
+    try {
+      return window.localStorage.getItem(key) ?? "";
+    } catch {
+      return "";
+    }
+  };
+  const dismissedSettlementRaidId = readPersistedDismissed(dismissStorageKey);
+  const setDismissedSettlementRaidId = useCallback(
+    (raidId: string) => {
+      setDismissedByStorageKey((prev) => ({
+        ...prev,
+        [dismissStorageKey]: raidId,
+      }));
+      if (typeof window !== "undefined") {
+        try {
+          if (raidId) {
+            window.localStorage.setItem(dismissStorageKey, raidId);
+          } else {
+            window.localStorage.removeItem(dismissStorageKey);
+          }
+        } catch {
+          // Ignore storage quota / privacy mode errors
+        }
+      }
+    },
+    [dismissStorageKey],
+  );
 
   const [facing, setFacing] = useState<FacingDirection>(() =>
     serverFacing === "up" ||
