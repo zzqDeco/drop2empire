@@ -148,10 +148,11 @@ FROM drop2empire-base-nginx:local
 USER root
 LABEL org.opencontainers.image.version=${VERSION} org.opencontainers.image.revision=${COMMIT_SHA}
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+RUN sed -i 's/^worker_processes.*/worker_processes  1;/' /etc/nginx/nginx.conf
 RUN rm -rf /usr/share/nginx/html/*
 COPY dist/ /usr/share/nginx/html/
 EXPOSE 80 8443 18480
-HEALTHCHECK --interval=15s --timeout=3s CMD wget -qO- http://127.0.0.1/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1/healthz || exit 1
 DOCKEREOF
 
 GAME_IMG="drop2empire-game:${SHORT_SHA}"
