@@ -1203,6 +1203,8 @@ type RaidSessionDTO struct {
 	RaidId                  string             `thrift:"raidId,25,required" json:"raidId"`
 	LastCommandSeq          int64              `thrift:"lastCommandSeq,26,required" json:"lastCommandSeq"`
 	ChannelRemainingMs      int64              `thrift:"channelRemainingMs,27,required" json:"channelRemainingMs"`
+	ServerNowUnixMs         *int64             `thrift:"serverNowUnixMs,28,optional" json:"serverNowUnixMs,omitempty"`
+	ExpiresAtUnixMs         *int64             `thrift:"expiresAtUnixMs,29,optional" json:"expiresAtUnixMs,omitempty"`
 	CurrentZoneId           int32              `thrift:"currentZoneId,2,required" json:"currentZoneId"`
 	PlayerX                 int32              `thrift:"playerX,3,required" json:"playerX"`
 	PlayerY                 int32              `thrift:"playerY,4,required" json:"playerY"`
@@ -1245,6 +1247,24 @@ func (p *RaidSessionDTO) GetLastCommandSeq() (v int64) {
 
 func (p *RaidSessionDTO) GetChannelRemainingMs() (v int64) {
 	return p.ChannelRemainingMs
+}
+
+var RaidSessionDTO_ServerNowUnixMs_DEFAULT int64
+
+func (p *RaidSessionDTO) GetServerNowUnixMs() (v int64) {
+	if !p.IsSetServerNowUnixMs() {
+		return RaidSessionDTO_ServerNowUnixMs_DEFAULT
+	}
+	return *p.ServerNowUnixMs
+}
+
+var RaidSessionDTO_ExpiresAtUnixMs_DEFAULT int64
+
+func (p *RaidSessionDTO) GetExpiresAtUnixMs() (v int64) {
+	if !p.IsSetExpiresAtUnixMs() {
+		return RaidSessionDTO_ExpiresAtUnixMs_DEFAULT
+	}
+	return *p.ExpiresAtUnixMs
 }
 
 func (p *RaidSessionDTO) GetCurrentZoneId() (v int32) {
@@ -1337,6 +1357,14 @@ func (p *RaidSessionDTO) GetBossesKilledCount() (v int32) {
 
 func (p *RaidSessionDTO) GetZones() (v []*RaidZoneViewDTO) {
 	return p.Zones
+}
+
+func (p *RaidSessionDTO) IsSetServerNowUnixMs() bool {
+	return p.ServerNowUnixMs != nil
+}
+
+func (p *RaidSessionDTO) IsSetExpiresAtUnixMs() bool {
+	return p.ExpiresAtUnixMs != nil
 }
 
 func (p *RaidSessionDTO) String() string {
@@ -3713,6 +3741,7 @@ func (p *IntroduceCompanyReq) String() string {
 }
 
 type DashboardStateResp struct {
+	ServerNowUnixMs     *int64                   `thrift:"serverNowUnixMs,35,optional" json:"serverNowUnixMs,omitempty"`
 	Economy             *EconomyStateDTO         `thrift:"economy,34,required" json:"economy"`
 	Settlement          *SettlementProgressDTO   `thrift:"settlement,33,required" json:"settlement"`
 	Revision            int64                    `thrift:"revision,32,required" json:"revision"`
@@ -3754,6 +3783,15 @@ func NewDashboardStateResp() *DashboardStateResp {
 }
 
 func (p *DashboardStateResp) InitDefault() {
+}
+
+var DashboardStateResp_ServerNowUnixMs_DEFAULT int64
+
+func (p *DashboardStateResp) GetServerNowUnixMs() (v int64) {
+	if !p.IsSetServerNowUnixMs() {
+		return DashboardStateResp_ServerNowUnixMs_DEFAULT
+	}
+	return *p.ServerNowUnixMs
 }
 
 var DashboardStateResp_Economy_DEFAULT *EconomyStateDTO
@@ -3947,6 +3985,10 @@ func (p *DashboardStateResp) GetCurrentSeason() (v *SeasonStateDTO) {
 	return p.CurrentSeason
 }
 
+func (p *DashboardStateResp) IsSetServerNowUnixMs() bool {
+	return p.ServerNowUnixMs != nil
+}
+
 func (p *DashboardStateResp) IsSetEconomy() bool {
 	return p.Economy != nil
 }
@@ -3999,9 +4041,10 @@ func (p *DashboardStateResp) String() string {
 }
 
 type RaidUpdateResp struct {
-	PlayerHandle string               `thrift:"playerHandle,1,required" json:"playerHandle"`
-	Revision     int64                `thrift:"revision,2,required" json:"revision"`
-	RaidLoadout  *RaidLoadoutStateDTO `thrift:"raidLoadout,3,required" json:"raidLoadout"`
+	PlayerHandle    string               `thrift:"playerHandle,1,required" json:"playerHandle"`
+	Revision        int64                `thrift:"revision,2,required" json:"revision"`
+	RaidLoadout     *RaidLoadoutStateDTO `thrift:"raidLoadout,3,required" json:"raidLoadout"`
+	ServerNowUnixMs *int64               `thrift:"serverNowUnixMs,4,optional" json:"serverNowUnixMs,omitempty"`
 }
 
 func NewRaidUpdateResp() *RaidUpdateResp {
@@ -4028,8 +4071,21 @@ func (p *RaidUpdateResp) GetRaidLoadout() (v *RaidLoadoutStateDTO) {
 	return p.RaidLoadout
 }
 
+var RaidUpdateResp_ServerNowUnixMs_DEFAULT int64
+
+func (p *RaidUpdateResp) GetServerNowUnixMs() (v int64) {
+	if !p.IsSetServerNowUnixMs() {
+		return RaidUpdateResp_ServerNowUnixMs_DEFAULT
+	}
+	return *p.ServerNowUnixMs
+}
+
 func (p *RaidUpdateResp) IsSetRaidLoadout() bool {
 	return p.RaidLoadout != nil
+}
+
+func (p *RaidUpdateResp) IsSetServerNowUnixMs() bool {
+	return p.ServerNowUnixMs != nil
 }
 
 func (p *RaidUpdateResp) String() string {
