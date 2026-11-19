@@ -95,6 +95,30 @@ func NewSessionToken(handle string, now time.Time) string {
 	return hex.EncodeToString(b)
 }
 
+func EnsurePlayerState(pl *PlayerState) {
+	if pl == nil {
+		return
+	}
+	if pl.ActiveEdicts == nil {
+		pl.ActiveEdicts = map[string]bool{}
+	}
+	if pl.Workers == nil {
+		pl.Workers = map[string]int32{}
+	}
+	if pl.ResourcesMilli == nil {
+		pl.ResourcesMilli = map[string]int64{}
+	}
+	if pl.FrozenResourcesMilli == nil {
+		pl.FrozenResourcesMilli = map[string]int64{}
+	}
+	if pl.UnlockedBlueprints == nil {
+		pl.UnlockedBlueprints = map[string]bool{}
+	}
+	EnsureSettlementState(pl)
+	EnsureRaidState(pl)
+	MigrateInstalledEquipments(pl)
+}
+
 func EnsureDefaultAccounts(w *WorldState, now time.Time) {
 	EnsureSeasonState(w, now)
 	if w.Players == nil {
@@ -107,26 +131,7 @@ func EnsureDefaultAccounts(w *WorldState, now time.Time) {
 		w.Invites = []RegistrationInvite{}
 	}
 	for _, pl := range w.Players {
-		if pl == nil {
-			continue
-		}
-		if pl.ActiveEdicts == nil {
-			pl.ActiveEdicts = map[string]bool{}
-		}
-		if pl.Workers == nil {
-			pl.Workers = map[string]int32{}
-		}
-		if pl.ResourcesMilli == nil {
-			pl.ResourcesMilli = map[string]int64{}
-		}
-		if pl.FrozenResourcesMilli == nil {
-			pl.FrozenResourcesMilli = map[string]int64{}
-		}
-		if pl.UnlockedBlueprints == nil {
-			pl.UnlockedBlueprints = map[string]bool{}
-		}
-		EnsureSettlementState(pl)
-		EnsureRaidState(pl)
+		EnsurePlayerState(pl)
 	}
 	EnsureGuildState(w)
 }

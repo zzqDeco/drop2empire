@@ -1,7 +1,10 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -10,6 +13,9 @@ import (
 
 type sessionTokenKey struct{}
 type adminTunnelKey struct{}
+type idempotencyKeyCtxKey struct{}
+
+var errFallbackToGlobalWorld = errors.New("fallback_to_global_world")
 
 func WithSessionToken(ctx context.Context, token string) context.Context {
 	return context.WithValue(ctx, sessionTokenKey{}, strings.TrimSpace(token))
@@ -27,6 +33,19 @@ func WithAdminTunnel(ctx context.Context, flag string) context.Context {
 func IsPublicSurface(ctx context.Context) bool {
 	v, _ := ctx.Value(adminTunnelKey{}).(string)
 	return v == "0"
+}
+
+func WithIdempotencyKey(ctx context.Context, key string) context.Context {
+	clean := strings.TrimSpace(key)
+	if len(clean) > 160 {
+		clean = clean[:160]
+	}
+	return context.WithValue(ctx, idempotencyKeyCtxKey{}, clean)
+}
+
+func IdempotencyKeyFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(idempotencyKeyCtxKey{}).(string)
+	return v
 }
 
 type Service struct {
@@ -102,9 +121,13 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 			return err
 		}
 		domain.SettleWarDay(w, p, now)
-		if fn != nil {
+		idemKey := IdempotencyKeyFromContext(ctx)
+		if fn != nil && !(idemKey != "" && p.HasIdempotencyKey(idemKey)) {
 			if err := fn(w, p, now); err != nil {
 				return err
+			}
+			if idemKey != "" {
+				p.RecordIdempotencyKey(idemKey)
 			}
 		}
 		domain.RefreshSettlementDiscovery(p)
@@ -118,6 +141,77 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 		out = w
 		return nil
 	})
+	return out, err
+}
+
+func worldNeedsGlobalTick(w *domain.WorldState, now time.Time) bool {
+	if w == nil || w.Economy == nil || w.SeasonCode == "" || len(w.Guilds) == 0 {
+		return true
+	}
+	minute := now.UTC().Truncate(time.Minute)
+	if w.Economy.LastTick.IsZero() || w.Economy.LastTick.Before(minute) {
+		return true
+	}
+	period := domain.WarPeriod(now)
+	if w.LastWarPeriod == "" || period > w.LastWarPeriod {
+		return true
+	}
+	return false
+}
+
+// mutatePlayer runs polling and pure single-player commands under a single-player row lock
+// without acquiring the realm-wide FOR UPDATE lock, falling back to mutate() only when
+// an admin console view, uninitialized realm, or overdue world/war tick requires global coordination.
+func (s *Service) mutatePlayer(ctx context.Context, allowWorldTick bool, fn func(p *domain.PlayerState, now time.Time) error) (*domain.WorldState, error) {
+	token := SessionTokenFromContext(ctx)
+	if token == "" {
+		return nil, domain.ErrUnauthorized("请先登录或注册领主账号")
+	}
+	var out *domain.WorldState
+	err := s.tx.WithinTx(ctx, func(txCtx context.Context) error {
+		w, p, isAdmin, err := s.players.LoadSessionWorldView(txCtx, token)
+		if err != nil {
+			return err
+		}
+		if isAdmin && IsPublicSurface(ctx) {
+			return domain.ErrForbidden("管理后台未在公网开放，请通过 SSH 本地隧道访问")
+		}
+		now := s.now()
+		if isAdmin || w.Economy == nil || w.SeasonCode == "" || len(w.Guilds) == 0 || (allowWorldTick && worldNeedsGlobalTick(w, now)) {
+			return errFallbackToGlobalWorld
+		}
+		beforeRaw, _ := json.Marshal(p)
+		domain.EnsurePlayerState(p)
+		domain.SettleProduction(p, now)
+		idemKey := IdempotencyKeyFromContext(ctx)
+		if fn != nil && !(idemKey != "" && p.HasIdempotencyKey(idemKey)) {
+			if err := fn(p, now); err != nil {
+				return err
+			}
+			if idemKey != "" {
+				p.RecordIdempotencyKey(idemKey)
+			}
+		}
+		domain.RefreshSettlementDiscovery(p)
+		afterRaw, _ := json.Marshal(p)
+		if !bytes.Equal(beforeRaw, afterRaw) {
+			if err := s.players.SavePlayer(txCtx, p); err != nil {
+				return err
+			}
+		}
+		w.ActiveHandle = p.Handle
+		w.AdminMode = isAdmin
+		out = w
+		return nil
+	})
+	if errors.Is(err, errFallbackToGlobalWorld) {
+		if fn == nil {
+			return s.mutate(ctx, nil)
+		}
+		return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+			return fn(p, now)
+		})
+	}
 	return out, err
 }
 
@@ -263,7 +357,7 @@ func (s *Service) LogoutAccount(ctx context.Context) error {
 }
 
 func (s *Service) GetDashboard(ctx context.Context) (*domain.WorldState, error) {
-	return s.mutate(ctx, nil)
+	return s.mutatePlayer(ctx, true, nil)
 }
 
 func (s *Service) SwitchAccount(ctx context.Context, handle string) (*domain.WorldState, error) {

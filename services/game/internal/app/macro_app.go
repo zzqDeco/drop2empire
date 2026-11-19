@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Service) ChooseProfession(ctx context.Context, profession string) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.ChooseProfession(p, profession, now)
 	})
 }
@@ -21,7 +21,7 @@ func (s *Service) CraftItem(ctx context.Context, recipeCode string, batches int3
 }
 
 func (s *Service) InstallEquipment(ctx context.Context, itemKey string, delta int32) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.InstallEquipment(p, itemKey, delta, now)
 	})
 }

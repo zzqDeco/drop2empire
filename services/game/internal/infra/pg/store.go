@@ -1,6 +1,7 @@
 package pg
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"sort"
@@ -116,8 +117,9 @@ func (s *Store) LoadWorld(ctx context.Context, now time.Time) (*domain.WorldStat
 		return nil, domain.ErrPrecondition("economy_restart_required", "新经济规则要求清档重开，请按上线手册重新初始化经济数据库")
 	}
 	w.Players = make(map[string]*domain.PlayerState)
+	w.LoadedPlayerJSON = make(map[string][]byte)
 	// Global transactions always lock realm first, then players in handle order.
-	// Raid transactions lock only their player and never acquire the realm lock.
+	// Player-scoped transactions lock only their player and never acquire the realm lock.
 	rows, err := s.db.Query(ctx, `SELECT state_json,revision FROM d2e_players ORDER BY handle FOR UPDATE`)
 	if err != nil {
 		return nil, err
@@ -135,6 +137,9 @@ func (s *Store) LoadWorld(ctx context.Context, now time.Time) (*domain.WorldStat
 		}
 		p.Revision = revision
 		w.Players[p.Handle] = &p
+		if snap, snapErr := json.Marshal(&p); snapErr == nil {
+			w.LoadedPlayerJSON[p.Handle] = snap
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -168,7 +173,13 @@ SET state_json = EXCLUDED.state_json, updated_at = now()
 	}
 	sort.Strings(handles)
 	for _, handle := range handles {
-		if err := s.SavePlayer(ctx, world.Players[handle]); err != nil {
+		p := world.Players[handle]
+		if prev, ok := world.LoadedPlayerJSON[handle]; ok {
+			if cur, mErr := json.Marshal(p); mErr == nil && bytes.Equal(cur, prev) {
+				continue
+			}
+		}
+		if err := s.SavePlayer(ctx, p); err != nil {
 			return err
 		}
 	}
@@ -232,11 +243,22 @@ func (m *MemoryStore) LoadWorld(_ context.Context, now time.Time) (*domain.World
 	if err := json.Unmarshal(raw, &clone); err != nil {
 		return nil, err
 	}
+	clone.LoadedPlayerJSON = make(map[string][]byte, len(clone.Players))
+	for h, p := range clone.Players {
+		if snap, snapErr := json.Marshal(p); snapErr == nil {
+			clone.LoadedPlayerJSON[h] = snap
+		}
+	}
 	return &clone, nil
 }
 
 func (m *MemoryStore) SaveWorld(_ context.Context, world *domain.WorldState) error {
 	for handle, p := range world.Players {
+		if prev, ok := world.LoadedPlayerJSON[handle]; ok {
+			if cur, mErr := json.Marshal(p); mErr == nil && bytes.Equal(cur, prev) {
+				continue
+			}
+		}
 		if m.world != nil && m.world.Players[handle] != nil {
 			p.Revision = m.world.Players[handle].Revision + 1
 		} else {
@@ -313,6 +335,65 @@ func (s *Store) LoadSessionPlayer(ctx context.Context, token string) (*domain.Pl
 	return &p, admin || p.IsAdmin, nil
 }
 
+// LoadSessionWorldView reads realm metadata via non-locking MVCC SELECT and locks ONLY
+// the authenticated player row (FOR UPDATE), eliminating global lock contention for polling
+// and single-player commands while preserving deadlock-free lock ordering.
+func (s *Store) LoadSessionWorldView(ctx context.Context, token string) (*domain.WorldState, *domain.PlayerState, bool, error) {
+	var rawWorld []byte
+	err := s.db.QueryRow(ctx, `SELECT state_json FROM d2e_world_state WHERE realm_id = 'realm-main'`).Scan(&rawWorld)
+	if err != nil {
+		if postgres.IsNoRows(err) {
+			return nil, nil, false, domain.ErrUnauthorized("请先登录或注册领主账号")
+		}
+		return nil, nil, false, err
+	}
+	var w domain.WorldState
+	if err := json.Unmarshal(rawWorld, &w); err != nil {
+		return nil, nil, false, err
+	}
+	if w.Economy == nil || w.Economy.Version != 1 {
+		return nil, nil, false, domain.ErrPrecondition("economy_restart_required", "新经济规则要求清档重开，请按上线手册重新初始化经济数据库")
+	}
+	rawTarget := w.Sessions[token]
+	if rawTarget == "" {
+		return nil, nil, false, domain.ErrUnauthorized("登录会话已过期，请重新登录")
+	}
+	handle, admin := sessionTarget(rawTarget)
+	if admin {
+		var allowed bool
+		err := s.db.QueryRow(ctx, `SELECT COALESCE((state_json->>'isAdmin')::boolean,false) FROM d2e_players WHERE handle='admin'`).Scan(&allowed)
+		if err != nil || !allowed {
+			return nil, nil, false, domain.ErrUnauthorized("管理员会话无效")
+		}
+	}
+	var data []byte
+	var revision int64
+	err = s.db.QueryRow(ctx, `SELECT state_json,revision FROM d2e_players WHERE handle=$1 FOR UPDATE`, handle).Scan(&data, &revision)
+	if postgres.IsNoRows(err) {
+		return nil, nil, false, domain.ErrUnauthorized("登录账号不存在")
+	}
+	if err != nil {
+		return nil, nil, false, err
+	}
+	var p domain.PlayerState
+	if err := json.Unmarshal(data, &p); err != nil {
+		return nil, nil, false, err
+	}
+	p.Revision = revision
+
+	var totalGold, totalEscrow int64
+	if aggErr := s.db.QueryRow(ctx, `SELECT COALESCE(SUM((state_json->>'goldBasis')::bigint),0), COALESCE(SUM((state_json->>'goldFrozenBasis')::bigint),0) FROM d2e_players`).Scan(&totalGold, &totalEscrow); aggErr != nil {
+		return nil, nil, false, aggErr
+	}
+	w.MacroLedgerCached = true
+	w.CachedPlayerHeldBasis = totalGold
+	w.CachedEscrowFrozenBasis = totalEscrow
+	w.Players = map[string]*domain.PlayerState{p.Handle: &p}
+	w.ActiveHandle = p.Handle
+	w.AdminMode = admin || p.IsAdmin
+	return &w, &p, admin || p.IsAdmin, nil
+}
+
 func (m *MemoryStore) LoadSessionPlayer(_ context.Context, token string) (*domain.PlayerState, bool, error) {
 	if m.world == nil {
 		return nil, false, domain.ErrUnauthorized("请先登录")
@@ -331,6 +412,47 @@ func (m *MemoryStore) LoadSessionPlayer(_ context.Context, token string) (*domai
 		return nil, false, err
 	}
 	return &clone, admin || p.IsAdmin, nil
+}
+
+func (m *MemoryStore) LoadSessionWorldView(_ context.Context, token string) (*domain.WorldState, *domain.PlayerState, bool, error) {
+	if m.world == nil {
+		return nil, nil, false, domain.ErrUnauthorized("请先登录")
+	}
+	handle, admin := sessionTarget(m.world.Sessions[token])
+	origPlayer := m.world.Players[handle]
+	if origPlayer == nil || (admin && (m.world.Players["admin"] == nil || !m.world.Players["admin"].IsAdmin)) {
+		return nil, nil, false, domain.ErrUnauthorized("登录会话无效")
+	}
+	meta := *m.world
+	meta.Players = nil
+	rawWorld, err := json.Marshal(&meta)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	var w domain.WorldState
+	if err := json.Unmarshal(rawWorld, &w); err != nil {
+		return nil, nil, false, err
+	}
+	rawPlayer, err := json.Marshal(origPlayer)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	var p domain.PlayerState
+	if err := json.Unmarshal(rawPlayer, &p); err != nil {
+		return nil, nil, false, err
+	}
+	var totalGold, totalEscrow int64
+	for _, pl := range m.world.Players {
+		totalGold += pl.GoldBasis
+		totalEscrow += pl.GoldFrozenBasis
+	}
+	w.MacroLedgerCached = true
+	w.CachedPlayerHeldBasis = totalGold
+	w.CachedEscrowFrozenBasis = totalEscrow
+	w.Players = map[string]*domain.PlayerState{p.Handle: &p}
+	w.ActiveHandle = p.Handle
+	w.AdminMode = admin || p.IsAdmin
+	return &w, &p, admin || p.IsAdmin, nil
 }
 
 func (m *MemoryStore) SavePlayer(_ context.Context, p *domain.PlayerState) error {

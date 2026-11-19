@@ -36,6 +36,9 @@ func (f *fakeMemStore) SaveWorld(_ context.Context, world *domain.WorldState) er
 }
 
 func (f *fakeMemStore) LoadSessionPlayer(_ context.Context, token string) (*domain.PlayerState, bool, error) {
+	if f.w == nil {
+		return nil, false, domain.ErrUnauthorized("invalid session")
+	}
 	raw := f.w.Sessions[token]
 	admin := raw == "admin" || strings.HasPrefix(raw, "admin::")
 	handle := strings.TrimPrefix(raw, "admin::")
@@ -44,6 +47,28 @@ func (f *fakeMemStore) LoadSessionPlayer(_ context.Context, token string) (*doma
 		return nil, false, domain.ErrUnauthorized("invalid session")
 	}
 	return p, admin || p.IsAdmin, nil
+}
+func (f *fakeMemStore) LoadSessionWorldView(_ context.Context, token string) (*domain.WorldState, *domain.PlayerState, bool, error) {
+	if f.w == nil {
+		return nil, nil, false, domain.ErrUnauthorized("invalid session")
+	}
+	p, isAdmin, err := f.LoadSessionPlayer(context.Background(), token)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	view := *f.w
+	var totalGold, totalEscrow int64
+	for _, pl := range f.w.Players {
+		totalGold += pl.GoldBasis
+		totalEscrow += pl.GoldFrozenBasis
+	}
+	view.MacroLedgerCached = true
+	view.CachedPlayerHeldBasis = totalGold
+	view.CachedEscrowFrozenBasis = totalEscrow
+	view.Players = map[string]*domain.PlayerState{p.Handle: p}
+	view.ActiveHandle = p.Handle
+	view.AdminMode = isAdmin
+	return &view, p, isAdmin, nil
 }
 func (f *fakeMemStore) SavePlayer(_ context.Context, p *domain.PlayerState) error {
 	p.Revision++

@@ -449,6 +449,31 @@ type PlayerState struct {
 	LastOfflineSummary      string                 `json:"lastOfflineSummary"`
 	EventLogs               []EventEntry           `json:"eventLogs"`
 	NextEventSeq            int64                  `json:"nextEventSeq"`
+	RecentIdempotencyKeys   []string               `json:"recentIdempotencyKeys,omitempty"`
+}
+
+const MaxStoredIdempotencyKeys = 64
+
+func (p *PlayerState) HasIdempotencyKey(key string) bool {
+	if p == nil || key == "" {
+		return false
+	}
+	for _, existing := range p.RecentIdempotencyKeys {
+		if existing == key {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *PlayerState) RecordIdempotencyKey(key string) {
+	if p == nil || key == "" || p.HasIdempotencyKey(key) {
+		return
+	}
+	p.RecentIdempotencyKeys = append(p.RecentIdempotencyKeys, key)
+	if len(p.RecentIdempotencyKeys) > MaxStoredIdempotencyKeys {
+		p.RecentIdempotencyKeys = p.RecentIdempotencyKeys[len(p.RecentIdempotencyKeys)-MaxStoredIdempotencyKeys:]
+	}
 }
 
 type MarketOrder struct {
@@ -568,7 +593,11 @@ type SeasonNotice struct {
 }
 
 type WorldState struct {
-	PendingEconomyRecords  []EconomyRecord         `json:"-"`
+	LoadedPlayerJSON        map[string][]byte       `json:"-"`
+	MacroLedgerCached       bool                    `json:"-"`
+	CachedPlayerHeldBasis   int64                   `json:"-"`
+	CachedEscrowFrozenBasis int64                   `json:"-"`
+	PendingEconomyRecords   []EconomyRecord         `json:"-"`
 	Economy                *EconomyState           `json:"economy"`
 	LastWarPeriod          string                  `json:"lastWarPeriod"`
 	PendingTrades          []MarketTrade           `json:"-"`
@@ -618,10 +647,11 @@ type WorldRepository interface {
 	SaveWorld(ctx context.Context, world *WorldState) error
 }
 
-// PlayerRepository isolates high-frequency raid commands from realm-wide transactions.
-// The player must be locked for the duration of the surrounding transaction.
+// PlayerRepository isolates high-frequency player commands and polling from realm-wide locks.
+// The target player row must be locked for the duration of the surrounding transaction.
 type PlayerRepository interface {
 	LoadSessionPlayer(ctx context.Context, token string) (*PlayerState, bool, error)
+	LoadSessionWorldView(ctx context.Context, token string) (*WorldState, *PlayerState, bool, error)
 	SavePlayer(ctx context.Context, player *PlayerState) error
 }
 

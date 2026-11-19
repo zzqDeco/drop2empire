@@ -9,25 +9,25 @@ import (
 )
 
 func (s *Service) GatherWater(ctx context.Context, clicks int32) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.GatherWater(p, clicks, now)
 	})
 }
 
 func (s *Service) RecruitResident(ctx context.Context, count int32) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.RecruitResident(p, count, now)
 	})
 }
 
 func (s *Service) AllocateWorkers(ctx context.Context, mode string, entries map[string]int32, presetName string) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.AllocateWorkers(p, mode, entries, presetName, now)
 	})
 }
 
 func (s *Service) SaveAllocationPreset(ctx context.Context, name string) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.SavePreset(p, strings.TrimSpace(name), now)
 	})
 }
@@ -39,36 +39,36 @@ func (s *Service) UnlockBlueprint(ctx context.Context, code string) (*domain.Wor
 }
 
 func (s *Service) ToggleEdict(ctx context.Context, code string) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.ToggleEdict(p, code, now)
 	})
 }
 
 func (s *Service) DispatchExpedition(ctx context.Context, routeCode string) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.DispatchExpedition(p, routeCode, now)
 	})
 }
 
 func (s *Service) ClaimExpedition(ctx context.Context) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.ClaimExpedition(p, now)
 	})
 }
 
 func (s *Service) TradeCaravan(ctx context.Context, offerCode string) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.TradeCaravan(p, offerCode, now)
 	})
 }
 
 func (s *Service) ResearchTechnology(ctx context.Context, code string, seq int64) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.ResearchTechnology(p, code, seq, now)
 	})
 }
 func (s *Service) ConstructBuilding(ctx context.Context, code string, quantity int32, seq int64) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.ConstructBuilding(p, code, quantity, seq, now)
 	})
 }
