@@ -73,6 +73,7 @@ export function useRaidController(
     scope?: string,
   ) => Promise<void>,
   raidSyncedAtMs?: number,
+  raidExpiresAtClientMs?: number | null,
 ) {
   const { raidLoadout } = state;
   const activeSession = raidLoadout.activeSession ?? null;
@@ -91,8 +92,14 @@ export function useRaidController(
   );
   const [initialDeadlines] = useState(() => {
     const nowMs = Date.now();
+    const initialBaseSyncedAtMs =
+      raidExpiresAtClientMs != null
+        ? raidExpiresAtClientMs - serverTimeRemMs
+        : raidSyncedAtMs !== undefined
+          ? raidSyncedAtMs
+          : nowMs;
     return computeRaidDeadlines(
-      raidSyncedAtMs !== undefined ? raidSyncedAtMs : nowMs,
+      initialBaseSyncedAtMs,
       inRaid,
       activeRaidId,
       serverTimeRemMs,
@@ -331,9 +338,11 @@ export function useRaidController(
       };
     }
     const baseSyncedAtMs =
-      raidSyncedAtMs !== undefined
-        ? raidSyncedAtMs
-        : (fallbackSyncRef.current?.syncedAtMs ?? nowMs);
+      raidExpiresAtClientMs != null
+        ? raidExpiresAtClientMs - serverTimeRemMs
+        : raidSyncedAtMs !== undefined
+          ? raidSyncedAtMs
+          : (fallbackSyncRef.current?.syncedAtMs ?? nowMs);
     const next = computeRaidDeadlines(
       baseSyncedAtMs,
       inRaid,
@@ -370,6 +379,7 @@ export function useRaidController(
     inRaid,
     activeRaidId,
     raidSyncedAtMs,
+    raidExpiresAtClientMs,
     fallbackSnapshotKey,
     serverTimeRemMs,
     serverGaleRemMs,

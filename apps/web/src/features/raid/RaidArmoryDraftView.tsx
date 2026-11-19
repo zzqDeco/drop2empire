@@ -22,6 +22,7 @@ import type { useRaidController } from "../../hooks/useRaidController";
 
 interface RaidArmoryDraftViewProps {
   state: DashboardStateResp;
+  busy?: boolean;
   ctrl: ReturnType<typeof useRaidController>;
   runAction: (
     fn: () => Promise<ServerUpdate>,
@@ -32,6 +33,7 @@ interface RaidArmoryDraftViewProps {
 
 export function RaidArmoryDraftView({
   state,
+  busy = false,
   ctrl,
   runAction,
 }: RaidArmoryDraftViewProps) {
@@ -78,6 +80,7 @@ export function RaidArmoryDraftView({
               type="button"
               className="btn-water-strike"
               data-pop="⚡ 踏入荒原"
+              disabled={busy}
               onClick={() => void runAction(() => api.startRaid())}
             >
               <Compass size={ICON.sm} />
@@ -123,6 +126,7 @@ export function RaidArmoryDraftView({
                         className="buff-slot-remove"
                         aria-label={`移除槽位 ${slotIdx + 1} ${card.name}`}
                         data-pop="移除敕令"
+                        disabled={busy}
                         onClick={() =>
                           void runAction(() =>
                             api.draftRaidBuff({
@@ -169,7 +173,7 @@ export function RaidArmoryDraftView({
                 type="button"
                 className="btn-outline"
                 data-pop="↻ 重新洗牌"
-                disabled={!raidLoadout.canReroll}
+                disabled={busy || !raidLoadout.canReroll}
                 onClick={() =>
                   void runAction(() => api.draftRaidBuff({ action: "reroll" }))
                 }
@@ -189,15 +193,16 @@ export function RaidArmoryDraftView({
                 index={idx}
                 replaceSlotIdx={replaceSlotIdx}
                 equippedFull={equippedFull}
-                onSelectCard={(cardCode) =>
+                onSelectCard={(cardCode) => {
+                  if (busy) return;
                   void runAction(() =>
                     api.draftRaidBuff({
                       action: "buy",
                       cardCode,
                       replaceSlot: replaceSlotIdx,
                     }),
-                  )
-                }
+                  );
+                }}
               />
             ))}
           </div>
@@ -404,7 +409,7 @@ export function RaidArmoryDraftView({
                         <button
                           type="button"
                           className="btn-primary btn-sm"
-                          data-pop="✓ 研读蓝图"
+                          disabled={busy}
                           onClick={() => setPendingBlueprintGear(g)}
                         >
                           研读蓝图 (解锁本季打造)
@@ -417,6 +422,7 @@ export function RaidArmoryDraftView({
                           className="btn-primary btn-sm"
                           data-pop={`+1 ${g.name}`}
                           disabled={
+                            busy ||
                             !g.canCraft ||
                             (g.category === "safe_box" && g.ownedCount > 0)
                           }
@@ -442,7 +448,7 @@ export function RaidArmoryDraftView({
                           data-pop={
                             g.equipped ? "卸下装备" : `✦ 装备 ${g.name}`
                           }
-                          disabled={potionCapReached}
+                          disabled={busy || potionCapReached}
                           onClick={() =>
                             void runAction(() =>
                               api.manageRaidGear({

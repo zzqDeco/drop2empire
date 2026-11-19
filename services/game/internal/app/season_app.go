@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Service) RedeemSeasonChest(ctx context.Context, count int32) (*domain.WorldState, error) {
-	return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+	return s.mutatePlayer(ctx, false, func(p *domain.PlayerState, now time.Time) error {
 		return domain.RedeemSeasonChest(p, count, now)
 	})
 }

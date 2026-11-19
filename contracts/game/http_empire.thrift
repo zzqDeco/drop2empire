@@ -238,6 +238,8 @@ struct RaidSessionDTO {
   25: required string raidId (api.body="raidId")
   26: required i64 lastCommandSeq (api.body="lastCommandSeq")
   27: required i64 channelRemainingMs (api.body="channelRemainingMs")
+  28: optional i64 serverNowUnixMs (api.body="serverNowUnixMs")
+  29: optional i64 expiresAtUnixMs (api.body="expiresAtUnixMs")
   2: required i32 currentZoneId (api.body="currentZoneId")
   3: required i32 playerX (api.body="playerX")
   4: required i32 playerY (api.body="playerY")
@@ -708,6 +710,7 @@ struct IntroduceCompanyReq {
 }
 
 struct DashboardStateResp {
+  35: optional i64 serverNowUnixMs (api.body="serverNowUnixMs")
   34: required EconomyStateDTO economy (api.body="economy")
   33: required SettlementProgressDTO settlement (api.body="settlement")
   32: required i64 revision (api.body="revision")
@@ -748,6 +751,7 @@ struct RaidUpdateResp {
   1: required string playerHandle (api.body="playerHandle")
   2: required i64 revision (api.body="revision")
   3: required RaidLoadoutStateDTO raidLoadout (api.body="raidLoadout")
+  4: optional i64 serverNowUnixMs (api.body="serverNowUnixMs")
 }
 
 struct GetDashboardReq {}

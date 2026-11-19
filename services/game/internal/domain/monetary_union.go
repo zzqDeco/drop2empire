@@ -76,8 +76,12 @@ func ApplyMonetaryPolicy(w *WorldState, p MonetaryPolicy, now time.Time) error {
 // second account. Stock values and unfilled asks never enter this identity.
 func MoneyHoldings(w *WorldState) int64 {
 	total := w.TreasuryHeldBasis + w.NPCHeldBasis
-	for _, p := range w.Players {
-		total += p.GoldBasis + p.GoldFrozenBasis
+	if w.MacroLedgerCached {
+		total += w.CachedPlayerHeldBasis + w.CachedEscrowFrozenBasis
+	} else {
+		for _, p := range w.Players {
+			total += p.GoldBasis + p.GoldFrozenBasis
+		}
 	}
 	if e := w.Economy; e != nil {
 		total += e.Reserve + e.Public.Cash + e.Public.Escrow

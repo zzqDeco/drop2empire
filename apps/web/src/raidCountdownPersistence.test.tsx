@@ -477,4 +477,31 @@ describe("Issue #15: raid countdown & buff persistence across scene switches", (
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(view.container.textContent).not.toContain("正在搜索");
   });
+
+  it("displays separate outer beacon open window and switches to closed at <= 60s (F16)", async () => {
+    const nowMs = Date.now();
+    const snapshot = buildActiveRaidState({
+      playerX: 1,
+      playerY: 2,
+      timeRemainingMs: 80_000,
+    });
+
+    const view = mountView(
+      <WastelandRaidPanel
+        state={snapshot}
+        raidSyncedAtMs={nowMs}
+        raidExpiresAtClientMs={nowMs + 80_000}
+        runAction={vi.fn(async () => {})}
+      />,
+    );
+
+    expect(view.container.textContent).toContain("外围信标窗口");
+    expect(view.container.textContent).toContain("开放余 20.0s");
+
+    await act(async () => {
+      vi.advanceTimersByTime(21_000);
+    });
+
+    expect(view.container.textContent).toContain("已关闭 · 走深层");
+  });
 });

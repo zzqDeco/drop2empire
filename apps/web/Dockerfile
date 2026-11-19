@@ -14,6 +14,7 @@ ARG VERSION=development
 ARG COMMIT_SHA=unknown
 LABEL org.opencontainers.image.version=$VERSION org.opencontainers.image.revision=$COMMIT_SHA
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+RUN sed -i 's/^worker_processes.*/worker_processes  1;/' /etc/nginx/nginx.conf
 COPY --from=build /workspace/apps/web/dist /usr/share/nginx/html
 EXPOSE 80
-HEALTHCHECK --interval=15s --timeout=3s CMD wget -qO- http://127.0.0.1/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1/healthz || exit 1

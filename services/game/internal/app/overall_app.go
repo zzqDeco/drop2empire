@@ -1,8 +1,12 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"drop2empire/services/game/internal/domain"
@@ -10,6 +14,9 @@ import (
 
 type sessionTokenKey struct{}
 type adminTunnelKey struct{}
+type idempotencyKeyCtxKey struct{}
+
+var errFallbackToGlobalWorld = errors.New("fallback_to_global_world")
 
 func WithSessionToken(ctx context.Context, token string) context.Context {
 	return context.WithValue(ctx, sessionTokenKey{}, strings.TrimSpace(token))
@@ -29,12 +36,81 @@ func IsPublicSurface(ctx context.Context) bool {
 	return v == "0"
 }
 
+func WithIdempotencyKey(ctx context.Context, key string) context.Context {
+	clean := strings.TrimSpace(key)
+	if len(clean) > 160 {
+		clean = clean[:160]
+	}
+	return context.WithValue(ctx, idempotencyKeyCtxKey{}, clean)
+}
+
+func IdempotencyKeyFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(idempotencyKeyCtxKey{}).(string)
+	return v
+}
+
+const maxInviteReplayCache = domain.MaxStoredIdempotencyKeys * 4
+
+type inviteReplayEntry struct {
+	key  string
+	code string
+}
+
 type Service struct {
 	tx                  domain.TxManager
 	repo                domain.WorldRepository
 	players             domain.PlayerRepository
 	now                 func() time.Time
 	bootstrapInviteCode string
+
+	inviteReplayMu    sync.Mutex
+	inviteReplays     map[string]string
+	inviteReplayOrder []inviteReplayEntry
+}
+
+func inviteReplayCacheKey(handle, idemKey string) string {
+	return handle + "\x00" + idemKey
+}
+
+func (s *Service) rememberInviteReplay(cacheKey, plainCode string) {
+	if cacheKey == "" || plainCode == "" {
+		return
+	}
+	s.inviteReplayMu.Lock()
+	defer s.inviteReplayMu.Unlock()
+	if s.inviteReplays == nil {
+		s.inviteReplays = make(map[string]string)
+	}
+	s.inviteReplays[cacheKey] = plainCode
+	s.inviteReplayOrder = append(s.inviteReplayOrder, inviteReplayEntry{key: cacheKey, code: plainCode})
+	for len(s.inviteReplayOrder) > maxInviteReplayCache {
+		oldest := s.inviteReplayOrder[0]
+		s.inviteReplayOrder = s.inviteReplayOrder[1:]
+		if cur, ok := s.inviteReplays[oldest.key]; ok && cur == oldest.code {
+			delete(s.inviteReplays, oldest.key)
+		}
+	}
+}
+
+func (s *Service) lookupInviteReplay(cacheKey string) (string, bool) {
+	if cacheKey == "" {
+		return "", false
+	}
+	s.inviteReplayMu.Lock()
+	defer s.inviteReplayMu.Unlock()
+	code, ok := s.inviteReplays[cacheKey]
+	return code, ok
+}
+
+func (s *Service) forgetInviteReplay(cacheKey, plainCode string) {
+	if cacheKey == "" || plainCode == "" {
+		return
+	}
+	s.inviteReplayMu.Lock()
+	defer s.inviteReplayMu.Unlock()
+	if cur, ok := s.inviteReplays[cacheKey]; ok && cur == plainCode {
+		delete(s.inviteReplays, cacheKey)
+	}
 }
 
 func NewService(tx domain.TxManager, repo domain.GameRepository) *Service {
@@ -102,9 +178,13 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 			return err
 		}
 		domain.SettleWarDay(w, p, now)
-		if fn != nil {
+		idemKey := IdempotencyKeyFromContext(ctx)
+		if fn != nil && !(idemKey != "" && p.HasIdempotencyKey(idemKey)) {
 			if err := fn(w, p, now); err != nil {
 				return err
+			}
+			if idemKey != "" {
+				p.RecordIdempotencyKey(idemKey)
 			}
 		}
 		domain.RefreshSettlementDiscovery(p)
@@ -118,6 +198,77 @@ func (s *Service) mutate(ctx context.Context, fn func(w *domain.WorldState, p *d
 		out = w
 		return nil
 	})
+	return out, err
+}
+
+func worldNeedsGlobalTick(w *domain.WorldState, now time.Time) bool {
+	if w == nil || w.Economy == nil || w.SeasonCode == "" || len(w.Guilds) == 0 {
+		return true
+	}
+	minute := now.UTC().Truncate(time.Minute)
+	if w.Economy.LastTick.IsZero() || w.Economy.LastTick.Before(minute) {
+		return true
+	}
+	period := domain.WarPeriod(now)
+	if w.LastWarPeriod == "" || period > w.LastWarPeriod {
+		return true
+	}
+	return false
+}
+
+// mutatePlayer runs polling and pure single-player commands under a single-player row lock
+// without acquiring the realm-wide FOR UPDATE lock, falling back to mutate() only when
+// an admin console view, uninitialized realm, or overdue world/war tick requires global coordination.
+func (s *Service) mutatePlayer(ctx context.Context, allowWorldTick bool, fn func(p *domain.PlayerState, now time.Time) error) (*domain.WorldState, error) {
+	token := SessionTokenFromContext(ctx)
+	if token == "" {
+		return nil, domain.ErrUnauthorized("请先登录或注册领主账号")
+	}
+	var out *domain.WorldState
+	err := s.tx.WithinTx(ctx, func(txCtx context.Context) error {
+		w, p, isAdmin, err := s.players.LoadSessionWorldView(txCtx, token)
+		if err != nil {
+			return err
+		}
+		if isAdmin && IsPublicSurface(ctx) {
+			return domain.ErrForbidden("管理后台未在公网开放，请通过 SSH 本地隧道访问")
+		}
+		now := s.now()
+		if isAdmin || w.Economy == nil || w.SeasonCode == "" || len(w.Guilds) == 0 || (allowWorldTick && worldNeedsGlobalTick(w, now)) {
+			return errFallbackToGlobalWorld
+		}
+		beforeRaw, _ := json.Marshal(p)
+		domain.EnsurePlayerState(p)
+		domain.SettleProduction(p, now)
+		idemKey := IdempotencyKeyFromContext(ctx)
+		if fn != nil && !(idemKey != "" && p.HasIdempotencyKey(idemKey)) {
+			if err := fn(p, now); err != nil {
+				return err
+			}
+			if idemKey != "" {
+				p.RecordIdempotencyKey(idemKey)
+			}
+		}
+		domain.RefreshSettlementDiscovery(p)
+		afterRaw, _ := json.Marshal(p)
+		if !bytes.Equal(beforeRaw, afterRaw) {
+			if err := s.players.SavePlayer(txCtx, p); err != nil {
+				return err
+			}
+		}
+		w.ActiveHandle = p.Handle
+		w.AdminMode = isAdmin
+		out = w
+		return nil
+	})
+	if errors.Is(err, errFallbackToGlobalWorld) {
+		if fn == nil {
+			return s.mutate(ctx, nil)
+		}
+		return s.mutate(ctx, func(_ *domain.WorldState, p *domain.PlayerState, now time.Time) error {
+			return fn(p, now)
+		})
+	}
 	return out, err
 }
 
@@ -221,15 +372,40 @@ func (s *Service) CreateInvite(ctx context.Context) (*domain.WorldState, string,
 	if IsPublicSurface(ctx) {
 		return nil, "", domain.ErrForbidden("管理后台未在公网开放，请通过 SSH 本地隧道访问")
 	}
+	idemKey := IdempotencyKeyFromContext(ctx)
 	var plainCode string
-	w, err := s.mutate(ctx, func(w *domain.WorldState, _ *domain.PlayerState, now time.Time) error {
+	var replayKey string
+	ranCallback := false
+	w, err := s.mutate(ctx, func(w *domain.WorldState, p *domain.PlayerState, now time.Time) error {
 		if !w.AdminMode {
 			return domain.ErrForbidden("仅平台管理员可生成注册邀请码")
 		}
 		_, plainCode = domain.CreateInvite(w, now)
+		ranCallback = true
+		if idemKey != "" {
+			replayKey = inviteReplayCacheKey(p.Handle, idemKey)
+			s.rememberInviteReplay(replayKey, plainCode)
+		}
 		return nil
 	})
-	return w, plainCode, err
+	if err != nil {
+		if ranCallback && replayKey != "" {
+			s.forgetInviteReplay(replayKey, plainCode)
+		}
+		return nil, "", err
+	}
+	if !w.AdminMode {
+		return nil, "", domain.ErrForbidden("仅平台管理员可生成注册邀请码")
+	}
+	if !ranCallback {
+		if idemKey != "" {
+			if cached, ok := s.lookupInviteReplay(inviteReplayCacheKey(w.ActiveHandle, idemKey)); ok && cached != "" {
+				return w, cached, nil
+			}
+		}
+		return nil, "", domain.ErrPrecondition("invite_replay_unavailable", "该邀请码创建请求已提交，但明文邀请码无法跨进程重启恢复，请查看邀请码列表或发起新请求重新签发")
+	}
+	return w, plainCode, nil
 }
 
 func (s *Service) RevokeInvite(ctx context.Context, inviteID string) (*domain.WorldState, error) {
@@ -263,7 +439,7 @@ func (s *Service) LogoutAccount(ctx context.Context) error {
 }
 
 func (s *Service) GetDashboard(ctx context.Context) (*domain.WorldState, error) {
-	return s.mutate(ctx, nil)
+	return s.mutatePlayer(ctx, true, nil)
 }
 
 func (s *Service) SwitchAccount(ctx context.Context, handle string) (*domain.WorldState, error) {

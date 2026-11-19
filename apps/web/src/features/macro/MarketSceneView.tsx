@@ -358,7 +358,7 @@ export function MarketSceneView({
                       type="button"
                       className="btn-primary"
                       data-pop={`+${formatResource(totalOutMilli, 0)} ${rc.outputName}`}
-                      disabled={!canCraftBatch}
+                      disabled={busy || !canCraftBatch}
                       onClick={() =>
                         void runAction(() =>
                           api.craftItem({

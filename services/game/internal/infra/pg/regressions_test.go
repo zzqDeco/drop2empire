@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -347,6 +349,123 @@ func TestRaidPlayerLockDoesNotBlockOtherPlayersOrRequireRealmLock(t *testing.T) 
 	}
 	if string(meta["players"]) != "null" {
 		t.Fatal("realm still embeds player snapshots")
+	}
+}
+
+func TestLoadSessionWorldViewConsistentWithConcurrentGlobalTx(t *testing.T) {
+	s := integrationStore(t)
+	seedRegressionWorld(t, s, 4)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var expectedPairSum int64
+	if err := s.WithinTx(ctx, func(tx context.Context) error {
+		now := time.Now().UTC()
+		w, err := s.LoadWorld(tx, now)
+		if err != nil {
+			return err
+		}
+		grant := int64(500) * domain.GoldScale
+		if err := domain.ApplyMonetaryPolicy(w, domain.MonetaryPolicy{ID: "seed-world-view-test", Action: "issue", Amount: grant * 2}, now); err != nil {
+			return err
+		}
+		w.Economy.Reserve -= grant * 2
+		w.TreasuryHeldBasis += grant
+		w.Players["isolated_000"].GoldBasis += grant
+		expectedPairSum = w.Players["isolated_000"].GoldBasis + w.TreasuryHeldBasis
+		return s.SaveWorld(tx, w)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var stop atomic.Bool
+	var reads atomic.Int64
+	errCh := make(chan error, 4)
+	var wg sync.WaitGroup
+
+	// Global writer: alternates transferring gold between isolated_000 (d2e_players)
+	// and TreasuryHeldBasis (d2e_world_state) in SaveWorld.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer stop.Store(true)
+		step := int64(50) * domain.GoldScale
+		for i := 0; i < 25; i++ {
+			if err := s.WithinTx(ctx, func(tx context.Context) error {
+				w, err := s.LoadWorld(tx, time.Now())
+				if err != nil {
+					return err
+				}
+				if i%2 == 0 {
+					w.Players["isolated_000"].GoldBasis -= step
+					w.TreasuryHeldBasis += step
+				} else {
+					w.TreasuryHeldBasis -= step
+					w.Players["isolated_000"].GoldBasis += step
+				}
+				return s.SaveWorld(tx, w)
+			}); err != nil {
+				errCh <- fmt.Errorf("global writer iter %d: %w", i, err)
+				return
+			}
+		}
+	}()
+
+	// Concurrent single-player world-view readers on both the mutated player and a bystander.
+	for _, token := range []string{"token_isolated_000", "token_isolated_001"} {
+		tok := token
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for !stop.Load() {
+				if err := s.WithinTx(ctx, func(tx context.Context) error {
+					w, p, _, err := s.LoadSessionWorldView(tx, tok)
+					if err != nil {
+						return err
+					}
+					reads.Add(1)
+					if got := domain.MoneyHoldings(w); got != w.TotalIssuedBasis {
+						return fmt.Errorf("torn monetary snapshot for %s: holdings=%d issued=%d (cachedPlayer=%d treasury=%d)",
+							tok, got, w.TotalIssuedBasis, w.CachedPlayerHeldBasis, w.TreasuryHeldBasis)
+					}
+					if p.Handle == "isolated_000" && p.GoldBasis+w.TreasuryHeldBasis != expectedPairSum {
+						return fmt.Errorf("player/world mismatch for %s: player=%d treasury=%d wantSum=%d",
+							tok, p.GoldBasis, w.TreasuryHeldBasis, expectedPairSum)
+					}
+					return nil
+				}); err != nil {
+					errCh <- err
+					return
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatal(err)
+	}
+	if reads.Load() == 0 {
+		t.Fatal("expected concurrent LoadSessionWorldView reads to execute")
+	}
+
+	// Revoking the session in d2e_world_state must reject LoadSessionWorldView.
+	if err := s.WithinTx(ctx, func(tx context.Context) error {
+		w, err := s.LoadWorld(tx, time.Now())
+		if err != nil {
+			return err
+		}
+		delete(w.Sessions, "token_isolated_000")
+		return s.SaveWorld(tx, w)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.WithinTx(ctx, func(tx context.Context) error {
+		_, _, _, err := s.LoadSessionWorldView(tx, "token_isolated_000")
+		return err
+	}); err == nil {
+		t.Fatal("expected revoked session to fail LoadSessionWorldView")
 	}
 }
 

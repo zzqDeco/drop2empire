@@ -45,6 +45,11 @@ func NewHTTPHandler(svc *app.Service, ready func(context.Context) error) http.Ha
 		if tunnel := strings.TrimSpace(r.Header.Get("X-Admin-Tunnel")); tunnel != "" {
 			r = r.WithContext(app.WithAdminTunnel(r.Context(), tunnel))
 		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if rawIdem := strings.TrimSpace(r.Header.Get("X-Idempotency-Key")); rawIdem != "" {
+				r = r.WithContext(app.WithIdempotencyKey(r.Context(), r.Method+":"+r.URL.Path+":"+rawIdem))
+			}
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/v1/empire/colony/raid/") {
 			r.Body = http.MaxBytesReader(w, r.Body, 4096)
 			if token != "" && !limiter.allow(token, time.Now()) {
@@ -435,9 +440,14 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	}
 
 	var totalPlayerHeld, totalEscrow int64
-	for _, pl := range w.Players {
-		totalPlayerHeld += pl.GoldBasis
-		totalEscrow += pl.GoldFrozenBasis
+	if w.MacroLedgerCached {
+		totalPlayerHeld = w.CachedPlayerHeldBasis
+		totalEscrow = w.CachedEscrowFrozenBasis
+	} else {
+		for _, pl := range w.Players {
+			totalPlayerHeld += pl.GoldBasis
+			totalEscrow += pl.GoldFrozenBasis
+		}
 	}
 	macroDTO := &empire.MacroLedgerDTO{
 		TotalIssuedBasis:       w.TotalIssuedBasis,
@@ -537,7 +547,9 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 		})
 	}
 
-	domain.EnsureGuildState(w)
+	if !w.MacroLedgerCached {
+		domain.EnsureGuildState(w)
+	}
 	nodeNameMap := make(map[string]string, len(w.WarNodes))
 	for _, wn := range w.WarNodes {
 		nodeNameMap[wn.NodeID] = wn.Name
@@ -795,10 +807,13 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 	hydrationWarn := p.HydrationWarning
 
 	equippedCosDTO, cosmeticsDTO, raidGearsDTO, raidLoadoutDTO := mapRaidPresentation(p)
+	nowUTC := time.Now().UTC()
+	serverNowMs := nowUTC.UnixMilli()
 
 	return &empire.DashboardStateResp{
 		Economy:             mapEconomy(w, p, isAdmin),
-		ServerTime:          time.Now().UTC().Format(time.RFC3339Nano),
+		ServerTime:          nowUTC.Format(time.RFC3339Nano),
+		ServerNowUnixMs:     &serverNowMs,
 		Revision:            p.Revision,
 		Settlement:          mapSettlement(p, rates),
 		Player:              playerDTO,
@@ -1516,10 +1531,14 @@ func mapRaidPresentation(p *domain.PlayerState) (*empire.EquippedCosmeticsDTO, [
 				Tiles:         tilesDTO,
 			})
 		}
+		serverNowUnixMs := nowUTC.UnixMilli()
+		expiresAtUnixMs := sess.ExpiresAt.UnixMilli()
 		activeSessionDTO = &empire.RaidSessionDTO{
 			RaidId:                  sess.RaidID,
 			LastCommandSeq:          sess.LastCommandSeq,
 			ChannelRemainingMs:      max(int64(0), sess.ChannelReadyAt.Sub(nowUTC).Milliseconds()),
+			ServerNowUnixMs:         &serverNowUnixMs,
+			ExpiresAtUnixMs:         &expiresAtUnixMs,
 			CurrentZoneId:           sess.CurrentZoneID,
 			PlayerX:                 sess.PlayerX,
 			PlayerY:                 sess.PlayerY,
@@ -1596,5 +1615,6 @@ func mapRaidUpdate(p *domain.PlayerState) *empire.RaidUpdateResp {
 			}
 		}
 	}
-	return &empire.RaidUpdateResp{PlayerHandle: p.Handle, Revision: p.Revision, RaidLoadout: loadout}
+	serverNowMs := time.Now().UTC().UnixMilli()
+	return &empire.RaidUpdateResp{PlayerHandle: p.Handle, Revision: p.Revision, RaidLoadout: loadout, ServerNowUnixMs: &serverNowMs}
 }

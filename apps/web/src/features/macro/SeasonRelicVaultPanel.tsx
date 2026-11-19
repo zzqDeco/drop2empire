@@ -9,7 +9,11 @@ import type { SceneProps } from "./types";
 /**
  * Scene V (Lower Panel): Season Chest Console & Procedural UV-Etched Collectibles Gallery
  */
-export function SeasonRelicVaultPanel({ state, runAction }: SceneProps) {
+export function SeasonRelicVaultPanel({
+  state,
+  busy = false,
+  runAction,
+}: SceneProps) {
   const [revealedRelic, setRevealedRelic] = useState<CollectibleItemDTO | null>(
     null,
   );
@@ -39,7 +43,7 @@ export function SeasonRelicVaultPanel({ state, runAction }: SceneProps) {
               type="button"
               className="btn-outline mono-num"
               data-pop="+1 赛季宝箱"
-              disabled={player.activityPoints < 100}
+              disabled={busy || player.activityPoints < 100}
               onClick={() =>
                 void runAction(() => api.redeemSeasonChest({ count: 1 }))
               }
@@ -50,7 +54,7 @@ export function SeasonRelicVaultPanel({ state, runAction }: SceneProps) {
               type="button"
               className="btn-primary mono-num"
               data-pop="✦ 开启秘宝"
-              disabled={chestCount < 1}
+              disabled={busy || chestCount < 1}
               onClick={() => {
                 const existingIds = new Set(
                   state.collectibles.map((c) => c.itemId),

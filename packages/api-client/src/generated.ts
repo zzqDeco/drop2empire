@@ -238,6 +238,8 @@ export interface RaidSessionDTO {
   raidId: string;
   lastCommandSeq: number;
   channelRemainingMs: number;
+  serverNowUnixMs?: number;
+  expiresAtUnixMs?: number;
   currentZoneId: number;
   playerX: number;
   playerY: number;
@@ -706,6 +708,7 @@ export interface IntroduceCompanyReq {
 }
 
 export interface DashboardStateResp {
+  serverNowUnixMs?: number;
   economy: EconomyStateDTO;
   settlement: SettlementProgressDTO;
   revision: number;
@@ -746,6 +749,7 @@ export interface RaidUpdateResp {
   playerHandle: string;
   revision: number;
   raidLoadout: RaidLoadoutStateDTO;
+  serverNowUnixMs?: number;
 }
 
 export type GetDashboardReq = Record<string, never>;
