@@ -151,4 +151,101 @@ describe("authoritative response ordering", () => {
     const completed = advanceChannelingProgress(held, 2300, false);
     expect(completed?.progressPct).toBe(100);
   });
+
+  it("calibrates server clock offset so a 40s-delayed raid start never inflates countdown (F18)", () => {
+    // Server clock is +5,000ms ahead of client clock.
+    // Fast initial dashboard at client T=10_000 -> serverNow=15_000 calibrates offset=+5_000.
+    const initialDash = {
+      ...state(10, "raid-old", 1000),
+      serverNowUnixMs: 15_000,
+      raidLoadout: { activeSession: undefined },
+    } as unknown as DashboardStateResp;
+    const snap1 = applySnapshotUpdate(null, initialDash, "tok-alice", 10_000, {
+      startedAtMs: 9_950,
+      receivedAtMs: 10_050,
+    });
+    expect(snap1?.clockOffsetMs).toBe(5_000);
+
+    // Server starts raid at serverNow=20_000 (client T=15_000) with 280s duration -> expiresAt=300_000.
+    // Response arrives 40 seconds late at client T=55_000 (RTT = 40_000ms)!
+    const delayedStart = {
+      ...state(11, "raid-23", 1000),
+      serverNowUnixMs: 20_000,
+      raidLoadout: {
+        activeSession: {
+          raidId: "raid-23",
+          lastCommandSeq: 0,
+          timeRemainingMs: 280_000,
+          serverNowUnixMs: 20_000,
+          expiresAtUnixMs: 300_000,
+          zones: [zone(0, 9)],
+          playerX: 1,
+        } as unknown as RaidSessionDTO,
+      },
+    } as DashboardStateResp;
+    const snap2 = applySnapshotUpdate(snap1, delayedStart, "tok-alice", 55_000, {
+      startedAtMs: 15_000,
+      receivedAtMs: 55_000,
+    });
+    // Authoritative client deadline must be 300_000 - 5_000 = 295_000 (remaining 240s at T=55_000),
+    // NOT 55_000 + 280_000 = 335_000 (+40s inflated)!
+    expect(snap2?.raidExpiresAtClientMs).toBe(295_000);
+    expect((snap2?.raidExpiresAtClientMs ?? 0) - 55_000).toBe(240_000);
+
+    // Fast action at client T=56_000 (RTT=100ms, serverNow=61_000, expiresAt=300_000) keeps exact deadline 295_000 (zero jump!)
+    const fastAction = {
+      ...update(12, "raid-23", 2),
+      serverNowUnixMs: 61_000,
+      raidLoadout: {
+        activeSession: {
+          raidId: "raid-23",
+          lastCommandSeq: 1,
+          timeRemainingMs: 239_000,
+          serverNowUnixMs: 61_000,
+          expiresAtUnixMs: 300_000,
+          zones: [zone(0, 12)],
+          playerX: 2,
+        } as unknown as RaidSessionDTO,
+      },
+    } as RaidUpdateResp;
+    const snap3 = applySnapshotUpdate(snap2, fastAction, "tok-alice", 56_000, {
+      startedAtMs: 55_950,
+      receivedAtMs: 56_050,
+    });
+    expect(snap3?.raidExpiresAtClientMs).toBe(295_000);
+  });
+
+  it("ignores stale raid session with older serverNowUnixMs even at equal revision", () => {
+    const fresh = {
+      ...state(12, "raid-23", 1000),
+      raidLoadout: {
+        activeSession: {
+          raidId: "raid-23",
+          lastCommandSeq: 3,
+          timeRemainingMs: 200_000,
+          serverNowUnixMs: 100_000,
+          expiresAtUnixMs: 300_000,
+          zones: [zone(0, 12)],
+          playerX: 4,
+        } as unknown as RaidSessionDTO,
+      },
+    } as DashboardStateResp;
+    const stale = {
+      ...state(12, "raid-23", 1000),
+      raidLoadout: {
+        activeSession: {
+          raidId: "raid-23",
+          lastCommandSeq: 2,
+          timeRemainingMs: 240_000,
+          serverNowUnixMs: 60_000,
+          expiresAtUnixMs: 300_000,
+          zones: [zone(0, 10)],
+          playerX: 3,
+        } as unknown as RaidSessionDTO,
+      },
+    } as DashboardStateResp;
+    const merged = mergeServerUpdate(fresh, stale);
+    expect(merged?.raidLoadout.activeSession?.lastCommandSeq).toBe(3);
+    expect(merged?.raidLoadout.activeSession?.playerX).toBe(4);
+  });
 });

@@ -12,6 +12,7 @@ interface WastelandRaidPanelProps {
   state: DashboardStateResp;
   busy?: boolean;
   raidSyncedAtMs?: number;
+  raidExpiresAtClientMs?: number | null;
   runAction: (
     fn: () => Promise<ServerUpdate>,
     msg?: string,
@@ -21,10 +22,17 @@ interface WastelandRaidPanelProps {
 
 export function WastelandRaidPanel({
   state,
+  busy = false,
   raidSyncedAtMs,
+  raidExpiresAtClientMs,
   runAction,
 }: WastelandRaidPanelProps) {
-  const ctrl = useRaidController(state, runAction, raidSyncedAtMs);
+  const ctrl = useRaidController(
+    state,
+    runAction,
+    raidSyncedAtMs,
+    raidExpiresAtClientMs,
+  );
 
   if (ctrl.settlementReport) {
     return (
@@ -49,6 +57,11 @@ export function WastelandRaidPanel({
   }
 
   return (
-    <RaidArmoryDraftView state={state} ctrl={ctrl} runAction={runAction} />
+    <RaidArmoryDraftView
+      state={state}
+      busy={busy}
+      ctrl={ctrl}
+      runAction={runAction}
+    />
   );
 }

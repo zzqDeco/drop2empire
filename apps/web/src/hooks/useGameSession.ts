@@ -67,6 +67,7 @@ export function useGameSession(isAdminRoute: boolean) {
   const activeTokenRef = useRef<string | null>(api.getSessionToken());
   const boundTokenRef = useRef<string | null>(null);
   const localAuthInFlightRef = useRef(0);
+  const pollInFlightRef = useRef(false);
 
   const initialRoute =
     typeof window !== "undefined" && !isAdminRoute
@@ -272,6 +273,8 @@ export function useGameSession(isAdminRoute: boolean) {
   const boundSessionToken: string | null = snapshot?.sessionToken ?? null;
   const lastSyncAtMs: number = snapshot?.lastSyncAtMs ?? fallbackSyncMs;
   const raidSyncedAtMs: number = snapshot?.raidSyncedAtMs ?? lastSyncAtMs;
+  const raidExpiresAtClientMs: number | null =
+    snapshot?.raidExpiresAtClientMs ?? null;
 
   const hasState = state !== null;
   const hasActivePopulation = (state?.player.populationTotal ?? 0) > 0;
@@ -286,6 +289,28 @@ export function useGameSession(isAdminRoute: boolean) {
 
   useEffect(() => {
     if (!hasState) return;
+    let cancelled = false;
+    const pollDashboard = (liveToken: string) => {
+      if (pollInFlightRef.current) return;
+      pollInFlightRef.current = true;
+      const epoch = sessionEpochRef.current;
+      api
+        .getDashboard()
+        .then((res) => {
+          if (
+            !cancelled &&
+            sessionEpochRef.current === epoch &&
+            api.getSessionToken() === liveToken
+          ) {
+            applyServerStateForSession(res, liveToken);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          pollInFlightRef.current = false;
+        });
+    };
+
     const onVisibility = () => {
       if (document.visibilityState !== "visible") return;
       const liveToken = api.getSessionToken();
@@ -293,19 +318,8 @@ export function useGameSession(isAdminRoute: boolean) {
         reconcileExternalSession(liveToken);
         return;
       }
-      if (!hasActivePopulation || raidActive) return;
-      const epoch = sessionEpochRef.current;
-      api
-        .getDashboard()
-        .then((res) => {
-          if (
-            sessionEpochRef.current === epoch &&
-            api.getSessionToken() === liveToken
-          ) {
-            applyServerStateForSession(res, liveToken);
-          }
-        })
-        .catch(() => {});
+      if (!hasActivePopulation || raidActive || !liveToken) return;
+      pollDashboard(liveToken);
     };
 
     if (typeof document !== "undefined") {
@@ -314,6 +328,7 @@ export function useGameSession(isAdminRoute: boolean) {
 
     if (!hasActivePopulation || raidActive) {
       return () => {
+        cancelled = true;
         if (typeof document !== "undefined") {
           document.removeEventListener("visibilitychange", onVisibility);
         }
@@ -333,18 +348,7 @@ export function useGameSession(isAdminRoute: boolean) {
         return;
       }
       if (!liveToken) return;
-      const epoch = sessionEpochRef.current;
-      api
-        .getDashboard()
-        .then((res) => {
-          if (
-            sessionEpochRef.current === epoch &&
-            api.getSessionToken() === liveToken
-          ) {
-            applyServerStateForSession(res, liveToken);
-          }
-        })
-        .catch(() => {});
+      pollDashboard(liveToken);
     };
 
     const timer = window.setInterval(
@@ -352,6 +356,7 @@ export function useGameSession(isAdminRoute: boolean) {
       SETTLEMENT_UI_CONFIG.syncPollIntervalMs,
     );
     return () => {
+      cancelled = true;
       window.clearInterval(timer);
       if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", onVisibility);
@@ -568,5 +573,6 @@ export function useGameSession(isAdminRoute: boolean) {
     handleLogout,
     lastSyncAtMs,
     raidSyncedAtMs,
+    raidExpiresAtClientMs,
   };
 }

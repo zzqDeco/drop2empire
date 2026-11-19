@@ -66,6 +66,7 @@ export function App() {
     reconcileSessionMismatch,
     lastSyncAtMs,
     raidSyncedAtMs,
+    raidExpiresAtClientMs,
   } = useGameSession(isAdminRoute);
 
   const firstResBpUnlocked =
@@ -273,7 +274,9 @@ export function App() {
         >
           <WastelandRaidPanel
             state={state}
+            busy={busy}
             raidSyncedAtMs={raidSyncedAtMs}
+            raidExpiresAtClientMs={raidExpiresAtClientMs}
             runAction={runAction}
           />
         </section>
@@ -299,7 +302,11 @@ export function App() {
 
       {effectiveScene === "lord" && flags.showLordScene && (
         <div key="scene-lord" className="scene-workspace-offset">
-          <SeasonRelicVaultPanel state={state} runAction={runAction} />
+          <SeasonRelicVaultPanel
+            state={state}
+            busy={busy}
+            runAction={runAction}
+          />
         </div>
       )}
 

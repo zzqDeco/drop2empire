@@ -51,6 +51,13 @@ export type CommandSyncOutcome =
 
 const commandSyncOutcomes = new WeakMap<object, CommandSyncOutcome>();
 
+export interface ResponseTiming {
+  startedAtMs: number;
+  receivedAtMs: number;
+}
+
+const responseTimings = new WeakMap<object, ResponseTiming>();
+
 function markCommandSyncOutcome<T extends object>(
   resp: T,
   outcome: CommandSyncOutcome,
@@ -64,6 +71,31 @@ export function getCommandSyncOutcome(resp: unknown): CommandSyncOutcome {
     return commandSyncOutcomes.get(resp) ?? { kind: "executed" };
   }
   return { kind: "executed" };
+}
+
+export function getResponseTiming(resp: unknown): ResponseTiming | null {
+  if (resp && typeof resp === "object") {
+    return responseTimings.get(resp) ?? null;
+  }
+  return null;
+}
+
+function generateIdempotencyKey(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function withIdempotencyHeader(init: RequestInit, key: string): RequestInit {
+  const headers = new Headers(init.headers);
+  if (!headers.has("X-Idempotency-Key")) {
+    headers.set("X-Idempotency-Key", key);
+  }
+  return { ...init, headers };
 }
 
 export class ApiError extends Error {
@@ -157,6 +189,7 @@ export class EmpireClient {
     if (options.body && !(options.body instanceof FormData)) {
       headers.set("Content-Type", "application/json");
     }
+    const startedAtMs = Date.now();
     const response = await fetch(`/api/v1${path}`, {
       ...options,
       headers,
@@ -171,7 +204,12 @@ export class EmpireClient {
         data.error?.message ?? `请求失败 (${response.status})`,
       );
     }
-    return (await response.json()) as T;
+    const parsed = (await response.json()) as T;
+    const receivedAtMs = Date.now();
+    if (parsed && typeof parsed === "object") {
+      responseTimings.set(parsed as object, { startedAtMs, receivedAtMs });
+    }
+    return parsed;
   }
 
   getDashboard = () =>
@@ -225,42 +263,69 @@ export class EmpireClient {
       body: JSON.stringify(req),
     });
 
+  async #mutateRequest(path: string, init: RequestInit): Promise<DashboardStateResp> {
+    const token = this.getSessionToken();
+    const scopedInit = withIdempotencyHeader(init, generateIdempotencyKey());
+    try {
+      try {
+        return await this.#request<DashboardStateResp>(path, scopedInit);
+      } catch (error) {
+        if (!(error instanceof TypeError) || this.getSessionToken() !== token) throw error;
+        // Exact-once server deduplication on X-Idempotency-Key makes a single transport retry safe.
+        return await this.#request<DashboardStateResp>(path, scopedInit);
+      }
+    } catch (error) {
+      if (this.getSessionToken() === token && error instanceof TypeError) {
+        const synced = await this.getDashboard();
+        return markCommandSyncOutcome(synced, {
+          kind: "uncertain",
+          message: "网络响应中断，操作结果不确定，已同步最新状态，请核对后再操作",
+        });
+      }
+      throw error;
+    }
+  }
+
   gatherWater = (req: GatherWaterReq = {}) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.GatherWater.clientPath, {
-      method: IDL_ROUTES.GatherWater.method,
-      body: JSON.stringify(req),
-    });
+    this.#request<DashboardStateResp>(
+      IDL_ROUTES.GatherWater.clientPath,
+      withIdempotencyHeader(
+        {
+          method: IDL_ROUTES.GatherWater.method,
+          body: JSON.stringify(req),
+        },
+        generateIdempotencyKey(),
+      ),
+    );
 
   recruitResident = (req: RecruitResidentReq = {}) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.RecruitResident.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.RecruitResident.clientPath, {
       method: IDL_ROUTES.RecruitResident.method,
       body: JSON.stringify(req),
     });
 
   allocateWorkers = (req: AllocateWorkersReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.AllocateWorkers.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.AllocateWorkers.clientPath, {
       method: IDL_ROUTES.AllocateWorkers.method,
       body: JSON.stringify(req),
     });
 
   saveAllocationPreset = (req: SaveAllocationPresetReq) =>
-    this.#request<DashboardStateResp>(
-      IDL_ROUTES.SaveAllocationPreset.clientPath,
-      {
-        method: IDL_ROUTES.SaveAllocationPreset.method,
-        body: JSON.stringify(req),
-      },
-    );
+    this.#mutateRequest(IDL_ROUTES.SaveAllocationPreset.clientPath, {
+      method: IDL_ROUTES.SaveAllocationPreset.method,
+      body: JSON.stringify(req),
+    });
 
   async #settlementRequest(path: string, init: RequestInit): Promise<DashboardStateResp> {
     const token = this.getSessionToken();
+    const scopedInit = withIdempotencyHeader(init, generateIdempotencyKey());
     let retriedAfterTransportError = false;
     try {
-      try { return await this.#request<DashboardStateResp>(path, init); }
+      try { return await this.#request<DashboardStateResp>(path, scopedInit); }
       catch (error) {
         if (!(error instanceof TypeError) || this.getSessionToken() !== token) throw error;
         retriedAfterTransportError = true;
-        return await this.#request<DashboardStateResp>(path, init);
+        return await this.#request<DashboardStateResp>(path, scopedInit);
       }
     } catch (error) {
       if (this.getSessionToken() === token) {
@@ -293,8 +358,8 @@ export class EmpireClient {
   }
 
   economyAction = (req: EconomyActionReq) => this.#settlementRequest(IDL_ROUTES.EconomyAction.clientPath, { method: IDL_ROUTES.EconomyAction.method, body: JSON.stringify(req) });
-  monetaryPolicy = (req: MonetaryPolicyReq) => this.#request<DashboardStateResp>(IDL_ROUTES.MonetaryPolicy.clientPath, { method: IDL_ROUTES.MonetaryPolicy.method, body: JSON.stringify(req) });
-  introduceCompany = (req: IntroduceCompanyReq) => this.#request<DashboardStateResp>(IDL_ROUTES.IntroduceCompany.clientPath, { method: IDL_ROUTES.IntroduceCompany.method, body: JSON.stringify(req) });
+  monetaryPolicy = (req: MonetaryPolicyReq) => this.#mutateRequest(IDL_ROUTES.MonetaryPolicy.clientPath, { method: IDL_ROUTES.MonetaryPolicy.method, body: JSON.stringify(req) });
+  introduceCompany = (req: IntroduceCompanyReq) => this.#mutateRequest(IDL_ROUTES.IntroduceCompany.clientPath, { method: IDL_ROUTES.IntroduceCompany.method, body: JSON.stringify(req) });
 
   researchTechnology = (req: ResearchTechnologyReq) =>
     this.#settlementRequest(IDL_ROUTES.ResearchTechnology.clientPath, {
@@ -307,82 +372,77 @@ export class EmpireClient {
     });
 
   unlockBlueprint = (req: UnlockBlueprintReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.UnlockBlueprint.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.UnlockBlueprint.clientPath, {
       method: IDL_ROUTES.UnlockBlueprint.method,
       body: JSON.stringify(req),
     });
 
   toggleEdict = (req: ToggleEdictReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.ToggleEdict.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.ToggleEdict.clientPath, {
       method: IDL_ROUTES.ToggleEdict.method,
       body: JSON.stringify(req),
     });
 
   dispatchExpedition = (req: DispatchExpeditionReq) =>
-    this.#request<DashboardStateResp>(
-      IDL_ROUTES.DispatchExpedition.clientPath,
-      {
-        method: IDL_ROUTES.DispatchExpedition.method,
-        body: JSON.stringify(req),
-      },
-    );
+    this.#mutateRequest(IDL_ROUTES.DispatchExpedition.clientPath, {
+      method: IDL_ROUTES.DispatchExpedition.method,
+      body: JSON.stringify(req),
+    });
 
   claimExpedition = () =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.ClaimExpedition.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.ClaimExpedition.clientPath, {
       method: IDL_ROUTES.ClaimExpedition.method,
       body: JSON.stringify({}),
     });
 
   tradeCaravan = (req: TradeCaravanReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.TradeCaravan.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.TradeCaravan.clientPath, {
       method: IDL_ROUTES.TradeCaravan.method,
       body: JSON.stringify(req),
     });
 
   equipCosmetic = (req: EquipCosmeticReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.EquipCosmetic.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.EquipCosmetic.clientPath, {
       method: IDL_ROUTES.EquipCosmetic.method,
       body: JSON.stringify(req),
     });
 
   learnRaidBlueprint = (req: LearnRaidBlueprintReq) =>
-    this.#request<DashboardStateResp>(
-      IDL_ROUTES.LearnRaidBlueprint.clientPath,
-      {
-        method: IDL_ROUTES.LearnRaidBlueprint.method,
-        body: JSON.stringify(req),
-      },
-    );
+    this.#mutateRequest(IDL_ROUTES.LearnRaidBlueprint.clientPath, {
+      method: IDL_ROUTES.LearnRaidBlueprint.method,
+      body: JSON.stringify(req),
+    });
 
   manageRaidGear = (req: ManageRaidGearReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.ManageRaidGear.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.ManageRaidGear.clientPath, {
       method: IDL_ROUTES.ManageRaidGear.method,
       body: JSON.stringify(req),
     });
 
   draftRaidBuff = (req: DraftRaidBuffReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.DraftRaidBuff.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.DraftRaidBuff.clientPath, {
       method: IDL_ROUTES.DraftRaidBuff.method,
       body: JSON.stringify(req),
     });
 
   startRaid = () =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.StartRaid.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.StartRaid.clientPath, {
       method: IDL_ROUTES.StartRaid.method,
       body: JSON.stringify({}),
     });
 
   async #raidRequest(path: string, init: RequestInit): Promise<RaidUpdateResp | DashboardStateResp> {
     const token = this.getSessionToken();
+    const scopedInit = withIdempotencyHeader(init, generateIdempotencyKey());
     let update: RaidUpdateResp;
     let retriedAfterTransportError = false;
     try {
       try {
-        update = await this.#request<RaidUpdateResp>(path, init);
+        update = await this.#request<RaidUpdateResp>(path, scopedInit);
       } catch (error) {
         if (!(error instanceof TypeError) || this.getSessionToken() !== token) throw error;
         retriedAfterTransportError = true;
-        update = await this.#request<RaidUpdateResp>(path, init);
+        update = await this.#request<RaidUpdateResp>(path, scopedInit);
       }
     } catch (error) {
       if (this.getSessionToken() === token) {
@@ -442,73 +502,67 @@ export class EmpireClient {
     });
 
   chooseProfession = (req: ChooseProfessionReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.ChooseProfession.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.ChooseProfession.clientPath, {
       method: IDL_ROUTES.ChooseProfession.method,
       body: JSON.stringify(req),
     });
 
   craftItem = (req: CraftItemReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.CraftItem.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.CraftItem.clientPath, {
       method: IDL_ROUTES.CraftItem.method,
       body: JSON.stringify(req),
     });
 
   installEquipment = (req: InstallEquipmentReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.InstallEquipment.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.InstallEquipment.clientPath, {
       method: IDL_ROUTES.InstallEquipment.method,
       body: JSON.stringify(req),
     });
 
   placeMarketOrder = (req: PlaceMarketOrderReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.PlaceMarketOrder.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.PlaceMarketOrder.clientPath, {
       method: IDL_ROUTES.PlaceMarketOrder.method,
       body: JSON.stringify(req),
     });
 
   cancelMarketOrder = (id: string) =>
-    this.#request<DashboardStateResp>(
-      routePath(IDL_ROUTES.CancelMarketOrder, { id }),
-      {
-        method: IDL_ROUTES.CancelMarketOrder.method,
-        body: JSON.stringify({}),
-      },
-    );
+    this.#mutateRequest(routePath(IDL_ROUTES.CancelMarketOrder, { id }), {
+      method: IDL_ROUTES.CancelMarketOrder.method,
+      body: JSON.stringify({}),
+    });
 
   switchGuild = (req: SwitchGuildReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.SwitchGuild.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.SwitchGuild.clientPath, {
       method: IDL_ROUTES.SwitchGuild.method,
       body: JSON.stringify(req),
     });
 
   guildAction = (req: GuildActionReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.GuildAction.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.GuildAction.clientPath, {
       method: IDL_ROUTES.GuildAction.method,
       body: JSON.stringify(req),
     });
 
   deployWarTroops = (req: DeployWarTroopsReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.DeployWarTroops.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.DeployWarTroops.clientPath, {
       method: IDL_ROUTES.DeployWarTroops.method,
       body: JSON.stringify(req),
     });
 
   triggerWarSettlement = () =>
-    this.#request<DashboardStateResp>(
-      IDL_ROUTES.TriggerWarSettlement.clientPath,
-      {
-        method: IDL_ROUTES.TriggerWarSettlement.method,
-        body: JSON.stringify({}),
-      },
-    );
+    this.#mutateRequest(IDL_ROUTES.TriggerWarSettlement.clientPath, {
+      method: IDL_ROUTES.TriggerWarSettlement.method,
+      body: JSON.stringify({}),
+    });
 
   redeemSeasonChest = (req: RedeemSeasonChestReq) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.RedeemSeasonChest.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.RedeemSeasonChest.clientPath, {
       method: IDL_ROUTES.RedeemSeasonChest.method,
       body: JSON.stringify(req),
     });
 
   openSeasonChest = (req: OpenSeasonChestReq = {}) =>
-    this.#request<DashboardStateResp>(IDL_ROUTES.OpenSeasonChest.clientPath, {
+    this.#mutateRequest(IDL_ROUTES.OpenSeasonChest.clientPath, {
       method: IDL_ROUTES.OpenSeasonChest.method,
       body: JSON.stringify(req),
     });

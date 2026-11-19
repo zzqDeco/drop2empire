@@ -159,6 +159,21 @@ export function RaidBattlefieldViewport({
             </span>
           </div>
           <div className="metric-cell">
+            <span className="metric-label">外围信标窗口</span>
+            <span
+              className={`metric-value mono-num ${
+                timeLeftMs <= EARLY_EXTRACT_CUTOFF_MS ||
+                timeLeftMs - EARLY_EXTRACT_CUTOFF_MS <= 30000
+                  ? "cost-lack"
+                  : ""
+              }`}
+            >
+              {timeLeftMs > EARLY_EXTRACT_CUTOFF_MS
+                ? `开放余 ${((timeLeftMs - EARLY_EXTRACT_CUTOFF_MS) / 1000).toFixed(1)}s`
+                : "已关闭 · 走深层"}
+            </span>
+          </div>
+          <div className="metric-cell">
             <span className="metric-label">生命值</span>
             <span className="metric-value mono-num">
               {hp} / {maxHp}

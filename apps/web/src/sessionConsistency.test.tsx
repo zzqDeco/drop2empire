@@ -633,4 +633,72 @@ describe("client session & state consistency (#14, #16, #17, #20)", () => {
     });
     expect(byTestId("workers-busy")).toBe("false");
   });
+
+  it("prevents overlapping GET /state polls while a slow poll is still in flight", async () => {
+    window.localStorage.setItem("d2e-session-token", "tok-alice");
+    fetchMock.mockResolvedValueOnce(
+      json(makeDashboard({ handle: "alice", revision: 1 })),
+    );
+
+    let resolveSlowPoll!: (resp: Response) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveSlowPoll = resolve;
+        }),
+    );
+
+    function Harness() {
+      const session = useGameSession(false);
+      return <span data-testid="handle">{session.state?.player.handle ?? ""}</span>;
+    }
+
+    await mount(<Harness />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Advance across 3 polling intervals (6s) while the 1st poll is still unresolved
+    await act(async () => {
+      vi.advanceTimersByTime(6_500);
+      await Promise.resolve();
+    });
+    // Must only have fired 1 poll (total 2 fetches including initial load), never 3 overlapping polls!
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // Once the slow poll resolves, subsequent interval fires cleanly
+    fetchMock.mockResolvedValueOnce(
+      json(makeDashboard({ handle: "alice", revision: 3 })),
+    );
+    await act(async () => {
+      resolveSlowPoll(json(makeDashboard({ handle: "alice", revision: 2 })));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(2_100);
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("reuses identical X-Idempotency-Key across transport retry on redeemSeasonChest", async () => {
+    window.localStorage.setItem("d2e-session-token", "tok-alice");
+    const seenKeys: string[] = [];
+    fetchMock
+      .mockImplementationOnce(async (_url, init) => {
+        seenKeys.push(new Headers(init?.headers).get("X-Idempotency-Key") ?? "");
+        throw new TypeError("Failed to fetch");
+      })
+      .mockImplementationOnce(async (_url, init) => {
+        seenKeys.push(new Headers(init?.headers).get("X-Idempotency-Key") ?? "");
+        return json(makeDashboard({ handle: "alice", revision: 2 }));
+      });
+
+    const resp = await api.redeemSeasonChest({ count: 1 });
+    expect(resp.revision).toBe(2);
+    expect(seenKeys).toHaveLength(2);
+    expect(seenKeys[0]).not.toBe("");
+    expect(seenKeys[0]).toBe(seenKeys[1]);
+  });
 });

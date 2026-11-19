@@ -1,7 +1,9 @@
-import type {
-  DashboardStateResp,
-  RaidSessionDTO,
-  RaidUpdateResp,
+import {
+  getResponseTiming,
+  type DashboardStateResp,
+  type RaidSessionDTO,
+  type RaidUpdateResp,
+  type ResponseTiming,
 } from "@drop2empire/api-client";
 
 export type ServerUpdate = DashboardStateResp | RaidUpdateResp;
@@ -33,11 +35,35 @@ function withPartitionRevisions(
   return state;
 }
 
+function isStaleRaidSession(
+  previous: RaidSessionDTO | undefined,
+  incoming: RaidSessionDTO | undefined,
+): boolean {
+  if (!previous || !incoming || previous.raidId !== incoming.raidId) {
+    return false;
+  }
+  if (incoming.lastCommandSeq < previous.lastCommandSeq) {
+    return true;
+  }
+  if (
+    incoming.lastCommandSeq === previous.lastCommandSeq &&
+    previous.serverNowUnixMs !== undefined &&
+    incoming.serverNowUnixMs !== undefined &&
+    incoming.serverNowUnixMs < previous.serverNowUnixMs
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function mergeRaidZones(
   previous: RaidSessionDTO | undefined,
   incoming: RaidSessionDTO | undefined,
 ): RaidSessionDTO | undefined {
   if (!incoming) return undefined;
+  if (isStaleRaidSession(previous, incoming)) {
+    return previous;
+  }
   const zones = new Map(
     (previous?.raidId === incoming.raidId ? previous.zones : []).map((zone) => [
       zone.id,
@@ -137,7 +163,60 @@ export interface ClientSessionSnapshot {
   raidRevision: number;
   lastSyncAtMs: number;
   raidSyncedAtMs: number;
+  clockOffsetMs: number | null;
+  clockOffsetRttMs: number;
+  raidExpiresAtClientMs: number | null;
   needsDashboardCatchup: boolean;
+}
+
+function calibrateClockOffset(
+  prevOffsetMs: number | null,
+  prevRttMs: number,
+  serverNowUnixMs: number | undefined,
+  timing: ResponseTiming | null,
+  fallbackNowMs: number,
+): { clockOffsetMs: number | null; clockOffsetRttMs: number } {
+  if (serverNowUnixMs === undefined || serverNowUnixMs <= 0) {
+    return { clockOffsetMs: prevOffsetMs, clockOffsetRttMs: prevRttMs };
+  }
+  const rttMs = timing
+    ? Math.max(0, timing.receivedAtMs - timing.startedAtMs)
+    : Number.POSITIVE_INFINITY;
+  const clientAnchorMs = timing
+    ? (timing.startedAtMs + timing.receivedAtMs) / 2
+    : fallbackNowMs;
+  const sampleOffsetMs = serverNowUnixMs - clientAnchorMs;
+  if (prevOffsetMs === null) {
+    return {
+      clockOffsetMs: sampleOffsetMs,
+      clockOffsetRttMs: rttMs,
+    };
+  }
+  if (
+    Number.isFinite(rttMs) &&
+    (rttMs <= prevRttMs + 250 || rttMs <= 2000)
+  ) {
+    return {
+      clockOffsetMs: sampleOffsetMs,
+      clockOffsetRttMs: Math.min(prevRttMs, rttMs),
+    };
+  }
+  return { clockOffsetMs: prevOffsetMs, clockOffsetRttMs: prevRttMs };
+}
+
+function deriveRaidExpiresAtClientMs(
+  session: RaidSessionDTO | undefined,
+  clockOffsetMs: number | null,
+): number | null {
+  if (
+    !session ||
+    session.expiresAtUnixMs === undefined ||
+    session.expiresAtUnixMs <= 0 ||
+    clockOffsetMs === null
+  ) {
+    return null;
+  }
+  return Math.round(session.expiresAtUnixMs - clockOffsetMs);
 }
 
 export function applySnapshotUpdate(
@@ -145,7 +224,16 @@ export function applySnapshotUpdate(
   update: ServerUpdate,
   sessionToken: string | null,
   nowMs: number = Date.now(),
+  timingOverride?: ResponseTiming | null,
 ): ClientSessionSnapshot | null {
+  const timing =
+    timingOverride !== undefined ? timingOverride : getResponseTiming(update);
+  const updateServerNowMs =
+    update.serverNowUnixMs ?? update.raidLoadout.activeSession?.serverNowUnixMs;
+  const anchorMs = timing
+    ? Math.round((timing.startedAtMs + timing.receivedAtMs) / 2)
+    : nowMs;
+
   if (!current || current.sessionToken !== sessionToken) {
     if (!("player" in update)) {
       return null;
@@ -155,19 +243,51 @@ export function applySnapshotUpdate(
       update.revision,
       update.revision,
     );
+    const { clockOffsetMs, clockOffsetRttMs } = calibrateClockOffset(
+      null,
+      Number.POSITIVE_INFINITY,
+      updateServerNowMs,
+      timing,
+      nowMs,
+    );
     return {
       state,
       sessionToken,
       dashboardRevision: update.revision,
       raidRevision: update.revision,
       lastSyncAtMs: nowMs,
-      raidSyncedAtMs: nowMs,
+      raidSyncedAtMs: anchorMs,
+      clockOffsetMs,
+      clockOffsetRttMs,
+      raidExpiresAtClientMs: deriveRaidExpiresAtClientMs(
+        state.raidLoadout.activeSession,
+        clockOffsetMs,
+      ),
       needsDashboardCatchup: false,
     };
   }
 
+  const { clockOffsetMs, clockOffsetRttMs } = calibrateClockOffset(
+    current.clockOffsetMs,
+    current.clockOffsetRttMs,
+    updateServerNowMs,
+    timing,
+    nowMs,
+  );
+
   const nextState = mergeServerUpdate(current.state, update);
   if (!nextState || nextState === current.state) {
+    if (clockOffsetMs !== current.clockOffsetMs) {
+      return {
+        ...current,
+        clockOffsetMs,
+        clockOffsetRttMs,
+        raidExpiresAtClientMs: deriveRaidExpiresAtClientMs(
+          current.state.raidLoadout.activeSession,
+          clockOffsetMs,
+        ),
+      };
+    }
     return current;
   }
 
@@ -177,7 +297,13 @@ export function applySnapshotUpdate(
   const dashboardAccepted =
     "player" in update &&
     (handleChanged || update.revision >= current.dashboardRevision);
-  const raidAccepted = handleChanged || update.revision >= current.raidRevision;
+  const raidSessionReplaced =
+    nextState.raidLoadout.activeSession !==
+    current.state.raidLoadout.activeSession;
+  const raidAccepted =
+    handleChanged ||
+    (update.revision >= current.raidRevision &&
+      (raidSessionReplaced || !nextState.raidLoadout.activeSession));
 
   const needsDashboardCatchup =
     raidRevision > dashboardRevision + 1 ||
@@ -189,7 +315,13 @@ export function applySnapshotUpdate(
     dashboardRevision,
     raidRevision,
     lastSyncAtMs: dashboardAccepted ? nowMs : current.lastSyncAtMs,
-    raidSyncedAtMs: raidAccepted ? nowMs : current.raidSyncedAtMs,
+    raidSyncedAtMs: raidAccepted ? anchorMs : current.raidSyncedAtMs,
+    clockOffsetMs,
+    clockOffsetRttMs,
+    raidExpiresAtClientMs: deriveRaidExpiresAtClientMs(
+      nextState.raidLoadout.activeSession,
+      clockOffsetMs,
+    ),
     needsDashboardCatchup,
   };
 }
