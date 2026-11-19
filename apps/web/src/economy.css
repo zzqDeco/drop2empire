@@ -78,10 +78,6 @@
   padding: 1.5rem;
 }
 .economy-toast {
-  position: fixed;
-  z-index: 90;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(36rem, 90vw);
+  margin: var(--space-2) 18px 0;
+  max-width: calc(100% - 36px);
 }

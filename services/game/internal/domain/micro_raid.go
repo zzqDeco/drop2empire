@@ -452,9 +452,17 @@ func buildServerRaidZones(seed int64) []RaidZoneState {
 			Visited:  tmpl.ID == 0,
 			Tiles:    tiles,
 		}
+		protectedFromWall := make([]bool, int(z.Width*z.Height))
 		for _, fix := range tmpl.Fixed {
 			if fix.X < 0 || fix.X >= z.Width || fix.Y < 0 || fix.Y >= z.Height {
 				continue
+			}
+			protectedFromWall[int(fix.Y*z.Width+fix.X)] = true
+			for _, dir := range [][2]int32{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+				nx, ny := fix.X+dir[0], fix.Y+dir[1]
+				if nx >= 0 && nx < z.Width && ny >= 0 && ny < z.Height {
+					protectedFromWall[int(ny*z.Width+nx)] = true
+				}
 			}
 			tile := &z.Tiles[int(fix.Y*z.Width+fix.X)]
 			if fix.EnemyArchetype != "" {
@@ -484,7 +492,8 @@ func buildServerRaidZones(seed int64) []RaidZoneState {
 			for _, rule := range tmpl.ProcRules {
 				if r < rule.MaxRoll {
 					if rule.Kind == "wall" {
-						if (rule.WallClearRowY >= 0 && t.Y == rule.WallClearRowY) ||
+						if protectedFromWall[i] ||
+							(rule.WallClearRowY >= 0 && t.Y == rule.WallClearRowY) ||
 							(rule.WallClearColX >= 0 && t.X == rule.WallClearColX) ||
 							(rule.WallClearX >= 0 && rule.WallClearY >= 0 && t.X == rule.WallClearX && t.Y == rule.WallClearY) {
 							continue
@@ -507,9 +516,118 @@ func buildServerRaidZones(seed int64) []RaidZoneState {
 				}
 			}
 		}
+		ensureZoneLandmarksReachable(&z, tmpl.Fixed)
 		zones = append(zones, z)
 	}
 	return zones
+}
+
+func ensureZoneLandmarksReachable(z *RaidZoneState, fixed []RaidFixedTileSpec) {
+	if z == nil || z.Width <= 0 || z.Height <= 0 || len(fixed) == 0 {
+		return
+	}
+	anchorX, anchorY := int32(-1), int32(-1)
+	for _, fix := range fixed {
+		if fix.Kind == "spawn" {
+			anchorX, anchorY = fix.X, fix.Y
+			break
+		}
+	}
+	if anchorX < 0 {
+		for _, fix := range fixed {
+			if fix.Kind == "portal" {
+				anchorX, anchorY = fix.X, fix.Y
+				break
+			}
+		}
+	}
+	if anchorX < 0 {
+		anchorX, anchorY = fixed[0].X, fixed[0].Y
+	}
+	if anchorX < 0 || anchorX >= z.Width || anchorY < 0 || anchorY >= z.Height {
+		return
+	}
+
+	bfs := func() []bool {
+		visited := make([]bool, int(z.Width*z.Height))
+		startIdx := int(anchorY*z.Width + anchorX)
+		visited[startIdx] = true
+		queue := []int{startIdx}
+		for head := 0; head < len(queue); head++ {
+			cur := queue[head]
+			cx := int32(cur) % z.Width
+			cy := int32(cur) / z.Width
+			for _, dir := range [][2]int32{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+				nx, ny := cx+dir[0], cy+dir[1]
+				if nx < 0 || nx >= z.Width || ny < 0 || ny >= z.Height {
+					continue
+				}
+				nIdx := int(ny*z.Width + nx)
+				if visited[nIdx] || z.Tiles[nIdx].Kind == "wall" {
+					continue
+				}
+				visited[nIdx] = true
+				queue = append(queue, nIdx)
+			}
+		}
+		return visited
+	}
+
+	visited := bfs()
+	for _, fix := range fixed {
+		if fix.X < 0 || fix.X >= z.Width || fix.Y < 0 || fix.Y >= z.Height {
+			continue
+		}
+		targetIdx := int(fix.Y*z.Width + fix.X)
+		if visited[targetIdx] {
+			continue
+		}
+		bestX, bestY := anchorX, anchorY
+		bestDist := int32(1 << 30)
+		for i, ok := range visited {
+			if !ok {
+				continue
+			}
+			vx := int32(i) % z.Width
+			vy := int32(i) / z.Width
+			dx := vx - fix.X
+			if dx < 0 {
+				dx = -dx
+			}
+			dy := vy - fix.Y
+			if dy < 0 {
+				dy = -dy
+			}
+			if dx+dy < bestDist {
+				bestDist = dx + dy
+				bestX, bestY = vx, vy
+			}
+		}
+		cx, cy := bestX, bestY
+		for cx != fix.X {
+			if cx < fix.X {
+				cx++
+			} else {
+				cx--
+			}
+			idx := int(cy*z.Width + cx)
+			if z.Tiles[idx].Kind == "wall" {
+				z.Tiles[idx].Kind = "empty"
+			}
+		}
+		for cy != fix.Y {
+			if cy < fix.Y {
+				cy++
+			} else {
+				cy--
+			}
+			idx := int(cy*z.Width + cx)
+			if z.Tiles[idx].Kind == "wall" {
+				z.Tiles[idx].Kind = "empty"
+			}
+		}
+		visited = bfs()
+	}
 }
 
 func makeServerLootItem(itemKey string, seq *int32) RaidLootItem {
@@ -912,7 +1030,7 @@ func PerformRaidAction(p *PlayerState, action string, dx, dy int32, itemID, from
 			prependRaidLog(sess, fmt.Sprintf("饮用【清泉止血露】：生命 +%d，时间 +%ds！", RaidBalance.PotionHealSpringHP, RaidBalance.PotionHealSpringBonusS))
 		case "pot_gale_stride", "pot_gale_draught":
 			sess.GaleEndsAt = now.Add(time.Duration(RaidBalance.PotionGaleStrideSec) * time.Second)
-			prependRaidLog(sess, fmt.Sprintf("饮用【轻身疾行散】：%d秒内移动冷却缩短 35%%！", RaidBalance.PotionGaleStrideSec))
+			prependRaidLog(sess, fmt.Sprintf("饮用【轻身疾行散】：%d秒内移动冷却压至 %dms/格！", RaidBalance.PotionGaleStrideSec, RaidBalance.GalePotionCooldownMs))
 		case "pot_scavenge_elixir":
 			sess.ScavEndsAt = now.Add(time.Duration(RaidBalance.PotionScavElixirSec) * time.Second)
 			prependRaidLog(sess, fmt.Sprintf("饮用【巧手速搜合剂】：%d秒内搜索宝箱读条缩短 %d%%！", RaidBalance.PotionScavElixirSec, RaidBalance.PotionScavSpeedPct))

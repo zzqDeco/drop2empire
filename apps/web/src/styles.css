@@ -247,7 +247,9 @@ button:disabled {
 }
 
 .btn-step {
-  padding: 3px 7px;
+  min-width: 34px;
+  min-height: 30px;
+  padding: 4px 8px;
   font-size: var(--font-xs);
   font-weight: 600;
   background: var(--surface);

@@ -496,6 +496,7 @@ struct CollectibleItemDTO {
   18: required string specialTag (api.body="specialTag")
   19: required string mintedAt (api.body="mintedAt")
   20: required string ownerName (api.body="ownerName")
+  21: optional string patternSeedText (api.body="patternSeedText")
 }
 
 struct SeasonNoticeDTO {

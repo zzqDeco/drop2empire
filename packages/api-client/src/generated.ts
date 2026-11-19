@@ -496,6 +496,7 @@ export interface CollectibleItemDTO {
   specialTag: string;
   mintedAt: string;
   ownerName: string;
+  patternSeedText?: string;
 }
 
 export interface SeasonNoticeDTO {

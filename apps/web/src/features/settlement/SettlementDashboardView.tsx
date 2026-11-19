@@ -84,6 +84,13 @@ function SettlementResourceLedger({
               </small>
             )}
           </strong>
+          {waterRes.capacityMilli > 0 &&
+            liveWaterMilli > waterRes.capacityMilli && (
+              <span className="tag-badge tag-warning mono-num">
+                超仓可用 +
+                {formatResource(liveWaterMilli - waterRes.capacityMilli, 1)}
+              </span>
+            )}
           <span className="water-rate mono-num">
             <span className="rate-pos">
               增速 +{formatResource(waterRes.grossRatePerSecMilli, 2)}/s
@@ -137,10 +144,14 @@ function SettlementResourceLedger({
                     ? liveWaterMilli
                     : r.amountMilli +
                       Math.floor(r.netRatePerSecMilli * interpSeconds);
+                const effectiveCeiling =
+                  r.capacityMilli > 0
+                    ? Math.max(r.capacityMilli, r.amountMilli)
+                    : Number.POSITIVE_INFINITY;
                 const liveAmt = Math.max(
                   0,
                   r.capacityMilli > 0
-                    ? Math.min(r.capacityMilli, rawLive)
+                    ? Math.min(effectiveCeiling, rawLive)
                     : rawLive,
                 );
                 const isContinuous =
@@ -149,6 +160,10 @@ function SettlementResourceLedger({
                   r.key === "flint" ||
                   r.key === "ancient_shard";
                 const shownAmt = isContinuous ? liveAmt : r.amountMilli;
+                const overCapMilli =
+                  r.capacityMilli > 0
+                    ? Math.max(0, shownAmt - r.capacityMilli)
+                    : 0;
                 const isStorageFull =
                   r.capacityMilli > 0 && shownAmt >= r.capacityMilli;
                 return (
@@ -161,8 +176,14 @@ function SettlementResourceLedger({
                             冻:{formatResource(r.frozenMilli, 0)}
                           </small>
                         )}
-                        {isStorageFull && (
-                          <small className="frozen-tag">满仓</small>
+                        {overCapMilli > 0 ? (
+                          <small className="frozen-tag mono-num">
+                            超仓+{formatResource(overCapMilli, 0)}
+                          </small>
+                        ) : (
+                          isStorageFull && (
+                            <small className="frozen-tag">满仓</small>
+                          )
                         )}
                       </div>
                       {r.description && (
@@ -351,7 +372,6 @@ export function SettlementDashboardView({
                 <button
                   type="button"
                   className="btn-primary btn-block"
-                  data-pop={`★ 就职 ${pr.name}`}
                   disabled={busy}
                   onClick={() => setPendingProfession(pr)}
                 >
@@ -527,6 +547,8 @@ export function SettlementDashboardView({
                         <button
                           type="button"
                           className="btn-step mono-num"
+                          aria-label={`减少 5 名${job.name}`}
+                          title={`减少 5 名${job.name}`}
                           data-pop={`-5 ${job.name}`}
                           disabled={workerBusy || job.assigned < 5}
                           onClick={() => adjustJobCount(job.jobKey, -5)}
@@ -536,6 +558,8 @@ export function SettlementDashboardView({
                         <button
                           type="button"
                           className="btn-step mono-num"
+                          aria-label={`减少 1 名${job.name}`}
+                          title={`减少 1 名${job.name}`}
                           data-pop={`-1 ${job.name}`}
                           disabled={workerBusy || job.assigned <= 0}
                           onClick={() => adjustJobCount(job.jobKey, -1)}
@@ -548,6 +572,8 @@ export function SettlementDashboardView({
                         <button
                           type="button"
                           className="btn-step mono-num"
+                          aria-label={`增加 1 名${job.name}`}
+                          title={`增加 1 名${job.name}`}
                           data-pop={`+1 ${job.name}`}
                           disabled={workerBusy || canAddPool < 1}
                           onClick={() => adjustJobCount(job.jobKey, 1)}
@@ -557,6 +583,8 @@ export function SettlementDashboardView({
                         <button
                           type="button"
                           className="btn-step mono-num"
+                          aria-label={`增加 5 名${job.name}`}
+                          title={`增加 5 名${job.name}`}
                           data-pop={`+5 ${job.name}`}
                           disabled={workerBusy || canAddPool < 5}
                           onClick={() => adjustJobCount(job.jobKey, 5)}

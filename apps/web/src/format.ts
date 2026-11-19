@@ -6,6 +6,19 @@ export function formatResource(milli: number, decimals = 1): string {
   });
 }
 
+/**
+ * Formats integer stocks without trailing zeros and preserves fractional tenths
+ * (e.g. 2500 -> "2.5", 2000 -> "2") without rounding half-units up to the next integer.
+ */
+export function formatExactResource(milli: number): string {
+  const remainder = Math.abs(milli) % 1000;
+  if (remainder === 0) {
+    return formatResource(milli, 0);
+  }
+  const decimals = remainder % 100 === 0 ? 1 : 2;
+  return formatResource(milli, decimals);
+}
+
 export function formatRate(milliPerSec: number): string {
   const val = milliPerSec / 1000;
   const sign = val >= 0 ? "+" : "";

@@ -44,7 +44,8 @@
 | :--- | :--- | :--- |
 | `itemId` | `string` | 全服唯一递增序列号（如 `S1-#000042`） |
 | `rarity` | `string` | 四档概率检定：`Common (60%)`、`Rare (28%)`、`Epic (10%)`、`Legendary (2%)` |
-| `patternSeed` | `int32` | `[1, 999]` 随机图案种子（其中 `#777`、`#888`、`#999` 为特殊黄金对称模板） |
+| `patternSeed` / `patternSeedText` | `int64` / `string` | 53 位 JS 安全整数范围内的 CSPRNG 图案种子（`[100000, 2^53 - 1]`），同时通过 `patternSeedText` 下发精确十进制字符串以兼容早期 55 位历史藏品 |
+| `ownerName` | `string` | 铸造持有人领主名号；前端秘宝馆严格区分「我的秘宝」与「全服馆藏」 |
 | `uvOffsetX` / `uvOffsetY` | `double` | `[0.000, 1.000]` 纹理采样偏移坐标，决定精密齿轮与星轨在器物表面的切割位置 |
 | `uvScale` / `uvRotation` | `double` | `[0.75, 1.65]` 缩放比与 `[0°, 360°]` 旋转角，保证全服没有任何两件藏品纹理完全相同 |
 | `paletteId` | `int32` | 古典纸墨、朱砂印泥、氧化铜绿与鎏金黑曜配色方案 |

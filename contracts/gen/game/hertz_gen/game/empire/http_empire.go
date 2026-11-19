@@ -2473,26 +2473,27 @@ func (p *WarStateDTO) String() string {
 }
 
 type CollectibleItemDTO struct {
-	ItemId        string `thrift:"itemId,1,required" json:"itemId"`
-	SerialNumber  int32  `thrift:"serialNumber,2,required" json:"serialNumber"`
-	SeasonId      string `thrift:"seasonId,3,required" json:"seasonId"`
-	CollectionId  string `thrift:"collectionId,4,required" json:"collectionId"`
-	Name          string `thrift:"name,5,required" json:"name"`
-	BaseModelId   string `thrift:"baseModelId,6,required" json:"baseModelId"`
-	BaseModelName string `thrift:"baseModelName,7,required" json:"baseModelName"`
-	TextureId     string `thrift:"textureId,8,required" json:"textureId"`
-	TextureName   string `thrift:"textureName,9,required" json:"textureName"`
-	PatternSeed   int64  `thrift:"patternSeed,10,required" json:"patternSeed"`
-	UvOffsetX     int32  `thrift:"uvOffsetX,11,required" json:"uvOffsetX"`
-	UvOffsetY     int32  `thrift:"uvOffsetY,12,required" json:"uvOffsetY"`
-	UvScale       int32  `thrift:"uvScale,13,required" json:"uvScale"`
-	UvRotation    int32  `thrift:"uvRotation,14,required" json:"uvRotation"`
-	PaletteId     string `thrift:"paletteId,15,required" json:"paletteId"`
-	PaletteName   string `thrift:"paletteName,16,required" json:"paletteName"`
-	RarityTier    string `thrift:"rarityTier,17,required" json:"rarityTier"`
-	SpecialTag    string `thrift:"specialTag,18,required" json:"specialTag"`
-	MintedAt      string `thrift:"mintedAt,19,required" json:"mintedAt"`
-	OwnerName     string `thrift:"ownerName,20,required" json:"ownerName"`
+	ItemId          string  `thrift:"itemId,1,required" json:"itemId"`
+	SerialNumber    int32   `thrift:"serialNumber,2,required" json:"serialNumber"`
+	SeasonId        string  `thrift:"seasonId,3,required" json:"seasonId"`
+	CollectionId    string  `thrift:"collectionId,4,required" json:"collectionId"`
+	Name            string  `thrift:"name,5,required" json:"name"`
+	BaseModelId     string  `thrift:"baseModelId,6,required" json:"baseModelId"`
+	BaseModelName   string  `thrift:"baseModelName,7,required" json:"baseModelName"`
+	TextureId       string  `thrift:"textureId,8,required" json:"textureId"`
+	TextureName     string  `thrift:"textureName,9,required" json:"textureName"`
+	PatternSeed     int64   `thrift:"patternSeed,10,required" json:"patternSeed"`
+	UvOffsetX       int32   `thrift:"uvOffsetX,11,required" json:"uvOffsetX"`
+	UvOffsetY       int32   `thrift:"uvOffsetY,12,required" json:"uvOffsetY"`
+	UvScale         int32   `thrift:"uvScale,13,required" json:"uvScale"`
+	UvRotation      int32   `thrift:"uvRotation,14,required" json:"uvRotation"`
+	PaletteId       string  `thrift:"paletteId,15,required" json:"paletteId"`
+	PaletteName     string  `thrift:"paletteName,16,required" json:"paletteName"`
+	RarityTier      string  `thrift:"rarityTier,17,required" json:"rarityTier"`
+	SpecialTag      string  `thrift:"specialTag,18,required" json:"specialTag"`
+	MintedAt        string  `thrift:"mintedAt,19,required" json:"mintedAt"`
+	OwnerName       string  `thrift:"ownerName,20,required" json:"ownerName"`
+	PatternSeedText *string `thrift:"patternSeedText,21,optional" json:"patternSeedText,omitempty"`
 }
 
 func NewCollectibleItemDTO() *CollectibleItemDTO {
@@ -2580,6 +2581,19 @@ func (p *CollectibleItemDTO) GetMintedAt() (v string) {
 
 func (p *CollectibleItemDTO) GetOwnerName() (v string) {
 	return p.OwnerName
+}
+
+var CollectibleItemDTO_PatternSeedText_DEFAULT string
+
+func (p *CollectibleItemDTO) GetPatternSeedText() (v string) {
+	if !p.IsSetPatternSeedText() {
+		return CollectibleItemDTO_PatternSeedText_DEFAULT
+	}
+	return *p.PatternSeedText
+}
+
+func (p *CollectibleItemDTO) IsSetPatternSeedText() bool {
+	return p.PatternSeedText != nil
 }
 
 func (p *CollectibleItemDTO) String() string {

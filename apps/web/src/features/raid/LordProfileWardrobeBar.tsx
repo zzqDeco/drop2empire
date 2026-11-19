@@ -13,6 +13,13 @@ import { RaidItemIconSVG } from "../../RaidSpritesSVG";
 import { ModalShell } from "../../components/ModalShell";
 import type { ServerUpdate } from "../../serverState";
 
+const COSMETIC_SLOT_LABELS: Record<string, string> = {
+  headgear: "头饰",
+  mantle: "披风背饰",
+  held_relic: "手持秘宝",
+  companion: "随行灵宠",
+};
+
 /**
  * Integrated Personal Lord Profile & Wardrobe Card (Used on Main Settlement Screen & Relic Vault).
  */
@@ -38,6 +45,9 @@ export function LordProfileWardrobeBar({
   const { player, equippedCosmetics, cosmetics, raidLoadout, marketSummaries } =
     state;
   const ownedCosCount = cosmetics.filter((c) => c.ownedCount > 0).length;
+  const myCollectiblesCount = state.collectibles.filter(
+    (c) => c.ownerName === player.handle,
+  ).length;
   const canVisitMarket =
     player.profession !== "none" && Boolean(onNavigateMarketItem);
 
@@ -142,7 +152,9 @@ export function LordProfileWardrobeBar({
                 </p>
                 <div className="bp-footer">
                   <div className="bp-costs">
-                    <span className="cost-chip">{cos.slot}</span>
+                    <span className="cost-chip">
+                      {COSMETIC_SLOT_LABELS[cos.slot] ?? cos.slot}
+                    </span>
                     {refAsk && (
                       <span className="cost-chip mono-num">
                         行情 ~{refAsk} G
@@ -261,8 +273,8 @@ export function LordProfileWardrobeBar({
             领主真身披挂 · 荒原出征与主城同辉
           </div>
           <div className="water-rate mono-num">
-            S1 外观典藏：{ownedCosCount}/{cosmetics.length} · 唯一秘宝：
-            {state.collectibles.length} 件
+            S1 外观典藏：{ownedCosCount}/{cosmetics.length} · 我的秘宝：
+            {myCollectiblesCount} 件（全服 {state.collectibles.length} 件）
           </div>
           <div className="bp-costs lord-profile-costs">
             <span className="cost-chip mono-num">

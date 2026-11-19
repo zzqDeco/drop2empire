@@ -202,11 +202,12 @@
 /* Tab 3: Chamber War */
 .war-layout {
   display: grid;
-  grid-template-columns: 1.75fr 1fr;
+  grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
   gap: var(--space-3);
 }
 
 .war-main-col {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -259,6 +260,12 @@
 
 .war-node-group {
   cursor: pointer;
+  outline: none;
+}
+
+.war-node-group:focus-visible .war-node-circle {
+  stroke: var(--focus-ring);
+  stroke-width: 4;
 }
 
 .war-node-circle {

@@ -92,8 +92,16 @@ export function RaidBattlefieldViewport({
     currentTile?.kind === "extract_deep" ||
     (currentTile?.kind === "extract_early" && earlyExtractOpen);
 
+  const tacticalPotionKeySet = new Set(
+    raidGears.filter((g) => g.category === "potion").map((g) => g.itemKey),
+  );
   const carriedPotionKeys = Array.from(
-    new Set([...(raidLoadout.equippedPotions ?? []), ...usedPotions]),
+    new Set([
+      ...(raidLoadout.equippedPotions ?? []),
+      ...usedPotions.filter(
+        (key) => key.startsWith("pot_") || tacticalPotionKeySet.has(key),
+      ),
+    ]),
   );
 
   const equippedDestroyableNames = [

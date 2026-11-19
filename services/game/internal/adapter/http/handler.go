@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -337,7 +338,7 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 			ProfessionReqName: rc.ProfessionReqName,
 			OutputKey:         rc.OutputKey,
 			OutputName:        rc.OutputName,
-			OutputAmountMilli: rc.OutputAmountMilli,
+			OutputAmountMilli: domain.EffectiveCraftOutputMilli(p, rc, 1),
 			Costs:             costsDTO,
 			GoldCostBasis:     rc.GoldCostBasis,
 			EffectSummary:     rc.EffectSummary,
@@ -626,18 +627,20 @@ func mapDashboardResp(w *domain.WorldState) *empire.DashboardStateResp {
 
 	collectiblesDTO := make([]*empire.CollectibleItemDTO, 0, len(w.Collectibles))
 	for _, c := range w.Collectibles {
+		seedText := strconv.FormatInt(c.PatternSeed, 10)
 		collectiblesDTO = append(collectiblesDTO, &empire.CollectibleItemDTO{
-			ItemId:        c.ItemID,
-			SerialNumber:  c.SerialNumber,
-			SeasonId:      c.SeasonID,
-			CollectionId:  c.CollectionID,
-			Name:          c.Name,
-			BaseModelId:   c.BaseModelID,
-			BaseModelName: c.BaseModelName,
-			TextureId:     c.TextureID,
-			TextureName:   c.TextureName,
-			PatternSeed:   c.PatternSeed,
-			UvOffsetX:     c.UVOffsetX,
+			ItemId:          c.ItemID,
+			SerialNumber:    c.SerialNumber,
+			SeasonId:        c.SeasonID,
+			CollectionId:    c.CollectionID,
+			Name:            c.Name,
+			BaseModelId:     c.BaseModelID,
+			BaseModelName:   c.BaseModelName,
+			TextureId:       c.TextureID,
+			TextureName:     c.TextureName,
+			PatternSeed:     c.PatternSeed,
+			PatternSeedText: &seedText,
+			UvOffsetX:       c.UVOffsetX,
 			UvOffsetY:     c.UVOffsetY,
 			UvScale:       c.UVScale,
 			UvRotation:    c.UVRotation,

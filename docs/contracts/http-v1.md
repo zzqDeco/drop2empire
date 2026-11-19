@@ -61,7 +61,7 @@ All player endpoints authenticate via the `Authorization: Bearer <session_token>
 | `POST /api/v1/empire/war/guild` | `SwitchGuild` | Switches allegiance between Obsidian (`OBSIDIAN`) and Argent (`ARGENT`) chambers. |
 | `POST /api/v1/empire/war/guild-action` | `GuildAction` | Executes a guild operation (`join`, `create`, `donate_supplies`, `donate_gold`, `donate_heavy_pack`, `donate_precision_pack`, `set_rally`). |
 | `POST /api/v1/empire/war/deploy` | `DeployWarTroops` | Deploys infantry, archer, and cavalry regiments under the player's joined Guild to a connected war node (up to 100 daily budget points; grants `+5` bonus activity points when deploying to the Guild's `rallyNodeId`). |
-| `POST /api/v1/empire/season/redeem-chest` | `RedeemSeasonChest` | Spends `100` war activity points (`ChestRedeemCostPoints`) to redeem `1 × S1·墨械宝箱` (`season_chest`), which can then be opened (`POST /api/v1/empire/season/open-chest`) to mint a procedural UV-etched collectible relic. |
+| `POST /api/v1/empire/season/redeem-chest` | `RedeemSeasonChest` | Spends `100` war activity points (`ChestRedeemCostPoints`) to redeem `1 × S1·墨械宝箱` (`season_chest`), which can then be opened (`POST /api/v1/empire/season/open-chest`) to mint a procedural UV-etched collectible relic (`CollectibleItemDTO`, exposing JS-safe 53-bit `patternSeed`, exact decimal `patternSeedText`, and `ownerName`). |
 
 ---
 

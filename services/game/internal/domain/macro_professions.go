@@ -32,6 +32,25 @@ func ChooseProfession(p *PlayerState, prof string, now time.Time) error {
 	return nil
 }
 
+// EffectiveCraftOutputMilli computes the exact authoritative craft output in milli-units,
+// including profession multipliers (e.g. Artisan +25% on war armaments), so UI previews
+// match server production and chronicle logs verbatim.
+func EffectiveCraftOutputMilli(p *PlayerState, spec CraftRecipeSpec, batches int32) int64 {
+	if batches <= 0 {
+		batches = 1
+	}
+	outMilli := spec.OutputAmountMilli * int64(batches)
+	if spec.Category == "armament" && p != nil {
+		for _, profSpec := range ProfessionCatalog {
+			if profSpec.Code == p.Profession && profSpec.ArmamentOutputMultPct > 100 {
+				outMilli = (outMilli * profSpec.ArmamentOutputMultPct) / 100
+				break
+			}
+		}
+	}
+	return outMilli
+}
+
 func CraftItem(w *WorldState, p *PlayerState, recipeCode string, batches int32, now time.Time) error {
 	if _, ok := FindConsumable(recipeCode); ok {
 		return ErrPrecondition("sequenced_command_required", "职业耗材请使用带指令序号的经济操作接口")
@@ -80,15 +99,7 @@ func CraftItem(w *WorldState, p *PlayerState, recipeCode string, batches int32, 
 		w.TreasuryHeldBasis += totalGoldCost
 	}
 
-	outMilli := spec.OutputAmountMilli * b64
-	if spec.Category == "armament" {
-		for _, profSpec := range ProfessionCatalog {
-			if profSpec.Code == p.Profession && profSpec.ArmamentOutputMultPct > 100 {
-				outMilli = (outMilli * profSpec.ArmamentOutputMultPct) / 100
-				break
-			}
-		}
-	}
+	outMilli := EffectiveCraftOutputMilli(p, *spec, batches)
 	p.ResourcesMilli[spec.OutputKey] += outMilli
 	AppendLog(p, now, "PRODUCTION", fmt.Sprintf("工坊制造完成：产出 %.1f 单位【%s】。", float64(outMilli)/1000.0, spec.OutputName))
 	return nil

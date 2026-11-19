@@ -3,7 +3,7 @@ import { api } from "@drop2empire/api-client";
 import { Award, Compass, Package, Plus, Shield, Swords } from "lucide-react";
 import { economyCommand } from "../../economy";
 import { ICON } from "../../icons";
-import { formatGold, formatResource } from "../../format";
+import { formatExactResource, formatGold } from "../../format";
 import { WarGraphMapSVG } from "../../WarGraphMapSVG";
 import type { SceneProps } from "./types";
 
@@ -44,7 +44,18 @@ const NODE_SUPPORT_CATALOG = [
  * Scene IV: Guild System (公会大厅) & 8-Node Chamber Territory War (城池争夺战区)
  */
 export function WarGuildSceneView({ state, busy, runAction }: SceneProps) {
-  const [selectedNodeId, setSelectedNodeId] = useState("node_north_fort");
+  const { player, resources, war } = state;
+  const guilds = war.guilds ?? [];
+  const joinedGuild =
+    guilds.find((g) => g.guildId === war.joinedGuildId) ?? null;
+
+  const [selectedNodeId, setSelectedNodeId] = useState(
+    () =>
+      joinedGuild?.rallyNodeId ||
+      war.nodes.find((n) => n.canDeploy)?.nodeId ||
+      war.nodes[0]?.nodeId ||
+      "node_north_fort",
+  );
   const [deployInf, setDeployInf] = useState(2);
   const [deployArc, setDeployArc] = useState(2);
   const [deployCav, setDeployCav] = useState(2);
@@ -54,11 +65,6 @@ export function WarGuildSceneView({ state, busy, runAction }: SceneProps) {
   const [newGuildFaction, setNewGuildFaction] = useState<"OBSIDIAN" | "ARGENT">(
     "OBSIDIAN",
   );
-
-  const { player, resources, war } = state;
-  const guilds = war.guilds ?? [];
-  const joinedGuild =
-    guilds.find((g) => g.guildId === war.joinedGuildId) ?? null;
 
   const selectedWarNode =
     war.nodes.find((n) => n.nodeId === selectedNodeId) ?? war.nodes[0];
@@ -200,7 +206,7 @@ export function WarGuildSceneView({ state, busy, runAction }: SceneProps) {
                   <span>
                     重载包捐献 (余{" "}
                     <span className="mono-num">
-                      {formatResource(heavyPackMilli, 0)}
+                      {Math.floor(heavyPackMilli / 1000)}
                     </span>
                     )
                   </span>
@@ -221,7 +227,7 @@ export function WarGuildSceneView({ state, busy, runAction }: SceneProps) {
                   <span>
                     精密包捐献 (余{" "}
                     <span className="mono-num">
-                      {formatResource(precisionPackMilli, 0)}
+                      {Math.floor(precisionPackMilli / 1000)}
                     </span>
                     )
                   </span>
@@ -518,13 +524,25 @@ export function WarGuildSceneView({ state, busy, runAction }: SceneProps) {
               </strong>
             </div>
             <div className="intel-row">
-              <span>军备库存 (步 / 弓 / 骑)</span>
+              <span>可派军备整团 (步 / 弓 / 骑)</span>
               <strong className="mono-num">
-                {formatResource(infKitMilli, 0)} /{" "}
-                {formatResource(arcKitMilli, 0)} /{" "}
-                {formatResource(cavKitMilli, 0)}
+                {Math.floor(infKitMilli / 1000)} /{" "}
+                {Math.floor(arcKitMilli / 1000)} /{" "}
+                {Math.floor(cavKitMilli / 1000)}
               </strong>
             </div>
+            {(infKitMilli % 1000 !== 0 ||
+              arcKitMilli % 1000 !== 0 ||
+              cavKitMilli % 1000 !== 0) && (
+              <div className="intel-row">
+                <span>精确军备库存 (含散件余量)</span>
+                <span className="mono-num">
+                  {formatExactResource(infKitMilli)} /{" "}
+                  {formatExactResource(arcKitMilli)} /{" "}
+                  {formatExactResource(cavKitMilli)}
+                </span>
+              </div>
+            )}
             <div className="intel-row">
               <span>公会补给线</span>
               <strong
@@ -666,7 +684,7 @@ export function WarGuildSceneView({ state, busy, runAction }: SceneProps) {
                   <div>
                     <strong>{item.name}</strong>{" "}
                     <span className="mono-num">
-                      ×{formatResource(ownedMilli, 0)}
+                      ×{Math.floor(ownedMilli / 1000)}
                     </span>
                     <div className="muted-note">{item.effect}</div>
                   </div>
@@ -700,7 +718,8 @@ export function WarGuildSceneView({ state, busy, runAction }: SceneProps) {
               0.90x）
             </p>
             <p className="mono-num">
-              每晚 20:00 锁定结算：胜方损耗 20% 留守城防，败方损耗 40% 残部退回。
+              每晚 20:00 锁定结算：胜方战损 20%、败方战损
+              40%，双方战后残部均继续留驻该据点归入各自阵营驻军（不退回个人库存），个人出兵记录随结算清零。
             </p>
           </div>
         </aside>

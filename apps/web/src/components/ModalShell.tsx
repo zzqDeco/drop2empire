@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Shield } from "lucide-react";
 import { ICON } from "../icons";
 
@@ -121,7 +122,7 @@ export function ModalShell({
     };
   }, []);
 
-  return (
+  const dialogNode = (
     <div
       ref={backdropRef}
       className={backdropClassName}
@@ -139,6 +140,11 @@ export function ModalShell({
       </div>
     </div>
   );
+
+  if (typeof document !== "undefined" && document.body) {
+    return createPortal(dialogNode, document.body);
+  }
+  return dialogNode;
 }
 
 interface ConfirmActionModalProps {

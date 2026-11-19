@@ -231,7 +231,7 @@ export function ProceduralRelicSVG({ item }: Props) {
         fontSize="11"
         fontFamily="monospace"
       >
-        SEED:{item.patternSeed}
+        SEED:{item.patternSeedText ?? item.patternSeed}
       </text>
     </svg>
   );
