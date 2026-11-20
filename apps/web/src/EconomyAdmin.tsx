@@ -1,8 +1,14 @@
-import { useState } from "react";
-import { api } from "@drop2empire/api-client";
+import { useMemo, useState } from "react";
+import { api, type DashboardStateResp } from "@drop2empire/api-client";
 import type { EconomyViewProps } from "./EconomyWorkspace";
+import { ConfirmActionModal } from "./components/ModalShell";
 import { fixedInput } from "./economy";
 import { formatGold as gold, formatResource } from "./format";
+import {
+  buildGenesisProcurementPlan,
+  DEFAULT_GENESIS_POLICY_PREFIX,
+  GENESIS_TOTAL_GOLD_BASIS,
+} from "./genesisProcurement";
 
 const formatGold = (basis: number) => gold(basis, 4);
 
@@ -32,10 +38,27 @@ export function EconomyAdmin({ state, busy, runAction }: EconomyViewProps) {
   const [ipoPrice, setIPOPrice] = useState("0.05");
   const [minimum, setMinimum] = useState("90000");
   const [hours, setHours] = useState("48");
+  const [genesisPrefix, setGenesisPrefix] = useState(
+    DEFAULT_GENESIS_POLICY_PREFIX,
+  );
+  const [confirmGenesisOpen, setConfirmGenesisOpen] = useState(false);
   const e = state.economy;
   const selectedCompany = e.companyCatalog.some((c) => c.id === company)
     ? company
     : (e.companyCatalog[0]?.id ?? "");
+
+  const genesisPlan = useMemo(
+    () => buildGenesisProcurementPlan(genesisPrefix),
+    [genesisPrefix],
+  );
+  const appliedPolicyIds = useMemo(
+    () => new Set(e.policies.map((p) => p.id)),
+    [e.policies],
+  );
+  const pendingGenesisSteps = useMemo(
+    () => genesisPlan.filter((step) => !appliedPolicyIds.has(step.policyId)),
+    [genesisPlan, appliedPolicyIds],
+  );
   return (
     <section className="subpanel" aria-label="货币联盟与公司引入">
       <h3>货币联盟</h3>
@@ -48,6 +71,80 @@ export function EconomyAdmin({ state, busy, runAction }: EconomyViewProps) {
         {formatGold(e.corporateCashBasis)} · IPO 托管{" "}
         {formatGold(e.ipoEscrowBasis)}
       </p>
+
+      <details open={e.issuedBasis === 0}>
+        <summary>
+          首批受控公共采购启动方案（8,000 G 创世章程 · 已完成{" "}
+          <span className="mono-num">
+            {genesisPlan.length - pendingGenesisSteps.length}/
+            {genesisPlan.length}
+          </span>
+          ）
+        </summary>
+        <div className="economy-form">
+          <label>
+            批次政策前缀（幂等防重）
+            <input
+              className="mono-num"
+              value={genesisPrefix}
+              onChange={(ev) => setGenesisPrefix(ev.target.value)}
+            />
+          </label>
+          <p>
+            按《清档与启动操作手册》一次性发行{" "}
+            <strong className="mono-num">
+              {formatGold(GENESIS_TOTAL_GOLD_BASIS)} G
+            </strong>{" "}
+            至联盟准备金，划拨至公共采购账户{" "}
+            <code>@public</code>{" "}
+            并对 6 种基础物资挂出有限预算限价买单（总承诺{" "}
+            <span className="mono-num">8,000.0000 G</span>
+            ，不自动补发、不托底公司或股价）。每步使用固定政策编号，中途中断可安全续跑。
+          </p>
+          <div className="table-wrap">
+            <table className="ink-table">
+              <thead>
+                <tr>
+                  <th>步骤</th>
+                  <th>政策编号</th>
+                  <th>执行内容</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {genesisPlan.map((step) => {
+                  const done = appliedPolicyIds.has(step.policyId);
+                  return (
+                    <tr key={step.policyId}>
+                      <td>{step.label}</td>
+                      <td className="mono-num">{step.policyId}</td>
+                      <td className="mono-num">{step.summary}</td>
+                      <td>
+                        <span
+                          className={`tag-badge ${done ? "tag-success" : "tag-warning"}`}
+                        >
+                          {done ? "已入账" : "待执行"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={busy || pendingGenesisSteps.length === 0}
+            onClick={() => setConfirmGenesisOpen(true)}
+          >
+            {pendingGenesisSteps.length === 0
+              ? "本批次 8 步创世政策已全部入账"
+              : `按章程执行待落账步骤 (${pendingGenesisSteps.length}/${genesisPlan.length})`}
+          </button>
+        </div>
+      </details>
+
       <form
         className="economy-form"
         onSubmit={(event) => {
@@ -173,7 +270,18 @@ export function EconomyAdmin({ state, busy, runAction }: EconomyViewProps) {
               {o.id} · {o.itemName} ·{" "}
               <span className="mono-num">
                 {formatResource(o.remainingMilli)} @ {formatGold(o.priceBasis)}
-              </span>
+              </span>{" "}
+              <button
+                type="button"
+                className="btn-link"
+                onClick={() => {
+                  setAction("withdraw_order");
+                  setItem(o.id);
+                  setPolicyId(crypto.randomUUID());
+                }}
+              >
+                填入撤单
+              </button>
             </p>
           ))}
       </details>
@@ -247,6 +355,34 @@ export function EconomyAdmin({ state, busy, runAction }: EconomyViewProps) {
           公告 IPO
         </button>
       </form>
+
+      {confirmGenesisOpen && (
+        <ConfirmActionModal
+          title="确认按创世章程执行首批受控公共采购"
+          subtitle={`本次将按固定政策前缀「${genesisPrefix.trim() || DEFAULT_GENESIS_POLICY_PREFIX}」依次提交 ${pendingGenesisSteps.length} 条幂等货币政策`}
+          severity="warning"
+          consequences={[
+            `若尚未发行，将向联盟准备金发行 ${formatGold(GENESIS_TOTAL_GOLD_BASIS)} G 并全额划拨至公共采购账户 @public。`,
+            "对水、原木、石材、木炭、铁锭、燧石 6 类基础物资挂出有限预算限价买单（总承诺 8,000.0000 G），仅与真实玩家卖单撮合，卖方扣 1% 交易税入国库。",
+            "此额度为有限启动预算，绝不自动补发，也不为公司或股票托底；全部政策均写入 d2e_economy_audit 审计账本且同编号重放幂等。",
+          ]}
+          confirmLabel={`确认执行 ${pendingGenesisSteps.length} 条政策`}
+          busy={busy}
+          onCancel={() => setConfirmGenesisOpen(false)}
+          onConfirm={() => {
+            const stepsToRun = [...pendingGenesisSteps];
+            setConfirmGenesisOpen(false);
+            if (stepsToRun.length === 0) return;
+            void runAction(async () => {
+              let latest: DashboardStateResp = state;
+              for (const step of stepsToRun) {
+                latest = await api.monetaryPolicy(step.req);
+              }
+              return latest;
+            }, `已按创世章程完成 ${stepsToRun.length} 条受控公共采购政策，可在审计记录与盘口核对`);
+          }}
+        />
+      )}
     </section>
   );
 }

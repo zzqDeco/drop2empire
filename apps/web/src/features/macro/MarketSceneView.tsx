@@ -216,6 +216,36 @@ export function MarketSceneView({
     [state.openOrders],
   );
 
+  const publicProcurementBids = useMemo(() => {
+    const byItem = new Map<
+      string,
+      {
+        itemKey: string;
+        itemName: string;
+        priceBasis: number;
+        remainingMilli: number;
+      }
+    >();
+    for (const o of state.openOrders) {
+      if (o.makerName !== "@public" || o.side !== "BID") continue;
+      const existing = byItem.get(o.itemKey);
+      if (!existing) {
+        byItem.set(o.itemKey, {
+          itemKey: o.itemKey,
+          itemName: o.itemName || marketNameMap.get(o.itemKey) || o.itemKey,
+          priceBasis: o.priceBasis,
+          remainingMilli: o.remainingMilli,
+        });
+      } else {
+        existing.remainingMilli += o.remainingMilli;
+        if (o.priceBasis > existing.priceBasis) {
+          existing.priceBasis = o.priceBasis;
+        }
+      }
+    }
+    return Array.from(byItem.values());
+  }, [state.openOrders, marketNameMap]);
+
   const spreadBasis =
     selectedMarketMeta &&
     selectedMarketMeta.bestAskBasis > 0 &&
@@ -407,6 +437,63 @@ export function MarketSceneView({
           </div>
         </div>
       </div>
+
+      {/* Cash-Entry & Controlled Public Procurement Guide (Player-Facing Read-Only) */}
+      {publicProcurementBids.length > 0 ? (
+        <div className="tab-body">
+          <div className="recruit-card">
+            <div className="recruit-meta">
+              <div className="recruit-head">
+                <strong>货币联盟受控公共采购（赚取金币入口）</strong>
+                <span className="tag-badge tag-success mono-num">
+                  进行中 {publicProcurementBids.length} 项限价买单 · 卖方税 1% 入国库
+                </span>
+              </div>
+              <p className="bp-desc">
+                本服严格遵守货币守恒，系统不凭空印钞。点击下方任一公共采购项即可直接选中商品并填入买一价卖出富余库存（预算有限，先到先撮合）：
+              </p>
+              <div className="quick-alloc-bar">
+                {publicProcurementBids.map((bid) => (
+                  <button
+                    key={bid.itemKey}
+                    type="button"
+                    className={`btn-chip mono-num ${activeItemKey === bid.itemKey && orderSide === "ASK" ? "active" : ""}`}
+                    onClick={() => {
+                      setSelectedMarketItem(bid.itemKey);
+                      setCategoryFilter("all");
+                      setSearchQuery("");
+                      setOrderSide("ASK");
+                      setOrderPriceGold((bid.priceBasis / 10000).toFixed(4));
+                      const stockUnits = Math.floor(
+                        resolveSellableStockMilli(state, bid.itemKey) / 1000,
+                      );
+                      const bidUnits = Math.floor(bid.remainingMilli / 1000);
+                      const suggested =
+                        stockUnits > 0
+                          ? Math.max(1, Math.min(stockUnits, bidUnits))
+                          : 1;
+                      setOrderQtyUnits(String(suggested));
+                    }}
+                  >
+                    {bid.itemName} 买一 {formatGold(bid.priceBasis, 2)} G (余{" "}
+                    {formatResource(bid.remainingMilli, 0)})
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        state.macroLedger?.totalIssuedBasis === 0 && (
+          <div className="tab-body">
+            <div className="empty-stage-hint">
+              当前处于零金币准备期（全服净发行{" "}
+              <span className="mono-num">0.00 G</span>
+              ）：本服严格遵守货币守恒法则，系统不会自动印钞；待货币联盟发布首轮受控公共采购买单后，即可通过挂单出售富余基础物资赚取首批金币。
+            </div>
+          </div>
+        )
+      )}
 
       {/* Lower Section: Global CLOB Spot Market */}
       <div className="tab-body split-3col">
