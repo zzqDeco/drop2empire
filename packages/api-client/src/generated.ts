@@ -678,6 +678,7 @@ export interface EconomyStateDTO {
   holdingsBasis: number;
   policies: MonetaryPolicyDTO[];
   publicInventory: InventoryAmountDTO[];
+  committedPolicyIds?: string[];
 }
 
 export interface EconomyActionReq {

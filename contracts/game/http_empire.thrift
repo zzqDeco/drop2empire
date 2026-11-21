@@ -680,6 +680,7 @@ struct EconomyStateDTO {
   10: required i64 holdingsBasis (api.body="holdingsBasis")
   11: required list<MonetaryPolicyDTO> policies (api.body="policies")
   12: required list<InventoryAmountDTO> publicInventory (api.body="publicInventory")
+  13: optional list<string> committedPolicyIds (api.body="committedPolicyIds")
 }
 
 struct EconomyActionReq {

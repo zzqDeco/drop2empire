@@ -3526,6 +3526,7 @@ type EconomyStateDTO struct {
 	HoldingsBasis      int64                 `thrift:"holdingsBasis,10,required" json:"holdingsBasis"`
 	Policies           []*MonetaryPolicyDTO  `thrift:"policies,11,required,list<MonetaryPolicyDTO>" json:"policies"`
 	PublicInventory    []*InventoryAmountDTO `thrift:"publicInventory,12,required,list<InventoryAmountDTO>" json:"publicInventory"`
+	CommittedPolicyIds []string              `thrift:"committedPolicyIds,13,optional,list<string>" json:"committedPolicyIds,omitempty"`
 }
 
 func NewEconomyStateDTO() *EconomyStateDTO {
@@ -3588,8 +3589,21 @@ func (p *EconomyStateDTO) GetPublicInventory() (v []*InventoryAmountDTO) {
 	return p.PublicInventory
 }
 
+var EconomyStateDTO_CommittedPolicyIds_DEFAULT []string
+
+func (p *EconomyStateDTO) GetCommittedPolicyIds() (v []string) {
+	if !p.IsSetCommittedPolicyIds() {
+		return EconomyStateDTO_CommittedPolicyIds_DEFAULT
+	}
+	return p.CommittedPolicyIds
+}
+
 func (p *EconomyStateDTO) IsSetProfessional() bool {
 	return p.Professional != nil
+}
+
+func (p *EconomyStateDTO) IsSetCommittedPolicyIds() bool {
+	return p.CommittedPolicyIds != nil
 }
 
 func (p *EconomyStateDTO) String() string {
