@@ -153,6 +153,12 @@ func mapEconomy(w *domain.WorldState, p *domain.PlayerState, admin bool) *empire
 		p := e.Policies[i]
 		out.Policies = append(out.Policies, &empire.MonetaryPolicyDTO{ID: p.ID, Action: p.Action, AmountBasis: p.Amount, ItemKey: p.Item, QuantityMilli: p.Quantity, PriceBasis: p.Price, At: date(p.At)})
 	}
+	if admin && len(e.Policies) > 0 {
+		out.CommittedPolicyIds = make([]string, len(e.Policies))
+		for i, pol := range e.Policies {
+			out.CommittedPolicyIds[i] = pol.ID
+		}
+	}
 	return out
 }
 
