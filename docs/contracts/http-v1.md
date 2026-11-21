@@ -106,7 +106,7 @@ A requested edict or mechanism with flat per-second resource drain (`night_shift
 
 ## 8. Professional industry, companies and monetary policy
 
-`DashboardStateResp.economy` is required. It carries `professional` (facility level/build costs/queue/consumables/active effects), announced `companies`, admin-only `companyCatalog` and `publicInventory`, monetary balances and latest 50 policy records. Catalog/consumable discovery is hidden before choosing a profession; current financial ownership is preserved through seasonal progression resets. Monetary `issuedBasis` and `cancelledBasis` are cumulative; `macroLedger.totalIssuedBasis` is net outstanding supply. Institutional cash summary fields include their order escrow; IPO escrow is separate.
+`DashboardStateResp.economy` is required. It carries `professional` (facility level/build costs/queue/consumables/active effects), announced `companies`, admin-only `companyCatalog`, admin-only full `committedPolicyIds` (untruncated set of all committed policy IDs for durable idempotent batch tracking), `publicInventory`, monetary balances and latest 50 detailed policy records. Catalog/consumable discovery is hidden before choosing a profession; current financial ownership is preserved through seasonal progression resets. Monetary `issuedBasis` and `cancelledBasis` are cumulative; `macroLedger.totalIssuedBasis` is net outstanding supply. Institutional cash summary fields include their order escrow; IPO escrow is separate.
 
 | Method / path | Operation | Semantics |
 | --- | --- | --- |

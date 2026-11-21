@@ -274,3 +274,73 @@ func TestDashboardExposesExactArtisanOutputAndLegacyPatternSeedText(t *testing.T
 		t.Fatalf("expected exact legacy 55-bit decimal seed text, got %q", *dash.Collectibles[0].PatternSeedText)
 	}
 }
+
+func TestAdminEconomyCommittedPolicyIdsNotTruncatedPast50(t *testing.T) {
+	now := time.Now().UTC()
+	w := domain.NewDefaultWorld(now)
+	domain.EnsureDefaultAccounts(w, now)
+	domain.EnsureEconomy(w, now)
+	w.Sessions["tok_admin"] = "admin"
+	w.Sessions["tok_player"] = "archon_demo"
+
+	// Record 60 policies so the earliest genesis ID falls outside the 50-item UI feed
+	if err := domain.ApplyMonetaryPolicy(w, domain.MonetaryPolicy{
+		ID:     "s1-genesis-001-issue-001",
+		Action: "issue",
+		Amount: 80_000_000,
+	}, now); err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 59; i++ {
+		if err := domain.ApplyMonetaryPolicy(w, domain.MonetaryPolicy{
+			ID:     "extra-policy-" + string(rune('a'+(i/26))) + string(rune('a'+(i%26))),
+			Action: "issue",
+			Amount: 10_000,
+		}, now.Add(time.Duration(i)*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	mem := &fakeMemStore{w: w}
+	h := NewHTTPHandler(app.NewService(mem, mem), nil)
+
+	// Admin receives latest 50 detailed policies AND full untruncated committedPolicyIds (60)
+	adminReq := httptest.NewRequest(http.MethodGet, "/api/v1/empire/state", nil)
+	adminReq.Header.Set("X-Session-Token", "tok_admin")
+	adminReq.Header.Set("X-Admin-Tunnel", "1")
+	adminRec := httptest.NewRecorder()
+	h.ServeHTTP(adminRec, adminReq)
+	if adminRec.Code != http.StatusOK {
+		t.Fatalf("admin GET /state failed: %s", adminRec.Body.String())
+	}
+	var adminDash empire.DashboardStateResp
+	if err := json.Unmarshal(adminRec.Body.Bytes(), &adminDash); err != nil {
+		t.Fatal(err)
+	}
+	if len(adminDash.Economy.Policies) != 50 {
+		t.Fatalf("expected detailed policy feed capped at 50, got %d", len(adminDash.Economy.Policies))
+	}
+	if len(adminDash.Economy.CommittedPolicyIds) != 60 {
+		t.Fatalf("expected all 60 committedPolicyIds on admin response, got %d", len(adminDash.Economy.CommittedPolicyIds))
+	}
+	if adminDash.Economy.CommittedPolicyIds[0] != "s1-genesis-001-issue-001" {
+		t.Fatalf("expected genesis policy ID preserved in committedPolicyIds, got %q", adminDash.Economy.CommittedPolicyIds[0])
+	}
+
+	// Regular player response omits committedPolicyIds
+	playerReq := httptest.NewRequest(http.MethodGet, "/api/v1/empire/state", nil)
+	playerReq.Header.Set("X-Session-Token", "tok_player")
+	playerReq.Header.Set("X-Admin-Tunnel", "0")
+	playerRec := httptest.NewRecorder()
+	h.ServeHTTP(playerRec, playerReq)
+	if playerRec.Code != http.StatusOK {
+		t.Fatalf("player GET /state failed: %s", playerRec.Body.String())
+	}
+	var playerDash empire.DashboardStateResp
+	if err := json.Unmarshal(playerRec.Body.Bytes(), &playerDash); err != nil {
+		t.Fatal(err)
+	}
+	if len(playerDash.Economy.CommittedPolicyIds) != 0 {
+		t.Fatalf("expected committedPolicyIds omitted for non-admin player, got %d", len(playerDash.Economy.CommittedPolicyIds))
+	}
+}

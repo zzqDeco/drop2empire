@@ -2,7 +2,11 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type DashboardStateResp } from "@drop2empire/api-client";
+import {
+  api,
+  getCommandSyncOutcome,
+  type DashboardStateResp,
+} from "@drop2empire/api-client";
 import { EconomyAdmin } from "./EconomyAdmin";
 import { MarketSceneView } from "./features/macro/MarketSceneView";
 import {
@@ -357,5 +361,136 @@ describe("Batch 3: Genesis procurement charter & player cash-entry guide", () =>
     const inputs = Array.from(container.querySelectorAll("input"));
     expect(inputs.some((i) => i.value === "0.4500")).toBe(true);
     expect(inputs.some((i) => i.value === "120")).toBe(true);
+  });
+
+  it("caps quick-sell depth strictly to executable quantity at the best @public price tier", async () => {
+    const state = makeState();
+    state.macroLedger.totalIssuedBasis = GENESIS_TOTAL_GOLD_BASIS;
+    state.openOrders = [
+      {
+        id: "ord_pub_water_low",
+        itemKey: "water",
+        itemName: "洁净饮水",
+        side: "BID",
+        priceBasis: 1000, // 0.10 G
+        quantityMilli: 100_000,
+        filledMilli: 0,
+        remainingMilli: 100_000, // 100 units
+        makerName: "@public",
+        isNpc: false,
+        isOwn: false,
+        status: "OPEN",
+        createdAt: "2026-11-20T12:00:00Z",
+      },
+      {
+        id: "ord_pub_water_high",
+        itemKey: "water",
+        itemName: "洁净饮水",
+        side: "BID",
+        priceBasis: 2000, // 0.20 G
+        quantityMilli: 10_000,
+        filledMilli: 0,
+        remainingMilli: 10_000, // 10 units
+        makerName: "@public",
+        isNpc: false,
+        isOwn: false,
+        status: "OPEN",
+        createdAt: "2026-11-20T12:01:00Z",
+      },
+    ];
+
+    await act(async () => {
+      root.render(<MarketSceneView state={state} runAction={async () => {}} />);
+    });
+
+    const chip = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("洁净饮水 买一 0.20 G (余 10)"),
+    )!;
+    expect(chip).toBeTruthy();
+
+    await act(async () => {
+      chip.click();
+    });
+    const inputs = Array.from(container.querySelectorAll("input"));
+    expect(inputs.some((i) => i.value === "0.2000")).toBe(true);
+    expect(inputs.some((i) => i.value === "10")).toBe(true);
+    expect(inputs.some((i) => i.value === "110")).toBe(false);
+  });
+
+  it("reads completion from untruncated committedPolicyIds even after >50 later policies and halts on uncertain SDK outcome", async () => {
+    // 1. All 8 genesis IDs exist in committedPolicyIds even though recent policies feed has 0 genesis entries
+    const doneState = makeState();
+    doneState.economy.policies = [];
+    doneState.economy.committedPolicyIds = buildGenesisProcurementPlan(
+      "s1-genesis-001",
+    ).map((s) => s.policyId);
+
+    await act(async () => {
+      root.render(
+        <EconomyAdmin
+          state={doneState}
+          busy={false}
+          runAction={async () => {}}
+        />,
+      );
+    });
+    expect(container.textContent).toContain("已完成 8/8");
+    const doneBtn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("本批次 8 步创世政策已全部入账"),
+    )!;
+    expect(doneBtn).toBeTruthy();
+    expect(doneBtn.disabled).toBe(true);
+
+    // 2. When step 2 resolves with an uncertain transport outcome via real EmpireClient fallback, stop immediately
+    const partialState = makeState();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    // Step 1 succeeds on first try
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify(partialState), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    // Step 2 fails twice with network TypeError, then GET /state refresh succeeds -> SDK tags outcome as "uncertain"
+    fetchMock.mockRejectedValueOnce(new TypeError("dropped 1"));
+    fetchMock.mockRejectedValueOnce(new TypeError("dropped 2"));
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify(partialState), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const policySpy = vi.spyOn(api, "monetaryPolicy");
+    let returnedResp: unknown = null;
+
+    await act(async () => {
+      root.render(
+        <EconomyAdmin
+          state={partialState}
+          busy={false}
+          runAction={async (fn) => {
+            returnedResp = await fn();
+          }}
+        />,
+      );
+    });
+
+    const launchBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent?.includes("按章程执行待落账步骤 (8/8)"),
+    )!;
+    await act(async () => {
+      launchBtn.click();
+    });
+    const confirmBtn = Array.from(
+      document.body.querySelectorAll("button"),
+    ).find((b) => b.textContent?.includes("确认执行 8 条政策"))!;
+    await act(async () => {
+      confirmBtn.click();
+    });
+
+    // Stopped right after step 2's uncertain response — must NOT continue to steps 3..8
+    expect(policySpy).toHaveBeenCalledTimes(2);
+    expect(getCommandSyncOutcome(returnedResp).kind).toBe("uncertain");
   });
 });

@@ -229,18 +229,15 @@ export function MarketSceneView({
     for (const o of state.openOrders) {
       if (o.makerName !== "@public" || o.side !== "BID") continue;
       const existing = byItem.get(o.itemKey);
-      if (!existing) {
+      if (!existing || o.priceBasis > existing.priceBasis) {
         byItem.set(o.itemKey, {
           itemKey: o.itemKey,
           itemName: o.itemName || marketNameMap.get(o.itemKey) || o.itemKey,
           priceBasis: o.priceBasis,
           remainingMilli: o.remainingMilli,
         });
-      } else {
+      } else if (o.priceBasis === existing.priceBasis) {
         existing.remainingMilli += o.remainingMilli;
-        if (o.priceBasis > existing.priceBasis) {
-          existing.priceBasis = o.priceBasis;
-        }
       }
     }
     return Array.from(byItem.values());

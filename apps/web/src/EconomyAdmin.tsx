@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
-import { api, type DashboardStateResp } from "@drop2empire/api-client";
+import {
+  api,
+  getCommandSyncOutcome,
+  type DashboardStateResp,
+} from "@drop2empire/api-client";
 import type { EconomyViewProps } from "./EconomyWorkspace";
 import { ConfirmActionModal } from "./components/ModalShell";
 import { fixedInput } from "./economy";
@@ -52,8 +56,12 @@ export function EconomyAdmin({ state, busy, runAction }: EconomyViewProps) {
     [genesisPrefix],
   );
   const appliedPolicyIds = useMemo(
-    () => new Set(e.policies.map((p) => p.id)),
-    [e.policies],
+    () =>
+      new Set([
+        ...(e.committedPolicyIds ?? []),
+        ...e.policies.map((p) => p.id),
+      ]),
+    [e.committedPolicyIds, e.policies],
   );
   const pendingGenesisSteps = useMemo(
     () => genesisPlan.filter((step) => !appliedPolicyIds.has(step.policyId)),
@@ -377,6 +385,9 @@ export function EconomyAdmin({ state, busy, runAction }: EconomyViewProps) {
               let latest: DashboardStateResp = state;
               for (const step of stepsToRun) {
                 latest = await api.monetaryPolicy(step.req);
+                if (getCommandSyncOutcome(latest).kind !== "executed") {
+                  return latest;
+                }
               }
               return latest;
             }, `已按创世章程完成 ${stepsToRun.length} 条受控公共采购政策，可在审计记录与盘口核对`);
